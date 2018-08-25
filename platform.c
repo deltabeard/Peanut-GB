@@ -12,16 +12,28 @@ struct priv_t
 	/* Pointer to allocated memory holding GB file. */
 	uint8_t *rom;
 	/* Pointer to allocated memory holding save file. */
-	uint8_t *save;
+	uint8_t *cart_ram;
 };
 
 /**
  * Returns an byte from the ROM file at the given address.
  */
-uint8_t gb_rom_read(uint32_t addr, struct gb_t *gb)
+uint8_t gb_rom_read(struct gb_t *gb, const uint32_t addr)
 {
     struct priv_t *p = gb->priv;
     return p->rom[addr];
+}
+
+uint8_t gb_cart_ram_read(struct gb_t *gb, const uint32_t addr)
+{
+	struct priv_t *p = gb->priv;
+	return p->cart_ram[addr];
+}
+
+void gb_cart_ram_write(struct gb_t *gb, const uint32_t addr, const uint8_t val)
+{
+	struct priv_t *p = gb->priv;
+	p->cart_ram[addr] = val;
 }
 
 /**
@@ -71,18 +83,19 @@ int main(int argc, char **argv)
 	}
 
     /* TODO: Init GB */
-    gb = gb_init(&gb_rom_read, &priv);
+    gb = gb_init(&gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &priv);
 
 	/* TODO: Load Save File. */
-	priv.save = malloc(gb_get_save_size(&gb));
+	priv.cart_ram = malloc(gb_get_save_size(&gb));
 
 	while(1)
 	{
 		/* TODO: Get joypad input. */
+		gb_run_frame(&gb);
 	}
 
 	free(priv.rom);
-	free(priv.save);
+	free(priv.cart_ram);
 	
 	return EXIT_SUCCESS;
 }
