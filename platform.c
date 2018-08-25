@@ -9,16 +9,24 @@
 
 struct priv_t
 {
-	/* Pointer allocated memory holding GB file. */
+	/* Pointer to allocated memory holding GB file. */
 	uint8_t *rom;
+	/* Pointer to allocated memory holding save file. */
+	uint8_t *save;
 };
 
+/**
+ * Returns an byte from the ROM file at the given address.
+ */
 uint8_t gb_rom_read(uint32_t addr, struct gb_t *gb)
 {
     struct priv_t *p = gb->priv;
     return p->rom[addr];
 }
 
+/**
+ * Returns a pointer to the allocated space containing the ROM. Must be freed.
+ */
 uint8_t *read_rom_to_ram(const char *file_name)
 {
 	FILE *rom_file = fopen(file_name, "rb");
@@ -62,10 +70,19 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-    /* TODO: Load Save File. */
-
     /* TODO: Init GB */
     gb = gb_init(&gb_rom_read, &priv);
 
+	/* TODO: Load Save File. */
+	priv.save = malloc(gb_get_save_size(&gb));
+
+	while(1)
+	{
+		/* TODO: Get joypad input. */
+	}
+
+	free(priv.rom);
+	free(priv.save);
+	
 	return EXIT_SUCCESS;
 }
