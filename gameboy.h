@@ -57,6 +57,13 @@
 #define LCDC_OBJ_ENABLE     0x02
 #define LCDC_BG_ENABLE      0x01
 
+/* Interrupt jump addresses */
+#define VBLANK_INTR_ADDR    0x0040
+#define LCDC_INTR_ADDR      0x0048
+#define TIMER_INTR_ADDR     0x0050
+#define SERIAL_INTR_ADDR    0x0058
+#define CONTROL_INTR_ADDR   0x0060
+
 struct cpu_registers_t
 {
 	struct {
@@ -601,6 +608,27 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 
 void __gb_step_cpu(struct gb_t *gb)
 {
+	uint8_t opcode, inst_cycles;
+	const uint8_t op_cycles[0x100] = {
+	/*  0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F	*/
+		4,12, 8, 8, 4, 4, 8, 4,20, 8, 8, 8, 4, 4, 8, 4,		/* 0x00 */
+		4,12, 8, 8, 4, 4, 8, 4, 8, 8, 8, 8, 4, 4, 8, 4,		/* 0x10 */
+		8,12, 8, 8, 4, 4, 8, 4, 8, 8, 8, 8, 4, 4, 8, 4,		/* 0x20 */
+		8,12, 8, 8,12,12,12, 4, 8, 8, 8, 8, 4, 4, 8, 4,		/* 0x30 */
+		4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,		/* 0x40 */
+		4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,		/* 0x50 */
+		4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,		/* 0x60 */
+		8, 8, 8, 8, 8, 8, 4, 8, 4, 4, 4, 4, 4, 4, 8, 4,		/* 0x70 */
+		4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,		/* 0x80 */
+		4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,		/* 0x90 */
+		4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,		/* 0xA0 */
+		4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,		/* 0xB0 */
+		8,12,12,12,12,16, 8,32, 8, 8,12, 8,12,12, 8,32,		/* 0xC0 */
+		8,12,12, 0,12,16, 8,32, 8, 8,12, 0,12, 0, 8,32,		/* 0xD0 */
+		12,12,8, 0, 0,16, 8,32,16, 4,16, 0, 0, 0, 8,32,		/* 0xE0 */
+		12,12,8, 4, 0,16, 8,32,12, 8,16, 4, 0, 0, 8,32		/* 0xF0 */
+	};
+
 	/* Handle interrupts */
 	if((gb->gb_ime || gb->gb_halt) &&
 		(gb->gb_reg.IF & gb->gb_reg.IE & ANY_INTR))
@@ -612,8 +640,48 @@ void __gb_step_cpu(struct gb_t *gb)
 			/* Disable interrupts */
 			gb->gb_ime = 0;
 
-			/* TODO */
+			/* Push Program Counter */
+			__gb_write(gb, --gb->cpu_reg.sp, gb->cpu_reg.pc >> 8);
+			__gb_write(gb, --gb->cpu_reg.sp, gb->cpu_reg.pc & 0xFF);
+
+			/* Call interrupt handler if required. */
+			if(gb->gb_reg.IF & gb->gb_reg.IE & VBLANK_INTR)
+			{
+				gb->cpu_reg.pc = VBLANK_INTR_ADDR;
+				gb->gb_reg.IF ^= VBLANK_INTR;
+			}
+			else if(gb->gb_reg.IF & gb->gb_reg.IE & LCDC_INTR)
+			{
+				gb->cpu_reg.pc = LCDC_INTR_ADDR;
+				gb->gb_reg.IF ^= LCDC_INTR;
+			}
+			else if(gb->gb_reg.IF & gb->gb_reg.IE & TIMER_INTR)
+			{
+				gb->cpu_reg.pc = TIMER_INTR_ADDR;
+				gb->gb_reg.IF ^= TIMER_INTR;
+			}
+			else if(gb->gb_reg.IF & gb->gb_reg.IE & SERIAL_INTR)
+			{
+				gb->cpu_reg.pc = SERIAL_INTR_ADDR;
+				gb->gb_reg.IF ^= SERIAL_INTR;
+			}
+			else if(gb->gb_reg.IF & gb->gb_reg.IE & CONTROL_INTR)
+			{
+				gb->cpu_reg.pc = CONTROL_INTR_ADDR;
+				gb->gb_reg.IF ^= CONTROL_INTR;
+			}
 		}
+	}
+
+	/* Obtain opcode */
+	opcode = (gb->gb_halt ? 0x00 : __gb_read(gb, gb->cpu_reg.pc++));
+	inst_cycles = op_cycles[opcode];
+
+	/* Execute opcode */
+	switch(opcode)
+	{
+		case 0x00: /* NOP */
+			break;
 	}
 }
 
