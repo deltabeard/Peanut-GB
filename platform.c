@@ -36,6 +36,20 @@ void gb_cart_ram_write(struct gb_t *gb, const uint32_t addr, const uint8_t val)
 	p->cart_ram[addr] = val;
 }
 
+void gb_error(struct gb_t *gb, const enum gb_error_e gb_err)
+{
+	switch(gb_err)
+	{
+		case GB_INVALID_OPCODE:
+			printf("Invalid opcode %#04x at PC: %#06x, SP: %#06x\n",
+					__gb_read(gb, gb->cpu_reg.pc),
+					gb->cpu_reg.pc, gb->cpu_reg.sp);
+			break;
+	}
+	
+	abort();
+}
+
 /**
  * Returns a pointer to the allocated space containing the ROM. Must be freed.
  */
@@ -82,8 +96,10 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
+	/* TODO: Sanity check input GB file. */
     /* TODO: Init GB */
-    gb = gb_init(&gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &priv);
+    gb = gb_init(&gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error,
+			&priv);
 
 	/* TODO: Load Save File. */
 	priv.cart_ram = malloc(gb_get_save_size(&gb));
