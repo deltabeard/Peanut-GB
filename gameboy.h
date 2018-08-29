@@ -38,6 +38,10 @@
 #define TAC_ENABLE          0x04
 #define TAC_RATE            0x03
 
+/* DIV Register is incremented at rate of 16384Hz.
+ * 4194304 / 16384 = 256 clock cycles for one increment. */
+#define DIV_CYCLES          256
+
 /* STAT register masks */
 #define STAT_LYC_INTR       0x40
 #define STAT_MODE_2_INTR    0x20
@@ -57,12 +61,43 @@
 #define LCDC_OBJ_ENABLE     0x02
 #define LCDC_BG_ENABLE      0x01
 
+/* LCD characteristics */
+#define LCD_LINE_CYCLES     456
+#define LCD_MODE_0_CYCLES   0
+#define LCD_MODE_2_CYCLES   204
+#define LCD_MODE_3_CYCLES   284
+#define LCD_VERT_LINES      154
+#define LCD_WIDTH           160
+#define LCD_HEIGHT          144
+
+/* VRAM Locations */
+#define VRAM_TILES_1        (0x8000 - VRAM_ADDR)
+#define VRAM_TILES_2        (0x8800 - VRAM_ADDR)
+#define VRAM_BMAP_1         (0x9800 - VRAM_ADDR)
+#define VRAM_BMAP_2         (0x9C00 - VRAM_ADDR)
+#define VRAM_TILES_3        (0x8000 - VRAM_ADDR + VRAM_BANK_SIZE)
+#define VRAM_TILES_4        (0x8800 - VRAM_ADDR + VRAM_BANK_SIZE)
+
 /* Interrupt jump addresses */
 #define VBLANK_INTR_ADDR    0x0040
 #define LCDC_INTR_ADDR      0x0048
 #define TIMER_INTR_ADDR     0x0050
 #define SERIAL_INTR_ADDR    0x0058
 #define CONTROL_INTR_ADDR   0x0060
+
+/* SPRITE controls */
+#define NUM_SPRITES         0x28
+#define MAX_SPRITES_LINE    0x0A
+#define OBJ_PRIORITY        0x80
+#define OBJ_FLIP_Y          0x40
+#define OBJ_FLIP_X          0x20
+#define OBJ_PALETTE         0x10
+
+#ifndef MIN
+#define MIN(a, b)   ((a) < (b) ? (a) : (b))
+#endif
+
+const unsigned int TAC_CYCLES[4] = {1024, 16, 64, 256};
 
 struct cpu_registers_t
 {
@@ -110,20 +145,20 @@ struct cpu_registers_t
 	struct {
 		union {
 			struct {
-				unsigned char l;
-				unsigned char h;
+				uint8_t l;
+				uint8_t h;
 			};
-			unsigned short hl;
+			uint16_t hl;
 		};
 	};
 
-	unsigned short sp; /* Stack pointer */
-	unsigned short pc; /* Program counter */
+	uint16_t sp; /* Stack pointer */
+	uint16_t pc; /* Program counter */
 };
 
 struct timer_t
 {
-	//uint16_t cpu_count; /* Unused currently */
+	uint16_t cpu_count; /* Unused currently */
 	uint16_t lcd_count;		/* LCD Timing */
 	uint16_t div_count;		/* Divider Register Counter */
 	uint16_t tima_count;	/* Timer Counter */
@@ -169,9 +204,9 @@ enum gb_error_e
 
 struct gb_t
 {
-	uint8_t (*gb_rom_read)(struct gb_t*, const uint32_t);
-	uint8_t (*gb_cart_ram_read)(struct gb_t*, const uint32_t);
-	void (*gb_cart_ram_write)(struct gb_t*, const uint32_t, const uint8_t val);
+	uint8_t (*gb_rom_read)(const struct gb_t * const, const uint32_t);
+	uint8_t (*gb_cart_ram_read)(const struct gb_t* const, const uint32_t);
+	void (*gb_cart_ram_write)(struct gb_t* const, const uint32_t, const uint8_t val);
 	void (*gb_error)(struct gb_t*, const enum gb_error_e);
 	void *priv;
 
@@ -212,11 +247,18 @@ struct gb_t
 	struct timer_t timer;
 	struct gb_registers_t gb_reg;
 
-	/* TODO: Allow implementation to allocate WRAM and VRAM. */
+	/* TODO: Allow implementation to allocate WRAM, VRAM and Frame Buffer. */
 	uint8_t wram[WRAM_SIZE];
 	uint8_t vram[VRAM_SIZE];
 	uint8_t hram[HRAM_SIZE];
 	uint8_t oam[OAM_SIZE];
+
+	/* Palettes */
+	uint8_t BGP[4];
+	uint8_t OBJP[8];
+
+	/* screen */
+	uint8_t gb_fb[LCD_HEIGHT][LCD_WIDTH];
 };
 
 /**
@@ -244,7 +286,7 @@ void __gb_power_on(struct gb_t *gb)
 	/* TODO: Add BIOS support. */
 	gb->cpu_reg.pc = 0x0100;
 
-	//gb->timer.cpu_count = 0; TODO
+	gb->timer.cpu_count = 0;
 	gb->timer.lcd_count = 0;
 	gb->timer.div_count = 0;
 	gb->timer.tima_count = 0;
@@ -284,7 +326,7 @@ void __gb_init_rom_type(struct gb_t *gb)
 	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(gb, ram_size_location)];
 }
 
-uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
+uint8_t __gb_read(const struct gb_t * const gb, const uint16_t addr)
 {
 	switch ((addr >> 12) & 0xF)
 	{
@@ -590,9 +632,29 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 					return;
 				
 				/* DMG Palette Registers */
-				case 0x47: gb->gb_reg.BGP = val;	return;
-				case 0x48: gb->gb_reg.OBP0 = val;	return;
-				case 0x49: gb->gb_reg.OBP1 = val;	return;
+				case 0x47:
+					gb->gb_reg.BGP = val;
+					gb->BGP[0] = (gb->gb_reg.BGP & 0x03);
+					gb->BGP[1] = (gb->gb_reg.BGP >> 2) & 0x03;
+					gb->BGP[2] = (gb->gb_reg.BGP >> 4) & 0x03;
+					gb->BGP[3] = (gb->gb_reg.BGP >> 6) & 0x03;
+					return;
+
+				case 0x48:
+					gb->gb_reg.OBP0 = val;
+					gb->OBJP[0] = (gb->gb_reg.OBP0 & 0x03);
+					gb->OBJP[1] = (gb->gb_reg.OBP0 >> 2) & 0x03;
+					gb->OBJP[2] = (gb->gb_reg.OBP0 >> 4) & 0x03;
+					gb->OBJP[3] = (gb->gb_reg.OBP0 >> 6) & 0x03;
+					return;
+
+				case 0x49:
+					gb->gb_reg.OBP1 = val;
+					gb->OBJP[4] = (gb->gb_reg.OBP1 & 0x03);
+					gb->OBJP[5] = (gb->gb_reg.OBP1 >> 2) & 0x03;
+					gb->OBJP[6] = (gb->gb_reg.OBP1 >> 4) & 0x03;
+					gb->OBJP[7] = (gb->gb_reg.OBP1 >> 6) & 0x03;
+					return;
 
 				/* Window Position Registers */
 				case 0x4A: gb->gb_reg.WY = val;		return;
@@ -732,6 +794,211 @@ void __gb_execute_cb(struct gb_t *gb)
 			case 6: __gb_write(gb, gb->cpu_reg.hl, val); break;
 			case 7: gb->cpu_reg.a = val; break;
 		}
+	}
+}
+
+void __gb_draw_line(struct gb_t *gb)
+{
+	uint8_t BX, BY;
+	uint8_t WY, WYC = 0, WX;
+	uint8_t SX[LCD_WIDTH];
+	uint16_t bg_line, win_line, tile;
+	uint8_t t1, t2, c;
+	uint8_t count = 0;
+
+	if(gb->gb_reg.LCDC & LCDC_BG_ENABLE)
+	{
+		BY = gb->gb_reg.LY + gb->gb_reg.SCY;
+		bg_line = (gb->gb_reg.LCDC & LCDC_BG_MAP) ? VRAM_BMAP_2 : VRAM_BMAP_1;
+		bg_line += (BY >> 3) * 0x20;
+	}
+	else
+		bg_line = 0;
+
+	if(gb->gb_reg.LCDC & LCDC_WINDOW_ENABLE
+			&& gb->gb_reg.LY >= WY && gb->gb_reg.WX <= 166)
+	{
+		win_line = (gb->gb_reg.LCDC & LCDC_WINDOW_MAP) ? VRAM_BMAP_2 : VRAM_BMAP_1;
+		/* TODO: Check this. */
+		win_line += (WYC >> 3) * 0x20;
+	}
+	else
+		win_line = 0;
+
+	memset(SX, 0xFF, LCD_WIDTH);
+
+	/* draw background */
+	if(bg_line)
+	{
+		uint8_t X = LCD_WIDTH - 1;
+		BX = X + gb->gb_reg.SCX;
+
+		/* TODO: Move declarations to the top. */
+		/* lookup tile index */
+		uint8_t py = (BY & 0x07);
+		uint8_t px = 7 - (BX & 0x07);
+		uint8_t idx = gb->vram[bg_line + (BX >> 3)];
+
+		if (gb->gb_reg.LCDC & LCDC_TILE_SELECT)
+			tile = VRAM_TILES_1 + idx * 0x10;
+		else
+			tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
+
+		tile += 2*py;
+
+		/* fetch first tile */
+		t1 = gb->vram[tile] >> px;
+		t2 = gb->vram[tile+1] >> px;
+
+		for (; X != 0xFF; X--)
+		{
+			SX[X] = 0xFE;
+			if (px == 8)
+			{
+				/* fetch next tile */
+				px = 0;
+				BX = X + gb->gb_reg.SCX;
+				idx = gb->vram[bg_line + (BX >> 3)];
+				if (gb->gb_reg.LCDC & LCDC_TILE_SELECT)
+					tile = VRAM_TILES_1 + idx * 0x10;
+				else
+					tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
+				tile += 2*py;
+				t1 = gb->vram[tile];
+				t2 = gb->vram[tile+1];
+			}
+			/* copy background */
+			c = (t1 & 0x1) | ((t2 & 0x1) << 1);
+			gb->gb_fb[gb->gb_reg.LY][X] = c;// BGP[c];
+			t1 = t1 >> 1;
+			t2 = t2 >> 1;
+			px++;
+		}
+	}
+
+	/* draw window */
+	if(win_line)
+	{
+		uint8_t X = LCD_WIDTH - 1;
+		WX = X - gb->gb_reg.WX + 7;
+
+		// look up tile
+		uint8_t py = WYC & 0x07;
+		uint8_t px = 7 - (WX & 0x07);
+		uint8_t idx = gb->vram[win_line + (WX >> 3)];
+
+		if (gb->gb_reg.LCDC & LCDC_TILE_SELECT)
+			tile = VRAM_TILES_1 + idx * 0x10;
+		else
+			tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
+
+		tile += 2*py;
+
+		// fetch first tile
+		t1 = gb->vram[tile] >> px;
+		t2 = gb->vram[tile+1] >> px;
+
+		// loop & copy window
+		uint8_t end = (gb->gb_reg.WX < 7 ? 0 : gb->gb_reg.WX - 7) - 1;
+
+		for (; X != end; X--)
+		{
+			SX[X] = 0xFE;
+			if (px == 8)
+			{
+				// fetch next tile
+				px = 0;
+				WX = X - gb->gb_reg.WX + 7;
+				idx = gb->vram[win_line + (WX >> 3)];
+				if (gb->gb_reg.LCDC & LCDC_TILE_SELECT)
+					tile = VRAM_TILES_1 + idx * 0x10;
+				else
+					tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
+
+				tile += 2*py;
+				t1 = gb->vram[tile];
+				t2 = gb->vram[tile+1];
+			}
+			// copy window
+			c = (t1 & 0x1) | ((t2 & 0x1) << 1);
+			gb->gb_fb[gb->gb_reg.LY][X] = c; //BGP[c];
+			t1 = t1 >> 1;
+			t2 = t2 >> 1;
+			px++;
+		}
+		WYC++; // advance window line
+	}
+
+	// draw sprites
+	if (gb->gb_reg.LCDC & LCDC_OBJ_ENABLE)
+	{
+		for(uint8_t s = NUM_SPRITES - 1; s != 0xFF; s--)
+			//for (u8 s = 0; s < NUM_SPRITES && count < MAX_SPRITES_LINE; s++)
+		{
+			uint8_t OY = gb->oam[4*s + 0];
+			uint8_t OX = gb->oam[4*s + 1];
+			uint8_t OT = gb->oam[4*s + 2] & (gb->gb_reg.LCDC & LCDC_OBJ_SIZE ? 0xFE : 0xFF);
+			uint8_t OF = gb->oam[4*s + 3];
+
+			// sprite is on this line
+			if (gb->gb_reg.LY + (gb->gb_reg.LCDC & LCDC_OBJ_SIZE ? 0 : 8) < OY && gb->gb_reg.LY + 16 >= OY)
+			{
+				count++;
+				if (OX == 0 || OX >= 168)
+					continue;   // but not visible
+
+				// y flip
+				uint8_t py = gb->gb_reg.LY - OY + 16;
+				if (OF & OBJ_FLIP_Y)
+					py = (gb->gb_reg.LCDC & LCDC_OBJ_SIZE ? 15 : 7) - py;
+
+				// fetch the tile
+				t1 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2*py];
+				t2 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2*py + 1];
+
+				// handle x flip
+				uint8_t dir, start, end, shift;
+				if (OF & OBJ_FLIP_X)
+				{
+					dir = 1;
+					start = (OX < 8 ? 0 : OX - 8);
+					end = MIN(OX, LCD_WIDTH);
+					shift = 8 - OX + start;
+				}
+				else
+				{
+					dir = -1;
+					start = MIN(OX, LCD_WIDTH) - 1;
+					end = (OX < 8 ? 0 : OX - 8) - 1;
+					shift = OX - (start + 1);
+				}
+
+				// copy tile
+				t1 >>= shift;
+				t2 >>= shift;
+				for(uint8_t X = start; X != end; X += dir)
+				{
+					c = (t1 & 0x1) | ((t2 & 0x1) << 1);
+					// check transparency / sprite overlap / background overlap
+					if (c && OX <= SX[X] &&
+							!((OF & OBJ_PRIORITY) && ((gb->gb_fb[gb->gb_reg.LY][X] & 0x3) && SX[X] == 0xFE)))
+						//                    if (c && OX <= SX[X] && !(OF & OBJ_PRIORITY && gb_fb[gb->gb_reg.LY][X] & 0x3))
+					{
+						SX[X] = OX;
+						gb->gb_fb[gb->gb_reg.LY][X] = (OF & OBJ_PALETTE) ? gb->OBJP[c + 4] : gb->OBJP[c];
+					}
+					t1 = t1 >> 1;
+					t2 = t2 >> 1;
+				}
+			}
+		}
+	}
+
+	/* Convert to 8-bit color. */
+	for(uint8_t X = 0; X < LCD_WIDTH; X++)
+	{
+		if (SX[X] == 0xFE)
+			gb->gb_fb[gb->gb_reg.LY][X] = gb->BGP[gb->gb_fb[gb->gb_reg.LY][X]];
 	}
 }
 
@@ -2362,6 +2629,92 @@ void __gb_step_cpu(struct gb_t *gb)
 		default:
 			gb->gb_error(gb, GB_INVALID_OPCODE);
 	}
+
+	/* CPU Timing */
+	gb->timer.cpu_count += inst_cycles;
+
+	/* LCD Timing */
+	gb->timer.lcd_count += inst_cycles;
+
+	/* New Scanline */
+	if(gb->timer.lcd_count > LCD_LINE_CYCLES)
+	{
+		gb->timer.lcd_count -= LCD_LINE_CYCLES;
+
+		/* LYC Update */
+		if(gb->gb_reg.LY == gb->gb_reg.LYC)
+		{
+			gb->gb_reg.STAT |= STAT_LYC_COINC;
+			if(gb->gb_reg.STAT & STAT_LYC_INTR)
+				gb->gb_reg.IF |= LCDC_INTR;
+		}
+		else
+			gb->gb_reg.STAT &= 0xFB;
+
+		/* Next line */
+		gb->gb_reg.LY = (gb->gb_reg.LY + 1) % LCD_VERT_LINES;
+
+		/* VBLANK Start */
+		if(gb->gb_reg.LY == LCD_HEIGHT)
+		{
+			gb->lcd_mode = LCD_VBLANK;
+			gb->gb_frame = 1;
+			gb->gb_reg.IF |= VBLANK_INTR;
+			if(gb->gb_reg.STAT & STAT_MODE_1_INTR)
+				gb->gb_reg.IF |= LCDC_INTR;
+		}
+		/* Normal Line */
+		else if(gb->gb_reg.LY < LCD_HEIGHT)
+		{
+			if(gb->gb_reg.LY == 0)
+			{
+				/* Clear Screen */
+				memset(gb->gb_fb, 0x00, LCD_WIDTH * LCD_HEIGHT);
+			}
+			
+			gb->lcd_mode = LCD_HBLANK;
+			if(gb->gb_reg.STAT & STAT_MODE_0_INTR)
+				gb->gb_reg.IF |= LCDC_INTR;
+		}
+	}
+	/* OAM access */
+	else if(gb->lcd_mode == LCD_HBLANK && gb->timer.lcd_count >= LCD_MODE_2_CYCLES)
+	{
+		gb->lcd_mode = LCD_SEARCH_OAM;
+		if(gb->gb_reg.STAT & STAT_MODE_2_INTR)
+			gb->gb_reg.IF |= LCDC_INTR;
+	}
+	/* Update LCD */
+	else if(gb->lcd_mode == LCD_SEARCH_OAM && gb->timer.lcd_count >= LCD_MODE_3_CYCLES)
+	{
+		gb->lcd_mode = LCD_TRANSFER;
+		/* TODO: LCD_DRAW_LINE(); */
+		__gb_draw_line(gb);
+	}
+
+	/* DIV register timing */
+	gb->timer.div_count += inst_cycles;
+	if(gb->timer.div_count > DIV_CYCLES)
+	{
+		gb->gb_reg.DIV++;
+		gb->timer.div_count -= DIV_CYCLES;
+	}
+
+	/* TIMA register timing */
+	if(gb->timer.tac_enable)
+	{
+		gb->timer.tima_count += inst_cycles;
+		if(gb->timer.tima_count > TAC_CYCLES[gb->timer.tac_rate])
+		{
+			gb->timer.tima_count -= TAC_CYCLES[gb->timer.tac_rate];
+			gb->gb_reg.TIMA++;
+			if(gb->gb_reg.TIMA == 0)
+			{
+				gb->gb_reg.IF |= TIMER_INTR;
+				gb->gb_reg.TIMA = gb->gb_reg.TMA;
+			}
+		}
+	}
 }
 
 void gb_run_frame(struct gb_t *gb)
@@ -2384,9 +2737,9 @@ uint32_t gb_get_save_size(struct gb_t *gb)
 	return ram_sizes[ram_size];
 }
 
-struct gb_t gb_init(uint8_t (*gb_rom_read)(struct gb_t*, const uint32_t),
-	uint8_t (*gb_cart_ram_read)(struct gb_t*, const uint32_t),
-	void (*gb_cart_ram_write)(struct gb_t*, const uint32_t, const uint8_t val),
+struct gb_t gb_init(uint8_t (*gb_rom_read)(const struct gb_t* const, const uint32_t),
+	uint8_t (*gb_cart_ram_read)(const struct gb_t* const, const uint32_t),
+	void (*gb_cart_ram_write)(struct gb_t* const, const uint32_t, const uint8_t val),
 	void (*gb_error)(struct gb_t*, const enum gb_error_e), void *priv)
 {
 	struct gb_t gb;

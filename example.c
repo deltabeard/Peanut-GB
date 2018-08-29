@@ -5,6 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <SDL/SDL.h>
+#include <SDL/SDL_main.h>
+
 #include "gameboy.h"
 
 struct priv_t
@@ -18,21 +21,22 @@ struct priv_t
 /**
  * Returns an byte from the ROM file at the given address.
  */
-uint8_t gb_rom_read(struct gb_t *gb, const uint32_t addr)
+uint8_t gb_rom_read(const struct gb_t * const gb, const uint32_t addr)
 {
-    struct priv_t *p = gb->priv;
+    const struct priv_t * const p = gb->priv;
     return p->rom[addr];
 }
 
-uint8_t gb_cart_ram_read(struct gb_t *gb, const uint32_t addr)
+uint8_t gb_cart_ram_read(const struct gb_t * const gb, const uint32_t addr)
 {
-	struct priv_t *p = gb->priv;
+	const struct priv_t * const p = gb->priv;
 	return p->cart_ram[addr];
 }
 
-void gb_cart_ram_write(struct gb_t *gb, const uint32_t addr, const uint8_t val)
+void gb_cart_ram_write(struct gb_t * const gb, const uint32_t addr,
+	const uint8_t val)
 {
-	struct priv_t *p = gb->priv;
+	struct priv_t * const p = gb->priv;
 	p->cart_ram[addr] = val;
 }
 
@@ -83,6 +87,10 @@ int main(int argc, char **argv)
 {
     struct gb_t gb;
 	struct priv_t priv;
+	const unsigned int height = 144;
+	const unsigned int width = 160;
+	unsigned int running = 1;
+	SDL_Surface* screen;
 
 	if(argc != 2)
 	{
@@ -104,12 +112,48 @@ int main(int argc, char **argv)
 	/* TODO: Load Save File. */
 	priv.cart_ram = malloc(gb_get_save_size(&gb));
 
-	while(1)
+	SDL_Init(SDL_INIT_VIDEO);
+	screen = SDL_SetVideoMode(width, height, 32, SDL_HWSURFACE | SDL_DOUBLEBUF);
+	SDL_WM_SetCaption("DMG Emulator", 0);
+
+	uint32_t fb[height][width];
+
+	while(running)
 	{
+		uint32_t palette[4] = {0xFFFFFFFF, 0x99999999, 0x44444444, 0x00000000};
+		uint32_t *screen_copy;
+		SDL_Event event;
+		
+		while(SDL_PollEvent(&event))
+		{
+			if(event.type == SDL_QUIT)
+				running = 0;
+		}
+
 		/* TODO: Get joypad input. */
 		gb_run_frame(&gb);
+
+		for (unsigned int y = 0; y < height; y++)
+		{
+			for (unsigned int x = 0; x < width; x++)
+				fb[y][x] = palette[gb.gb_fb[y][x] & 3];
+		}
+
+		SDL_LockSurface(screen);
+		screen_copy = (uint32_t *) screen->pixels;
+		for(unsigned int y = 0; y < height; y++)
+		{
+			for (unsigned int x = 0; x < width; x++)
+				*(screen_copy + x) = fb[y][x];
+			
+			screen_copy += screen->pitch / 4;
+		}
+		SDL_UnlockSurface(screen);
+		SDL_Flip(screen);
+		SDL_Delay(16);
 	}
 
+	SDL_Quit();
 	free(priv.rom);
 	free(priv.cart_ram);
 	

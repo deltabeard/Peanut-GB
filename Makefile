@@ -1,6 +1,6 @@
 .POSIX:
 CC		= cc
-CFLAGS	= -g -Og -std=c99 -Wall
+CFLAGS	= -g -Og -std=c99 -Wall -lSDL
 
 all: gameboy
 gameboy: gameboy.h example.c
