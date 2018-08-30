@@ -33,10 +33,10 @@ uint8_t gb_cart_ram_read(const struct gb_t * const gb, const uint32_t addr)
 	return p->cart_ram[addr];
 }
 
-void gb_cart_ram_write(struct gb_t * const gb, const uint32_t addr,
+void gb_cart_ram_write(const struct gb_t * const gb, const uint32_t addr,
 	const uint8_t val)
 {
-	struct priv_t * const p = gb->priv;
+	const struct priv_t * const p = gb->priv;
 	p->cart_ram[addr] = val;
 }
 

@@ -206,7 +206,8 @@ struct gb_t
 {
 	uint8_t (*gb_rom_read)(const struct gb_t * const, const uint32_t);
 	uint8_t (*gb_cart_ram_read)(const struct gb_t* const, const uint32_t);
-	void (*gb_cart_ram_write)(struct gb_t* const, const uint32_t, const uint8_t val);
+	void (*gb_cart_ram_write)(const struct gb_t* const, const uint32_t,
+			const uint8_t val);
 	void (*gb_error)(struct gb_t*, const enum gb_error_e);
 	void *priv;
 
@@ -2727,7 +2728,7 @@ void gb_run_frame(struct gb_t *gb)
 /**
  * Gets the size of the save file required for the ROM.
  */
-uint32_t gb_get_save_size(struct gb_t *gb)
+uint32_t gb_get_save_size(const struct gb_t * const gb)
 {
 	const unsigned int ram_size_location = 0x0149;
 	const uint32_t ram_sizes[] = {
@@ -2739,7 +2740,7 @@ uint32_t gb_get_save_size(struct gb_t *gb)
 
 struct gb_t gb_init(uint8_t (*gb_rom_read)(const struct gb_t* const, const uint32_t),
 	uint8_t (*gb_cart_ram_read)(const struct gb_t* const, const uint32_t),
-	void (*gb_cart_ram_write)(struct gb_t* const, const uint32_t, const uint8_t val),
+	void (*gb_cart_ram_write)(const struct gb_t* const, const uint32_t, const uint8_t val),
 	void (*gb_error)(struct gb_t*, const enum gb_error_e), void *priv)
 {
 	struct gb_t gb;
