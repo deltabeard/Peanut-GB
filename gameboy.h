@@ -198,7 +198,7 @@ struct gb_registers_t
 
 enum gb_error_e
 {
-	GB_NO_ERROR,
+	GB_UNKNOWN_ERROR,
 	GB_INVALID_OPCODE
 };
 
@@ -695,7 +695,10 @@ void __gb_execute_cb(struct gb_t *gb)
 		case 4: val = gb->cpu_reg.h; break;
 		case 5: val = gb->cpu_reg.l; break;
 		case 6: val = __gb_read(gb, gb->cpu_reg.hl); break;
-		case 7: val = gb->cpu_reg.a; break;
+
+		/* Only values 0-7 are possible here, so we make the final case default
+		 * to satisfy -Wmaybe-uninitialized warning. */
+		default: val = gb->cpu_reg.a; break;
 	}
 
 	/* TODO: Find out WTF this is doing. */
@@ -801,7 +804,7 @@ void __gb_execute_cb(struct gb_t *gb)
 void __gb_draw_line(struct gb_t *gb)
 {
 	uint8_t BX, BY;
-	uint8_t WY, WYC = 0, WX;
+	uint8_t WY = gb->gb_reg.WY, WYC = 0, WX;
 	uint8_t SX[LCD_WIDTH];
 	uint16_t bg_line, win_line, tile;
 	uint8_t t1, t2, c;
@@ -1113,8 +1116,8 @@ void __gb_step_cpu(struct gb_t *gb)
 			break;
 		case 0x08: /* LD (imm), SP */
 		{
-			/* TODO: Fix sequence point warning here. */
-			uint16_t temp = __gb_read(gb, gb->cpu_reg.pc++) | (__gb_read(gb, gb->cpu_reg.pc++) << 8);
+			uint16_t temp = __gb_read(gb, gb->cpu_reg.pc++);
+			temp |= __gb_read(gb, gb->cpu_reg.pc++) << 8;
 			__gb_write(gb, temp++, gb->cpu_reg.sp & 0xFF);
 			__gb_write(gb, temp, gb->cpu_reg.sp >> 8);
 			break;
@@ -2526,8 +2529,12 @@ void __gb_step_cpu(struct gb_t *gb)
 			gb->cpu_reg.pc = gb->cpu_reg.hl;
 			break;
 		case 0xEA: /* LD (imm), A */
-			__gb_write(gb, __gb_read(gb, gb->cpu_reg.pc++) | __gb_read(gb, gb->cpu_reg.pc++) << 8, gb->cpu_reg.a);
+		{
+			uint16_t addr = __gb_read(gb, gb->cpu_reg.pc++);
+			addr |= __gb_read(gb, gb->cpu_reg.pc++) << 8;
+			__gb_write(gb, addr, gb->cpu_reg.a);
 			break;
+		}
 		case 0xEE: /* XOR imm */
 			gb->cpu_reg.a = gb->cpu_reg.a ^ __gb_read(gb, gb->cpu_reg.pc++);
 			gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
@@ -2605,9 +2612,12 @@ void __gb_step_cpu(struct gb_t *gb)
 			gb->cpu_reg.sp = gb->cpu_reg.hl;
 			break;
 		case 0xFA: /* LD A, (imm) */
-			gb->cpu_reg.a = __gb_read(gb, __gb_read(gb, gb->cpu_reg.pc++) |
-						(__gb_read(gb, gb->cpu_reg.pc++) << 8));
+		{
+			uint16_t addr = __gb_read(gb, gb->cpu_reg.pc++);
+			addr |= __gb_read(gb, gb->cpu_reg.pc++) << 8;
+			gb->cpu_reg.a = __gb_read(gb, addr);
 			break;
+		}
 		case 0xFB: /* EI */
 			gb->gb_ime = 1;
 			break;

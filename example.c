@@ -45,11 +45,15 @@ void gb_error(struct gb_t *gb, const enum gb_error_e gb_err)
 	switch(gb_err)
 	{
 		case GB_INVALID_OPCODE:
-			printf("Invalid opcode %#04x at PC: %#06x, SP: %#06x\n",
-					__gb_read(gb, gb->cpu_reg.pc),
-					gb->cpu_reg.pc, gb->cpu_reg.sp);
+			printf("Invalid opcode %#04x", __gb_read(gb, gb->cpu_reg.pc));
+			break;
+		
+		default:
+			printf("Unknown error");
 			break;
 	}
+
+	printf(" at PC: %#06x, SP: %#06x\n", gb->cpu_reg.pc, gb->cpu_reg.sp);
 	
 	abort();
 }
@@ -123,7 +127,7 @@ int main(int argc, char **argv)
 		uint32_t palette[4] = {0xFFFFFFFF, 0x99999999, 0x44444444, 0x00000000};
 		uint32_t *screen_copy;
 		SDL_Event event;
-		
+
 		while(SDL_PollEvent(&event))
 		{
 			if(event.type == SDL_QUIT)
