@@ -21,31 +21,33 @@ struct priv_t
 /**
  * Returns an byte from the ROM file at the given address.
  */
-uint8_t gb_rom_read(const struct gb_t * const gb, const uint32_t addr)
+uint8_t gb_rom_read(struct gb_t **gb, const uint32_t addr)
 {
-    const struct priv_t * const p = gb->priv;
+    const struct priv_t * const p = (*gb)->priv;
     return p->rom[addr];
 }
 
-uint8_t gb_cart_ram_read(const struct gb_t * const gb, const uint32_t addr)
+uint8_t gb_cart_ram_read(struct gb_t **gb, const uint32_t addr)
 {
-	const struct priv_t * const p = gb->priv;
+	const struct priv_t * const p = (*gb)->priv;
 	return p->cart_ram[addr];
 }
 
-void gb_cart_ram_write(const struct gb_t * const gb, const uint32_t addr,
+void gb_cart_ram_write(struct gb_t **gb, const uint32_t addr,
 	const uint8_t val)
 {
-	const struct priv_t * const p = gb->priv;
+	const struct priv_t * const p = (*gb)->priv;
 	p->cart_ram[addr] = val;
 }
 
-void gb_error(struct gb_t *gb, const enum gb_error_e gb_err)
+void gb_error(struct gb_t **p, const enum gb_error_e gb_err)
 {
+	struct gb_t *gb = *p;
+
 	switch(gb_err)
 	{
 		case GB_INVALID_OPCODE:
-			printf("Invalid opcode %#04x", __gb_read(gb, gb->cpu_reg.pc));
+			printf("Invalid opcode %#04x", __gb_read(&gb, gb->cpu_reg.pc));
 			break;
 		
 		default:
@@ -68,7 +70,7 @@ uint8_t *read_rom_to_ram(const char *file_name)
 	uint8_t *rom = NULL;
 
 	if(rom_file == NULL)
-        goto err;
+        return NULL;
 
 	fseek(rom_file, 0, SEEK_END);
 	rom_size = ftell(rom_file);
@@ -76,15 +78,14 @@ uint8_t *read_rom_to_ram(const char *file_name)
 	rom = malloc(rom_size);
 
 	if(fread(rom, sizeof(uint8_t), rom_size, rom_file) != rom_size)
-        goto err;
+    {
+		free(rom);
+		fclose(rom_file);
+		return NULL;
+	}
 
 	fclose(rom_file);
-	return rom;
-
-err:
-	free(rom);
-	fclose(rom_file);
-	return NULL;
+	return rom;	
 }
 
 int main(int argc, char **argv)
@@ -101,7 +102,7 @@ int main(int argc, char **argv)
 		printf("Usage: %s FILE\n", argv[0]);
 		return EXIT_FAILURE;
 	}
-
+	
 	if((priv.rom = read_rom_to_ram(argv[1])) == NULL)
 	{
 		printf("%s\n", strerror(errno));
@@ -115,6 +116,7 @@ int main(int argc, char **argv)
 
 	/* TODO: Load Save File. */
 	priv.cart_ram = malloc(gb_get_save_size(&gb));
+	memset(priv.cart_ram, 0xFF, gb_get_save_size(&gb));
 
 	SDL_Init(SDL_INIT_VIDEO);
 	screen = SDL_SetVideoMode(width, height, 32, SDL_HWSURFACE | SDL_DOUBLEBUF);
@@ -124,7 +126,7 @@ int main(int argc, char **argv)
 
 	while(running)
 	{
-		uint32_t palette[4] = {0xFFFFFFFF, 0x99999999, 0x44444444, 0x00000000};
+		const uint32_t palette[4] = {0xFFFFFFFF, 0x99999999, 0x44444444, 0x00000000};
 		uint32_t *screen_copy;
 		SDL_Event event;
 
