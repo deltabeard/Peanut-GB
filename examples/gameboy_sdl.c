@@ -8,7 +8,7 @@
 #include <SDL/SDL.h>
 #include <SDL/SDL_main.h>
 
-#include "gameboy.h"
+#include "../gameboy.h"
 
 struct priv_t
 {
@@ -49,14 +49,14 @@ void gb_error(struct gb_t **p, const enum gb_error_e gb_err)
 		case GB_INVALID_OPCODE:
 			printf("Invalid opcode %#04x", __gb_read(&gb, gb->cpu_reg.pc));
 			break;
-		
+
 		default:
 			printf("Unknown error");
 			break;
 	}
 
 	printf(" at PC: %#06x, SP: %#06x\n", gb->cpu_reg.pc, gb->cpu_reg.sp);
-	
+
 	abort();
 }
 
@@ -85,7 +85,7 @@ uint8_t *read_rom_to_ram(const char *file_name)
 	}
 
 	fclose(rom_file);
-	return rom;	
+	return rom;
 }
 
 int main(int argc, char **argv)
@@ -102,7 +102,7 @@ int main(int argc, char **argv)
 		printf("Usage: %s FILE\n", argv[0]);
 		return EXIT_FAILURE;
 	}
-	
+
 	if((priv.rom = read_rom_to_ram(argv[1])) == NULL)
 	{
 		printf("%s\n", strerror(errno));
@@ -151,17 +151,17 @@ int main(int argc, char **argv)
 		{
 			for (unsigned int x = 0; x < width; x++)
 				*(screen_copy + x) = fb[y][x];
-			
+
 			screen_copy += screen->pitch / 4;
 		}
 		SDL_UnlockSurface(screen);
 		SDL_Flip(screen);
-		SDL_Delay(16);
+		SDL_Delay(10);
 	}
 
 	SDL_Quit();
 	free(priv.rom);
 	free(priv.cart_ram);
-	
+
 	return EXIT_SUCCESS;
 }
