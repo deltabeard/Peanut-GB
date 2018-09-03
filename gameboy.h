@@ -1,3 +1,27 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2018 Mahyar Koshkouei
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+
 #include <stdint.h>
 
 /* Interrupt masks */
@@ -182,13 +206,13 @@ struct gb_registers_t
 	uint8_t LCDC;	uint8_t STAT;	uint8_t SCY;	uint8_t SCX;
 	uint8_t LY;		uint8_t LYC;	uint8_t DMA;	uint8_t BGP;
 	uint8_t OBP0;	uint8_t OBP1;	uint8_t WY;		uint8_t WX;
-	
+
 	/* Joypad info. */
 	uint8_t P1;
 
 	/* Serial data. */
 	uint8_t SB;		uint8_t SC;
-	
+
 	/* Interrupt flag. */
 	uint8_t IF;
 
@@ -493,12 +517,12 @@ void __gb_write(struct gb_t **p, const uint16_t addr, const uint8_t val)
 		case 0x7:
 			gb->cart_mode_select = (val & 1);
 			return;
-		
+
 		case 0x8:
 		case 0x9:
 			gb->vram[addr - VRAM_ADDR] = val;
 			return;
-			
+
 		case 0xA:
 		case 0xB:
 			if(gb->cart_ram && gb->enable_cart_ram)
@@ -527,7 +551,7 @@ void __gb_write(struct gb_t **p, const uint16_t addr, const uint8_t val)
 		case 0xE:
 			gb->wram[addr - ECHO_ADDR] = val;
 			return;
-		
+
 		case 0xF:
 			if(addr < OAM_ADDR)
 			{
@@ -567,7 +591,7 @@ void __gb_write(struct gb_t **p, const uint16_t addr, const uint8_t val)
 				case 0x0F:
 					gb->gb_reg.IF = val;
 					return;
-				
+
 				/* Sound registers */
 				case 0x10: gb->gb_reg.NR10 = val;	return;
 				case 0x11: gb->gb_reg.NR11 = val;	return;
@@ -605,7 +629,7 @@ void __gb_write(struct gb_t **p, const uint16_t addr, const uint8_t val)
 						gb->oam[i] = __gb_read(&gb, (gb->gb_reg.DMA << 8) + i);
 
 					return;
-				
+
 				/* DMG Palette Registers */
 				case 0x47:
 					gb->gb_reg.BGP = val;
@@ -647,7 +671,7 @@ void __gb_write(struct gb_t **p, const uint16_t addr, const uint8_t val)
 					return;
 			}
 	}
-	
+
 	(gb->gb_error)(&gb, GB_INVALID_WRITE);
 }
 
@@ -2732,7 +2756,7 @@ void __gb_step_cpu(struct gb_t **p)
 				gb->WYC = 0;
 				memset(gb->gb_fb, 0x00, LCD_WIDTH * LCD_HEIGHT);
 			}
-			
+
 			gb->lcd_mode = LCD_HBLANK;
 			if(gb->gb_reg.STAT & STAT_MODE_0_INTR)
 				gb->gb_reg.IF |= LCDC_INTR;

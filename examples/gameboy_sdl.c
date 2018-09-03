@@ -1,3 +1,8 @@
+/**
+ * MIT License
+ * Copyright (c) 2018 Mahyar Koshkouei
+ */
+
 #include <errno.h>
 
 #include <stdint.h>
@@ -19,7 +24,7 @@ struct priv_t
 };
 
 /**
- * Returns an byte from the ROM file at the given address.
+ * Returns a byte from the ROM file at the given address.
  */
 uint8_t gb_rom_read(struct gb_t **gb, const uint32_t addr)
 {
@@ -27,12 +32,18 @@ uint8_t gb_rom_read(struct gb_t **gb, const uint32_t addr)
     return p->rom[addr];
 }
 
+/**
+ * Returns a byte from the cartridge RAM at the given address.
+ */
 uint8_t gb_cart_ram_read(struct gb_t **gb, const uint32_t addr)
 {
 	const struct priv_t * const p = (*gb)->priv;
 	return p->cart_ram[addr];
 }
 
+/**
+ * Writes a given byte to the cartridge RAM at the given address.
+ */
 void gb_cart_ram_write(struct gb_t **gb, const uint32_t addr,
 	const uint8_t val)
 {
@@ -40,9 +51,14 @@ void gb_cart_ram_write(struct gb_t **gb, const uint32_t addr,
 	p->cart_ram[addr] = val;
 }
 
+/**
+ * Handles an error reported by the emulator. The emulator context may be used
+ * to better understand why the error given in gb_err was reported.
+ */
 void gb_error(struct gb_t **p, const enum gb_error_e gb_err)
 {
 	struct gb_t *gb = *p;
+	struct priv_t *priv = gb->priv;
 
 	switch(gb_err)
 	{
@@ -57,7 +73,9 @@ void gb_error(struct gb_t **p, const enum gb_error_e gb_err)
 
 	printf(" at PC: %#06x, SP: %#06x\n", gb->cpu_reg.pc, gb->cpu_reg.sp);
 
-	abort();
+	free(priv->rom);
+	free(priv->cart_ram);
+	exit(EXIT_FAILURE);
 }
 
 /**
@@ -96,13 +114,16 @@ int main(int argc, char **argv)
 	const unsigned int width = 160;
 	unsigned int running = 1;
 	SDL_Surface* screen;
+	uint32_t fb[height][width];
 
+	/* Make sure a file name is given. */
 	if(argc != 2)
 	{
 		printf("Usage: %s FILE\n", argv[0]);
 		return EXIT_FAILURE;
 	}
 
+	/* Copy input ROM file to allocated memory. */
 	if((priv.rom = read_rom_to_ram(argv[1])) == NULL)
 	{
 		printf("%s\n", strerror(errno));
@@ -110,41 +131,49 @@ int main(int argc, char **argv)
 	}
 
 	/* TODO: Sanity check input GB file. */
-    /* TODO: Init GB */
+
+    /* Initialise emulator context. */
     gb = gb_init(&gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error,
 			&priv);
 
 	/* TODO: Load Save File. */
+
+	/* Allocate memory for save file if required. */
 	priv.cart_ram = malloc(gb_get_save_size(&gb));
 	memset(priv.cart_ram, 0xFF, gb_get_save_size(&gb));
 
+	/* Initialise frontend implementation, in this case, SDL. */
 	SDL_Init(SDL_INIT_VIDEO);
 	screen = SDL_SetVideoMode(width, height, 32, SDL_HWSURFACE | SDL_DOUBLEBUF);
 	SDL_WM_SetCaption("DMG Emulator", 0);
 
-	uint32_t fb[height][width];
-
 	while(running)
 	{
-		const uint32_t palette[4] = {0xFFFFFFFF, 0x99999999, 0x44444444, 0x00000000};
+		const uint32_t palette[4] = {
+			0xFFFFFFFF, 0x99999999, 0x44444444, 0x00000000
+		};
 		uint32_t *screen_copy;
 		SDL_Event event;
 
+		/* TODO: Get joypad input. */
 		while(SDL_PollEvent(&event))
 		{
 			if(event.type == SDL_QUIT)
 				running = 0;
 		}
 
-		/* TODO: Get joypad input. */
+		/* Execute CPU cycles until the screen has to be redrawn. */
 		gb_run_frame(&gb);
 
+		/* Copy frame buffer from emulator context, converting to colours
+		 * defined in the palette. */
 		for (unsigned int y = 0; y < height; y++)
 		{
 			for (unsigned int x = 0; x < width; x++)
 				fb[y][x] = palette[gb.gb_fb[y][x] & 3];
 		}
 
+		/* Copy frame buffer to SDL screen. */
 		SDL_LockSurface(screen);
 		screen_copy = (uint32_t *) screen->pixels;
 		for(unsigned int y = 0; y < height; y++)
@@ -156,6 +185,8 @@ int main(int argc, char **argv)
 		}
 		SDL_UnlockSurface(screen);
 		SDL_Flip(screen);
+
+		/* Use a delay that will draw the screen at a rate of 59.73 Hz. */
 		SDL_Delay(10);
 	}
 
