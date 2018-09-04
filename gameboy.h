@@ -1349,44 +1349,31 @@ void __gb_step_cpu(struct gb_t **p)
 			gb->cpu_reg.h = __gb_read(&gb, gb->cpu_reg.pc++);
 			break;
 		case 0x27: /* DAA */
-		/* TODO: Check this. */
 		{
-			uint8_t d1 = gb->cpu_reg.a >> 4;
-			uint8_t d2 = gb->cpu_reg.a & 0x0F;
+			uint16_t a = gb->cpu_reg.a;
+
 			if(gb->cpu_reg.f_bits.n)
 			{
 				if(gb->cpu_reg.f_bits.h)
-					d2 -= 6;
+					a = (a - 0x06) & 0xFF;
 				if(gb->cpu_reg.f_bits.c)
-					d1 -= 6;
-				if(d2 > 9)
-					d2 -= 6;
-				if(d1 > 9)
-				{
-					d1 -= 6;
-					gb->cpu_reg.f_bits.c = 1;
-				}
+					a -= 0x60;
 			}
 			else
 			{
-				if(gb->cpu_reg.f_bits.h)
-					d2 += 6;
-				if(gb->cpu_reg.f_bits.c)
-					d1 += 6;
-				if(d2 > 9)
-				{
-					d2 -= 10;
-					d1++;
-				}
-				if(d1 > 9)
-				{
-					d1 -= 10;
-					gb->cpu_reg.f_bits.c = 1;
-				}
+				if(gb->cpu_reg.f_bits.h || (a & 0x0F) > 9)
+					a += 0x06;
+				if(gb->cpu_reg.f_bits.c || a > 0x9F)
+					a += 0x60;
 			}
-			gb->cpu_reg.a = ((d1 << 4) & 0xF0) | (d2 & 0x0F);
+
+			if((a & 0x100) == 0x100)
+				gb->cpu_reg.f_bits.c = 1;
+
+			gb->cpu_reg.a = a;
 			gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0);
 			gb->cpu_reg.f_bits.h = 0;
+
 			break;
 		}
 		case 0x28: /* JP Z, imm */
