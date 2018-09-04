@@ -1482,9 +1482,9 @@ void __gb_step_cpu(struct gb_t **p)
 			uint32_t temp = gb->cpu_reg.hl + gb->cpu_reg.sp;
 			gb->cpu_reg.f_bits.n = 0;
 			gb->cpu_reg.f_bits.h =
-					(temp ^ gb->cpu_reg.hl ^ gb->cpu_reg.sp) & 0x1000 ? 1 : 0;
-			gb->cpu_reg.f_bits.c = (temp & 0xFFFF0000) ? 1 : 0;
-			gb->cpu_reg.hl = (temp & 0x0000FFFF);
+				((gb->cpu_reg.hl & 0xFFF) + (gb->cpu_reg.sp & 0xFFF)) & 0x1000 ? 1 : 0;
+			gb->cpu_reg.f_bits.c = temp & 0x10000 ? 1 : 0;
+			gb->cpu_reg.hl = (uint16_t)temp;
 			break;
 		}
 		case 0x3A: /* LD A, (HL) */
@@ -2564,24 +2564,13 @@ void __gb_step_cpu(struct gb_t **p)
 			break;
 		case 0xE8: /* ADD SP, imm */
 		{
-			int8_t temp_s8 = (int8_t) __gb_read(&gb, gb->cpu_reg.pc++);
-			uint16_t temp_16 = gb->cpu_reg.sp + temp_s8;
+			int8_t offset = (int8_t) __gb_read(&gb, gb->cpu_reg.pc++);
 			/* TODO: Move flag assignments for optimisation. */
-			if (temp_s8 >= 0)
-			{
-				gb->cpu_reg.f_bits.z = 0;
-				gb->cpu_reg.f_bits.n = 0;
-				gb->cpu_reg.f_bits.h = ((gb->cpu_reg.sp ^ temp_s8 ^ temp_16) & 0x1000) ? 1 : 0;
-				gb->cpu_reg.f_bits.c = (gb->cpu_reg.sp > temp_16);
-			}
-			else
-			{
-				gb->cpu_reg.f_bits.z = 0;
-				gb->cpu_reg.f_bits.n = 0;
-				gb->cpu_reg.f_bits.h = ((gb->cpu_reg.sp ^ temp_s8 ^ temp_16) & 0x1000) ? 1 : 0;
-				gb->cpu_reg.f_bits.c = (gb->cpu_reg.sp < temp_16);
-			}
-			gb->cpu_reg.sp = temp_16;
+			gb->cpu_reg.f_bits.z = 0;
+			gb->cpu_reg.f_bits.n = 0;
+			gb->cpu_reg.f_bits.h = ((gb->cpu_reg.sp & 0xF) + (offset & 0xF) > 0xF) ? 1 : 0;
+			gb->cpu_reg.f_bits.c = ((gb->cpu_reg.sp & 0xFF) + (offset & 0xFF) > 0xFF);
+			gb->cpu_reg.sp += offset;
 			break;
 		}
 		case 0xE9: /* JP (HL) */
@@ -2646,25 +2635,13 @@ void __gb_step_cpu(struct gb_t **p)
 			break;
 		case 0xF8: /* LD HL, SP+/-imm */
 		{
-			/* TODO: Optimisation */
-			int8_t temp_s8 = (int8_t) __gb_read(&gb, gb->cpu_reg.pc++);
-			uint16_t temp_16 = gb->cpu_reg.sp + temp_s8;
-			if(temp_s8 >= 0)
-			{
-				gb->cpu_reg.f_bits.z = 0;
-				gb->cpu_reg.f_bits.n = 0;
-				gb->cpu_reg.f_bits.h = ((gb->cpu_reg.sp ^ temp_s8 ^ temp_16) & 0x1000) ? 1 : 0;
-				gb->cpu_reg.f_bits.c = (gb->cpu_reg.sp > temp_16);
-			}
-			else
-			{
-				gb->cpu_reg.f_bits.z = 0;
-				gb->cpu_reg.f_bits.n = 0;
-				gb->cpu_reg.f_bits.h = ((gb->cpu_reg.sp ^ temp_s8 ^ temp_16) & 0x1000) ? 1 : 0;
-				gb->cpu_reg.f_bits.c = (gb->cpu_reg.sp < temp_16);
-			}
-			/* TODO: Check this. */
-			gb->cpu_reg.hl = temp_16;
+			/* Taken from SameBoy, which is released under MIT Licence. */
+			int8_t offset = (int8_t) __gb_read(&gb, gb->cpu_reg.pc++);
+			gb->cpu_reg.hl = gb->cpu_reg.sp + offset;
+			gb->cpu_reg.f_bits.z = 0;
+			gb->cpu_reg.f_bits.n = 0;
+			gb->cpu_reg.f_bits.h = ((gb->cpu_reg.sp & 0xF) + (offset & 0xF) > 0xF) ? 1 : 0;
+			gb->cpu_reg.f_bits.c = ((gb->cpu_reg.sp & 0xFF) + (offset & 0xFF) > 0xFF) ? 1 : 0;
 			break;
 		}
 		case 0xF9: /* LD SP, HL */
