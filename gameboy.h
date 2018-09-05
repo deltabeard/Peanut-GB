@@ -2335,14 +2335,15 @@ void __gb_step_cpu(struct gb_t **p)
 			break;
 		case 0xC6: /* ADD A, imm */
 		{
-			uint8_t temp_8 = __gb_read(&gb, gb->cpu_reg.pc++);
-			uint16_t temp_16 = gb->cpu_reg.a + temp_8;
-			gb->cpu_reg.f_bits.z = ((temp_16 & 0xFF) == 0x00);
-			gb->cpu_reg.f_bits.n = 1;
+			/* Taken from SameBoy, which is released under MIT Licence. */
+			uint8_t value = __gb_read(&gb, gb->cpu_reg.pc++);
+			uint16_t calc = gb->cpu_reg.a + value;
+			gb->cpu_reg.f_bits.z = ((uint8_t)calc == 0) ? 1 : 0;
 			gb->cpu_reg.f_bits.h =
-					(gb->cpu_reg.a ^ temp_8 ^ temp_16) & 0x10 ? 1 : 0;
-			gb->cpu_reg.f_bits.c = (temp_16 & 0xFF00) ? 1 : 0;
-			gb->cpu_reg.a = temp_16 & 0xFF;
+					((gb->cpu_reg.a & 0xF) + (value & 0xF) > 0x0F) ? 1 : 0;
+			gb->cpu_reg.f_bits.c = calc > 0xFF ? 1 : 0;
+			gb->cpu_reg.f_bits.n = 0;
+			gb->cpu_reg.a = (uint8_t)calc;
 			break;
 		}
 		case 0xC7: /* RST 0x0000 */
@@ -2402,14 +2403,18 @@ void __gb_step_cpu(struct gb_t **p)
 			break;
 		case 0xCE: /* ADC A, imm */
 		{
-			uint8_t temp_8 = __gb_read(&gb, gb->cpu_reg.pc++);
-			uint16_t temp_16 = gb->cpu_reg.a + temp_8 + gb->cpu_reg.f_bits.z;
-			gb->cpu_reg.f_bits.z = ((temp_16 & 0xFF) == 0x00);
-			gb->cpu_reg.f_bits.n = 0;
+			uint8_t value, a, carry;
+			value = __gb_read(&gb, gb->cpu_reg.pc++);
+			a = gb->cpu_reg.a;
+			carry = gb->cpu_reg.f_bits.c;
+			gb->cpu_reg.a = a + value + carry;
+
+			gb->cpu_reg.f_bits.z = gb->cpu_reg.a == 0 ? 1 : 0;
 			gb->cpu_reg.f_bits.h =
-					(gb->cpu_reg.a ^ temp_8 ^ temp_16) & 0x10 ? 1 : 0;
-			gb->cpu_reg.f_bits.c = (temp_16 & 0xFF00) ? 1 : 0;
-			gb->cpu_reg.a = temp_16 & 0xFF;
+					((a & 0xF) + (value & 0xF) + carry > 0x0F) ? 1 : 0;
+			gb->cpu_reg.f_bits.c =
+					(((uint16_t) a) + ((uint16_t) value) + carry > 0xFF) ? 1 : 0;
+			gb->cpu_reg.f_bits.n = 0;
 			break;
 		}
 		case 0xCF: /* RST 0x0008 */
