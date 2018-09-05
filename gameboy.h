@@ -121,8 +121,6 @@
 #define MIN(a, b)   ((a) < (b) ? (a) : (b))
 #endif
 
-const unsigned int TAC_CYCLES[4] = {1024, 16, 64, 256};
-
 struct cpu_registers_t
 {
 	struct {
@@ -2752,6 +2750,8 @@ void __gb_step_cpu(struct gb_t **p)
 	/* TIMA register timing */
 	if(gb->timer.tac_enable)
 	{
+		const unsigned int TAC_CYCLES[4] = {1024, 16, 64, 256};
+
 		gb->timer.tima_count += inst_cycles;
 		if(gb->timer.tima_count > TAC_CYCLES[gb->timer.tac_rate])
 		{
