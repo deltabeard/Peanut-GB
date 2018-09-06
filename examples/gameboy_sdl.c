@@ -15,6 +15,8 @@
 
 #include "../gameboy.h"
 
+//#define ENABLE_SOUND 1
+
 struct priv_t
 {
 	/* Pointer to allocated memory holding GB file. */
@@ -66,6 +68,12 @@ void gb_error(struct gb_t **p, const enum gb_error_e gb_err)
 			printf("Invalid opcode %#04x", __gb_read(&gb, gb->cpu_reg.pc));
 			break;
 
+		case GB_INVALID_WRITE:
+		case GB_INVALID_READ:
+			return;
+			printf("Invalid write");
+			break;
+
 		default:
 			printf("Unknown error");
 			break;
@@ -73,9 +81,15 @@ void gb_error(struct gb_t **p, const enum gb_error_e gb_err)
 
 	printf(" at PC: %#06x, SP: %#06x\n", gb->cpu_reg.pc, gb->cpu_reg.sp);
 
-	free(priv->rom);
-	free(priv->cart_ram);
-	exit(EXIT_FAILURE);
+	puts("Press q to exit, or any other key to continue.");
+	if(getchar() == 'q')
+	{
+		free(priv->rom);
+		free(priv->cart_ram);
+		exit(EXIT_FAILURE);
+	}
+
+	return;
 }
 
 /**

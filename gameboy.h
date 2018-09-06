@@ -49,7 +49,7 @@
 #define OAM_ADDR        0xFE00
 #define UNUSED_ADDR     0xFEA0
 #define IO_ADDR         0xFF00
-#define HRAM_ADDR       0xFF00 /* TODO: Check this. */
+#define HRAM_ADDR       0xFF80
 #define INTR_EN_ADDR    0xFFFF
 
 /* Cart section sizes */
@@ -193,13 +193,18 @@ struct gb_registers_t
 	/* TODO: Sort variables in address order. */
 	/* Timing */
 	uint8_t TIMA;	uint8_t TMA;	uint8_t TAC;	uint8_t DIV;
+
+#ifdef ENABLE_SOUND
 	/* Sound */
 	uint8_t NR10;	uint8_t NR11;	uint8_t NR12;	uint8_t NR13;
 	uint8_t NR14;
-	uint8_t NR21;	uint8_t NR22;	uint8_t NR24;
+	uint8_t NR21;	uint8_t NR22;	uint8_t NR23;	uint8_t NR24;
 	uint8_t NR30;	uint8_t NR31;	uint8_t NR32;	uint8_t NR33;
+	uint8_t NR34;
 	uint8_t NR41;	uint8_t NR42;	uint8_t NR43;	uint8_t NR44;
 	uint8_t NR50;	uint8_t NR51;	uint8_t NR52;
+	uint8_t WAV[0xF];
+#endif
 	/* LCD */
 	uint8_t LCDC;	uint8_t STAT;	uint8_t SCY;	uint8_t SCX;
 	uint8_t LY;		uint8_t LYC;	uint8_t DMA;	uint8_t BGP;
@@ -372,10 +377,22 @@ uint8_t __gb_read(struct gb_t **p, const uint16_t addr)
 				return gb->wram[addr - ECHO_ADDR];
 			if(addr < UNUSED_ADDR)
 				return gb->oam[addr - OAM_ADDR];
-			/* Unusable memory area. */
+			/* Unusable memory area. Reading from this area returns 0.*/
 			if(addr < IO_ADDR)
 				return 0;
-			/* IO, HRAM, and Interrupts. */
+			/* HRAM */
+			if(HRAM_ADDR <= addr && addr < INTR_EN_ADDR)
+				return gb->hram[addr - HRAM_ADDR];
+			/* Wave pattern RAM */
+			if((addr & 0xFFF0) == 0xFF30)
+			{
+#ifdef ENABLE_SOUND
+				return gb->gb_reg.WAV[addr & 0xF];
+#else
+				return 1;
+#endif
+			}
+			/* IO and Interrupts. */
 			switch (addr & 0xFF)
 			{
 				/* IO Registers */
@@ -392,6 +409,7 @@ uint8_t __gb_read(struct gb_t **p, const uint16_t addr)
 				/* Interrupt Flag Register */
 				case 0x0F: return gb->gb_reg.IF;
 
+#ifdef ENABLE_SOUND
 				/* Sound registers */
 				case 0x10: return gb->gb_reg.NR10;
 				case 0x11: return gb->gb_reg.NR11;
@@ -400,11 +418,13 @@ uint8_t __gb_read(struct gb_t **p, const uint16_t addr)
 				case 0x14: return gb->gb_reg.NR14;
 				case 0x16: return gb->gb_reg.NR21;
 				case 0x17: return gb->gb_reg.NR22;
+				case 0x18: return gb->gb_reg.NR23;
 				case 0x19: return gb->gb_reg.NR24;
 				case 0x1A: return gb->gb_reg.NR30;
 				case 0x1B: return gb->gb_reg.NR31;
 				case 0x1C: return gb->gb_reg.NR32;
-				case 0x1E: return gb->gb_reg.NR33;
+				case 0x1D: return gb->gb_reg.NR33;
+				case 0x1E: return gb->gb_reg.NR34;
 				case 0x20: return gb->gb_reg.NR41;
 				case 0x21: return gb->gb_reg.NR42;
 				case 0x22: return gb->gb_reg.NR43;
@@ -412,6 +432,7 @@ uint8_t __gb_read(struct gb_t **p, const uint16_t addr)
 				case 0x24: return gb->gb_reg.NR50;
 				case 0x25: return gb->gb_reg.NR51;
 				case 0x26: return gb->gb_reg.NR52;
+#endif
 
 				/* LCD Registers */
 				case 0x40: return gb->gb_reg.LCDC;
@@ -438,13 +459,13 @@ uint8_t __gb_read(struct gb_t **p, const uint16_t addr)
 				/* Interrupt Enable Register */
 				case 0xFF: return gb->gb_reg.IE;
 
-				/* HRAM */
-				default: return gb->hram[addr - HRAM_ADDR];
+				/* Unused registers return 1 */
+				default: return 1;
 			}
 	}
 
 	(gb->gb_error)(&gb, GB_INVALID_READ);
-	return 0;
+	return 1;
 }
 
 void __gb_write(struct gb_t **p, const uint16_t addr, const uint8_t val)
@@ -564,6 +585,19 @@ void __gb_write(struct gb_t **p, const uint16_t addr, const uint8_t val)
 			/* Unusable memory area. */
 			if(addr < IO_ADDR)
 				return;
+			if(HRAM_ADDR <= addr && addr < INTR_EN_ADDR)
+			{
+				gb->hram[addr - HRAM_ADDR] = val;
+				return;
+			}
+			/* Wave pattern RAM */
+			if((addr & 0xFFF0) == 0xFF30)
+			{
+#ifdef ENABLE_SOUND
+				gb->gb_reg.WAV[addr & 0xF] = val;
+#endif
+				return;
+			}
 			/* IO, HRAM, and Interrupts. */
 			switch(addr & 0xFF)
 			{
@@ -590,6 +624,7 @@ void __gb_write(struct gb_t **p, const uint16_t addr, const uint8_t val)
 					gb->gb_reg.IF = val;
 					return;
 
+#ifdef ENABLE_SOUND
 				/* Sound registers */
 				case 0x10: gb->gb_reg.NR10 = val;	return;
 				case 0x11: gb->gb_reg.NR11 = val;	return;
@@ -598,11 +633,13 @@ void __gb_write(struct gb_t **p, const uint16_t addr, const uint8_t val)
 				case 0x14: gb->gb_reg.NR14 = val;	return;
 				case 0x16: gb->gb_reg.NR21 = val;	return;
 				case 0x17: gb->gb_reg.NR22 = val;	return;
+				case 0x18: gb->gb_reg.NR23 = val;	return;
 				case 0x19: gb->gb_reg.NR24 = val;	return;
 				case 0x1A: gb->gb_reg.NR30 = val;	return;
 				case 0x1B: gb->gb_reg.NR31 = val;	return;
 				case 0x1C: gb->gb_reg.NR32 = val;	return;
-				case 0x1E: gb->gb_reg.NR33 = val;	return;
+				case 0x1D: gb->gb_reg.NR33 = val;	return;
+				case 0x1E: gb->gb_reg.NR34 = val;	return;
 				case 0x20: gb->gb_reg.NR41 = val;	return;
 				case 0x21: gb->gb_reg.NR42 = val;	return;
 				case 0x22: gb->gb_reg.NR43 = val;	return;
@@ -610,6 +647,7 @@ void __gb_write(struct gb_t **p, const uint16_t addr, const uint8_t val)
 				case 0x24: gb->gb_reg.NR50 = val;	return;
 				case 0x25: gb->gb_reg.NR51 = val;	return;
 				case 0x26: gb->gb_reg.NR52 = val;	return;
+#endif
 
 				/* LCD Registers */
 				case 0x40: gb->gb_reg.LCDC = val;	return;
@@ -662,11 +700,6 @@ void __gb_write(struct gb_t **p, const uint16_t addr, const uint8_t val)
 
 				/* Interrupt Enable Register */
 				case 0xFF: gb->gb_reg.IE = val;		return;
-
-				/* HRAM */
-				default:
-					gb->hram[addr - HRAM_ADDR] = val;
-					return;
 			}
 	}
 
@@ -708,6 +741,8 @@ void __gb_power_on(struct gb_t *gb)
 	gb->gb_reg.TIMA      = 0x00;
 	gb->gb_reg.TMA       = 0x00;
 	gb->gb_reg.TAC       = 0x00;
+
+#ifdef ENABLE_SOUND
 	gb->gb_reg.NR10      = 0x80;
 	gb->gb_reg.NR11      = 0xBF;
 	gb->gb_reg.NR12      = 0xF3;
@@ -726,6 +761,8 @@ void __gb_power_on(struct gb_t *gb)
 	gb->gb_reg.NR50      = 0x77;
 	gb->gb_reg.NR51      = 0xF3;
 	gb->gb_reg.NR52      = 0xF1;
+#endif
+
 	gb->gb_reg.LCDC      = 0x91;
 	gb->gb_reg.SCY       = 0x00;
 	gb->gb_reg.SCX       = 0x00;
@@ -863,6 +900,7 @@ void __gb_execute_cb(struct gb_t **p)
 	}
 }
 
+/* TODO: Completely rewrite this */
 void __gb_draw_line(struct gb_t **p)
 {
 	struct gb_t *gb = *p;
@@ -1227,7 +1265,7 @@ void __gb_step_cpu(struct gb_t **p)
 			gb->cpu_reg.f_bits.h = 0;
 			break;
 		case 0x10: /* STOP */
-			gb->gb_halt = 1;
+			//gb->gb_halt = 1;
 			break;
 		case 0x11: /* LD DE, imm */
 			gb->cpu_reg.e = __gb_read(&gb, gb->cpu_reg.pc++);
