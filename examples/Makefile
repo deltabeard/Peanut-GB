@@ -1,6 +1,7 @@
 .POSIX:
 CC		= cc
-CFLAGS	= -g -Og -std=c99 -Wall -Wextra
+OPT		= -g -Og
+CFLAGS	= $(OPT) -std=c99 -Wall -Wextra
 LDLIBS	= -lSDL
 
 all: gameboy_sdl
