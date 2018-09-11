@@ -22,7 +22,19 @@
  * IN THE SOFTWARE.
  */
 
-#include <stdint.h>
+#include <stdint.h> /* Required for int types */
+#include <string.h>	/* Required for memset() */
+
+/* Enable sound support, including sound registers. Off by default due to no
+ * implementation. */
+#ifndef ENABLE_SOUND
+#define ENABLE_SOUND 0
+#endif
+
+/* Enable LCD drawing. On by default. May be turned off for testing purposes. */
+#ifndef ENABLE_LCD
+#define ENABLE_LCD 1
+#endif
 
 /* Interrupt masks */
 #define VBLANK_INTR		0x01
@@ -194,7 +206,7 @@ struct gb_registers_t
 	/* Timing */
 	uint8_t TIMA;	uint8_t TMA;	uint8_t TAC;	uint8_t DIV;
 
-#ifdef ENABLE_SOUND
+#if ENABLE_SOUND
 	/* Sound */
 	uint8_t NR10;	uint8_t NR11;	uint8_t NR12;	uint8_t NR13;
 	uint8_t NR14;
@@ -386,7 +398,7 @@ uint8_t __gb_read(struct gb_t **p, const uint16_t addr)
 			/* Wave pattern RAM */
 			if((addr & 0xFFF0) == 0xFF30)
 			{
-#ifdef ENABLE_SOUND
+#if ENABLE_SOUND
 				return gb->gb_reg.WAV[addr & 0xF];
 #else
 				return 1;
@@ -409,7 +421,7 @@ uint8_t __gb_read(struct gb_t **p, const uint16_t addr)
 				/* Interrupt Flag Register */
 				case 0x0F: return gb->gb_reg.IF;
 
-#ifdef ENABLE_SOUND
+#if ENABLE_SOUND
 				/* Sound registers */
 				case 0x10: return gb->gb_reg.NR10;
 				case 0x11: return gb->gb_reg.NR11;
@@ -593,7 +605,7 @@ void __gb_write(struct gb_t **p, const uint16_t addr, const uint8_t val)
 			/* Wave pattern RAM */
 			if((addr & 0xFFF0) == 0xFF30)
 			{
-#ifdef ENABLE_SOUND
+#if ENABLE_SOUND
 				gb->gb_reg.WAV[addr & 0xF] = val;
 #endif
 				return;
@@ -624,7 +636,7 @@ void __gb_write(struct gb_t **p, const uint16_t addr, const uint8_t val)
 					gb->gb_reg.IF = val;
 					return;
 
-#ifdef ENABLE_SOUND
+#if ENABLE_SOUND
 				/* Sound registers */
 				case 0x10: gb->gb_reg.NR10 = val;	return;
 				case 0x11: gb->gb_reg.NR11 = val;	return;
@@ -742,7 +754,7 @@ void __gb_power_on(struct gb_t *gb)
 	gb->gb_reg.TMA       = 0x00;
 	gb->gb_reg.TAC       = 0x00;
 
-#ifdef ENABLE_SOUND
+#if ENABLE_SOUND
 	gb->gb_reg.NR10      = 0x80;
 	gb->gb_reg.NR11      = 0xBF;
 	gb->gb_reg.NR12      = 0xF3;
@@ -901,6 +913,7 @@ void __gb_execute_cb(struct gb_t **p)
 }
 
 /* TODO: Completely rewrite this */
+#if ENABLE_LCD
 void __gb_draw_line(struct gb_t **p)
 {
 	struct gb_t *gb = *p;
@@ -1106,6 +1119,7 @@ void __gb_draw_line(struct gb_t **p)
 			gb->gb_fb[gb->gb_reg.LY][X] = gb->BGP[gb->gb_fb[gb->gb_reg.LY][X]];
 	}
 }
+#endif
 
 void __gb_step_cpu(struct gb_t **p)
 {
@@ -2779,7 +2793,9 @@ void __gb_step_cpu(struct gb_t **p)
 	{
 		gb->lcd_mode = LCD_TRANSFER;
 		/* TODO: LCD_DRAW_LINE(); */
+#if ENABLE_LCD
 		__gb_draw_line(&gb);
+#endif
 	}
 
 	/* DIV register timing */
