@@ -1,11 +1,11 @@
 /* Import blarrg CPU test ROM. */
-#include "../test/cpu_instrs.h"
+#include "../../test/cpu_instrs.h"
 
 #define ENABLE_SOUND 0
 #define ENABLE_LCD 0
 
 /* Import emulator library. */
-#include "../gameboy.h"
+#include "../../gameboy.h"
 
 #include <stdio.h>
 #include <time.h>
