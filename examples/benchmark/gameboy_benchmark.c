@@ -46,7 +46,7 @@ int main(void)
 {
 	unsigned long long benchmark_ticks_total = 0;
 	unsigned long long benchmark_fps_total = 0;
-	struct gb_t gb;
+	
 	const unsigned short pc_end = 0x06F1; /* Test ends when PC is this value. */
 
 	puts("Benchmark started");
@@ -54,6 +54,7 @@ int main(void)
 	for(unsigned int i = 0; i < 5; i++)
 	{
 		/* Start benchmark. */
+		struct gb_t gb;
 		const unsigned long long start_time = (unsigned long)clock();
 		unsigned long long bench_ticks;
 		unsigned long long bench_fps;
