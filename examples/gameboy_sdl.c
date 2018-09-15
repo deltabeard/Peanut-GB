@@ -147,7 +147,7 @@ int main(int argc, char **argv)
 	/* TODO: Sanity check input GB file. */
 
     /* Initialise emulator context. */
-    gb = gb_init(&gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error,
+    gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error,
 			&priv);
 
 	/* TODO: Load Save File. */

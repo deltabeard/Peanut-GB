@@ -47,7 +47,7 @@ void test_cpu_inst(void)
 	const unsigned short pc_end = 0x06F1; /* Test ends when PC is this value. */
 
 	/* Run ROM test. */
-    *p = gb_init(&gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error,
+    gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error,
 			NULL);
 
 	printf("Serial: ");

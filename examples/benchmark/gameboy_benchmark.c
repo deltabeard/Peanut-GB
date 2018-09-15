@@ -60,8 +60,8 @@ int main(void)
 		unsigned long long bench_fps;
 		unsigned long long frames = 0;
 
-		/* Run ROM test. */
-    	gb = gb_init(&gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write,
+		/* Initialise context. */
+    	gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write,
 			&gb_error, NULL);
 
 		/* Step CPU until test is complete. */

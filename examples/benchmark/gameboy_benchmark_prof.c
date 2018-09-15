@@ -47,12 +47,11 @@ void gb_error(struct gb_t **gb, const enum gb_error_e gb_err)
 int main(void)
 {
 	const unsigned short pc_end = 0x06F1; /* Test ends when PC is this value. */
-
 	struct gb_t gb;
 
 	PROF_START();
 
-	gb = gb_init(&gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write,
+	gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write,
 			&gb_error, NULL);
 
 	/* Step CPU until test is complete. */

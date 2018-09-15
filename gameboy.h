@@ -307,35 +307,6 @@ struct gb_t
 	uint8_t WYC;
 };
 
-void __gb_init_rom_type(struct gb_t *gb)
-{
-	const unsigned int mbc_location = 0x0147;
-	const unsigned int bank_count_location = 0x0148;
-	const unsigned int ram_size_location = 0x0149;
-	const uint8_t cart_mbc[] = {
-		0, 1, 1, 1,-1, 2, 2,-1, 0, 0,-1, 0, 0, 0,-1, 3,
-		3, 3, 3, 3,-1,-1,-1,-1,-1, 5, 5, 5, 5, 5, 5, 0
-	};
-	const uint8_t cart_ram[] = {
-		0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0,
-		1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0
-	};
-	const uint8_t num_rom_banks[] = {
-		2, 4, 8,16,32,64,128, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0,72,80,96, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	};
-	const uint8_t num_ram_banks[] = { 0, 1, 1, 4, 16 };
-
-	gb->mbc = cart_mbc[gb->gb_rom_read(&gb, mbc_location)];
-	gb->cart_ram = cart_ram[gb->gb_rom_read(&gb, mbc_location)];
-	gb->num_rom_banks = num_rom_banks[gb->gb_rom_read(&gb, bank_count_location)];
-	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(&gb, ram_size_location)];
-}
-
 uint8_t __gb_read(struct gb_t **p, const uint16_t addr)
 {
 	struct gb_t *gb = *p;
@@ -721,8 +692,9 @@ void __gb_write(struct gb_t **p, const uint16_t addr, const uint8_t val)
 /**
  * Initialises startup values.
  */
-void __gb_power_on(struct gb_t *gb)
+void __gb_reset(struct gb_t **p)
 {
+	struct gb_t *gb = *p;
 	gb->gb_halt = 0;
 	gb->gb_ime = 1;
 	gb->gb_bios_enable = 0;
@@ -2835,20 +2807,44 @@ uint32_t gb_get_save_size(struct gb_t *gb)
 	return ram_sizes[ram_size];
 }
 
-struct gb_t gb_init(uint8_t (*gb_rom_read)(struct gb_t**, const uint32_t),
+void gb_init(struct gb_t *gb,
+	uint8_t (*gb_rom_read)(struct gb_t**, const uint32_t),
 	uint8_t (*gb_cart_ram_read)(struct gb_t**, const uint32_t),
 	void (*gb_cart_ram_write)(struct gb_t**, const uint32_t, const uint8_t val),
 	void (*gb_error)(struct gb_t**, const enum gb_error_e),
 	void *priv)
 {
-	struct gb_t gb;
-	gb.gb_rom_read = gb_rom_read;
-	gb.gb_cart_ram_read = gb_cart_ram_read;
-	gb.gb_cart_ram_write = gb_cart_ram_write;
-	gb.gb_error = gb_error;
-	gb.priv = priv;
+	const uint16_t mbc_location = 0x0147;
+	const uint16_t bank_count_location = 0x0148;
+	const uint16_t ram_size_location = 0x0149;
+	const uint8_t cart_mbc[] = {
+		0, 1, 1, 1,-1, 2, 2,-1, 0, 0,-1, 0, 0, 0,-1, 3,
+		3, 3, 3, 3,-1,-1,-1,-1,-1, 5, 5, 5, 5, 5, 5, 0
+	};
+	const uint8_t cart_ram[] = {
+		0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0,
+		1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0
+	};
+	const uint8_t num_rom_banks[] = {
+		2, 4, 8,16,32,64,128, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0,72,80,96, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	};
+	const uint8_t num_ram_banks[] = { 0, 1, 1, 4, 16 };
 
-	__gb_init_rom_type(&gb);
-	__gb_power_on(&gb);
-	return gb;
+	gb->gb_rom_read = gb_rom_read;
+	gb->gb_cart_ram_read = gb_cart_ram_read;
+	gb->gb_cart_ram_write = gb_cart_ram_write;
+	gb->gb_error = gb_error;
+	gb->priv = priv;
+
+	gb->mbc = cart_mbc[gb->gb_rom_read(&gb, mbc_location)];
+	gb->cart_ram = cart_ram[gb->gb_rom_read(&gb, mbc_location)];
+	gb->num_rom_banks = num_rom_banks[gb->gb_rom_read(&gb, bank_count_location)];
+	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(&gb, ram_size_location)];
+
+	__gb_reset(&gb);
 }
