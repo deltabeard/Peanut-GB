@@ -1104,7 +1104,7 @@ void __gb_step_cpu(struct gb_t **p)
 {
 	struct gb_t *gb = *p;
 	uint8_t opcode, inst_cycles;
-	const uint8_t op_cycles[0x100] = {
+	static const uint8_t op_cycles[0x100] = {
 	/*  0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F		*/
 		4,12, 8, 8, 4, 4, 8, 4,20, 8, 8, 8, 4, 4, 8, 4,		/* 0x00 */
 		4,12, 8, 8, 4, 4, 8, 4, 8, 8, 8, 8, 4, 4, 8, 4,		/* 0x10 */
