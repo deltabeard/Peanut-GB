@@ -1,5 +1,9 @@
 #include "minctest.h"
 #include "cpu_instrs.h"
+
+#define ENABLE_SOUND 0
+#define ENABLE_LCD 0
+
 #include "../gameboy.h"
 
 #include <string.h>

@@ -1,3 +1,7 @@
+CC=gcc
+OPT=-s -O2
+CFLAGS=$(OPT) -Wall -Werror
+
 all: test
-	gcc test.c -o test -s -O2 -Wall
+	$(CC) test.c -o test $(CFLAGS)
 	./test
