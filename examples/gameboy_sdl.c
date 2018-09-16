@@ -98,7 +98,7 @@ void gb_error(struct gb_t **p, const enum gb_error_e gb_err)
 uint8_t *read_rom_to_ram(const char *file_name)
 {
 	FILE *rom_file = fopen(file_name, "rb");
-	long rom_size;
+	size_t rom_size;
 	uint8_t *rom = NULL;
 
 	if(rom_file == NULL)
