@@ -128,6 +128,7 @@ int main(int argc, char **argv)
 	const unsigned int width = 160;
 	unsigned int running = 1;
 	SDL_Surface* screen;
+	SDL_Event event;
 	uint32_t fb[height][width];
 
 	/* Make sure a file name is given. */
@@ -167,14 +168,50 @@ int main(int argc, char **argv)
 			0xFFFFFFFF, 0x99999999, 0x44444444, 0x00000000
 		};
 		uint32_t *screen_copy;
-		SDL_Event event;
-
+		
 		/* TODO: Get joypad input. */
 		while(SDL_PollEvent(&event))
 		{
+			switch(event.type)
+			{
+				case SDL_QUIT:
+					running = 0;
+					break;
+				
+				case SDL_KEYDOWN:
+					switch(event.key.keysym.sym)
+					{
+						case SDLK_RETURN: gb.joypad_bits.start = 0; break;
+						case SDLK_BACKSPACE: gb.joypad_bits.select = 0; break;
+						case SDLK_z: gb.joypad_bits.a = 0; break;
+						case SDLK_x: gb.joypad_bits.b = 0; break;
+						case SDLK_UP: gb.joypad_bits.up = 0; break;
+						case SDLK_DOWN: gb.joypad_bits.down = 0; break;
+						case SDLK_LEFT: gb.joypad_bits.left = 0; break;
+						case SDLK_RIGHT: gb.joypad_bits.right = 0; break;
+						default: break;
+					}
+					break;
+				case SDL_KEYUP:
+					switch(event.key.keysym.sym)
+					{
+						case SDLK_RETURN: gb.joypad_bits.start = 1; break;
+						case SDLK_BACKSPACE: gb.joypad_bits.select = 1; break;
+						case SDLK_z: gb.joypad_bits.a = 1; break;
+						case SDLK_x: gb.joypad_bits.b = 1; break;
+						case SDLK_UP: gb.joypad_bits.up = 1; break;
+						case SDLK_DOWN: gb.joypad_bits.down = 1; break;
+						case SDLK_LEFT: gb.joypad_bits.left = 1; break;
+						case SDLK_RIGHT: gb.joypad_bits.right = 1; break;
+						default: break;
+					}
+					break;
+			}
 			if(event.type == SDL_QUIT)
 				running = 0;
 		}
+
+		gb_process_joypad(&gb);
 
 		/* Execute CPU cycles until the screen has to be redrawn. */
 		gb_run_frame(&gb);

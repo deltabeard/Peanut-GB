@@ -289,6 +289,25 @@ struct gb_t
 	struct timer_t timer;
 	struct gb_registers_t gb_reg;
 
+	struct
+	{
+		union
+		{
+			struct
+			{
+				unsigned int a		: 1;
+				unsigned int b		: 1;
+				unsigned int select	: 1;
+				unsigned int start	: 1;
+				unsigned int right	: 1;
+				unsigned int left	: 1;
+				unsigned int up		: 1;
+				unsigned int down	: 1;
+			} joypad_bits;
+			uint8_t joypad;
+		};
+	};
+
 	/* TODO: Allow implementation to allocate WRAM, VRAM and Frame Buffer. */
 	uint8_t wram[WRAM_SIZE];
 	uint8_t vram[VRAM_SIZE];
@@ -306,6 +325,25 @@ struct gb_t
 	uint8_t WY;
 	uint8_t WYC;
 };
+
+void __gb_process_joypad(struct gb_t **p)
+{
+	struct gb_t *gb = *p;
+	
+	gb->gb_reg.P1 |= 0x0F;
+
+	/* Direction keys selected */
+	if((gb->gb_reg.P1 & 0b010000) == 0)
+		gb->gb_reg.P1 &= 0xF0 | (((gb->joypad >> 4) & 0x0F));
+	/* Button keys selected */
+	if((gb->gb_reg.P1 & 0b100000) == 0)
+		gb->gb_reg.P1 &= 0xF0 | ((gb->joypad & 0x0F));
+}
+
+void gb_process_joypad(struct gb_t *gb)
+{
+	__gb_process_joypad(&gb);
+}
 
 uint8_t __gb_read(struct gb_t **p, const uint16_t addr)
 {
@@ -587,9 +625,7 @@ void __gb_write(struct gb_t **p, const uint16_t addr, const uint8_t val)
 				/* IO Registers */
 				case 0x00:
 					gb->gb_reg.P1 = val & 0x30;
-					/* TODO: Controls. */
-					/* Pressed == 0 */
-					gb->gb_reg.P1 |= 0b1111;
+					__gb_process_joypad(&gb);
 					return;
 				case 0x01: gb->gb_reg.SB = val;		return;
 				case 0x02: gb->gb_reg.SC = val;		return;
@@ -1697,6 +1733,7 @@ void __gb_step_cpu(struct gb_t **p)
 			__gb_write(&gb, gb->cpu_reg.hl, gb->cpu_reg.l);
 			break;
 		case 0x76: /* HALT */
+			/* TODO: Emulate HALT bug? */
 			gb->gb_halt = 1;
 			break;
 		case 0x77: /* LD (HL), A */
@@ -2849,6 +2886,8 @@ void gb_init(struct gb_t *gb,
 	gb->gb_cart_ram_write = gb_cart_ram_write;
 	gb->gb_error = gb_error;
 	gb->priv = priv;
+
+	gb->joypad = 0xFF;
 
 	gb->mbc = cart_mbc[gb->gb_rom_read(&gb, mbc_location)];
 	gb->cart_ram = cart_ram[gb->gb_rom_read(&gb, mbc_location)];
