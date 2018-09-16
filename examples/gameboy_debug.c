@@ -47,6 +47,14 @@ void gb_error(struct gb_t **p, const enum gb_error_e gb_err)
 			printf("Invalid opcode %#04x", __gb_read(&gb, gb->cpu_reg.pc));
 			break;
 
+		case GB_INVALID_WRITE:
+			puts("Invalid write");
+			return;
+
+		case GB_INVALID_READ:
+			puts("Invalid read");
+			return;
+
 		default:
 			printf("Unknown error");
 			break;
@@ -89,7 +97,7 @@ int main(int argc, char **argv)
 {
     struct gb_t gb;
 	struct priv_t priv;
-	uint16_t running = UINT16_MAX;
+	uint32_t running = UINT32_MAX;
 
 	if(argc != 2)
 	{
@@ -105,7 +113,7 @@ int main(int argc, char **argv)
 
 	/* TODO: Sanity check input GB file. */
     /* TODO: Init GB */
-    gb = gb_init(&gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error,
+    gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error,
 			&priv);
 
 	/* TODO: Load Save File. */
