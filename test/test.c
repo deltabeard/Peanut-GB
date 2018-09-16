@@ -1,11 +1,10 @@
 #include "minctest.h"
-#include "cpu_instrs.h"
 
 #define ENABLE_SOUND 0
 #define ENABLE_LCD 0
-
 #include "../gameboy.h"
 
+#include <assert.h>
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
@@ -13,8 +12,10 @@
 /**
  * Return byte from blarrg test ROM.
  */
-uint8_t gb_rom_read(struct gb_t **gb, const uint32_t addr)
+uint8_t gb_rom_read_cpu_instrs(struct gb_t **gb, const uint32_t addr)
 {
+	#include "cpu_instrs.h"
+	assert(addr < cpu_instrs_gb_len);
 	return cpu_instrs_gb[addr];
 }
 
@@ -51,8 +52,8 @@ void test_cpu_inst(void)
 	const unsigned short pc_end = 0x06F1; /* Test ends when PC is this value. */
 
 	/* Run ROM test. */
-    gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error,
-			NULL);
+    gb_init(&gb, &gb_rom_read_cpu_instrs, &gb_cart_ram_read, &gb_cart_ram_write,
+			&gb_error, NULL);
 
 	printf("Serial: ");
 
@@ -69,7 +70,7 @@ void test_cpu_inst(void)
 			str[count++] = gb.gb_reg.SB;
 			if(count == 1024)
 				abort();
-			
+
 			/* Simulate serial read, as emulator does not support serial
 			 * transmission yet. */
 			gb.gb_reg.SC = 0x01;
