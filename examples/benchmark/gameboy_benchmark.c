@@ -1,6 +1,3 @@
-/* Import blarrg CPU test ROM. */
-#include "../../test/cpu_instrs.h"
-
 #define ENABLE_SOUND 0
 #define ENABLE_LCD 0
 
@@ -13,15 +10,17 @@
 /**
  * Return byte from blarrg test ROM.
  */
-uint8_t gb_rom_read(struct gb_t **gb, const uint32_t addr)
+uint8_t gb_rom_read(struct gb_t *gb, const uint32_t addr)
 {
+	/* Import blarrg CPU test ROM. */
+	#include "../../test/cpu_instrs.h"
 	return cpu_instrs_gb[addr];
 }
 
 /**
  * Ignore cart RAM writes, since the test doesn't require it.
  */
-void gb_cart_ram_write(struct gb_t **gb, const uint32_t addr, const uint8_t val)
+void gb_cart_ram_write(struct gb_t *gb, const uint32_t addr, const uint8_t val)
 {
 	return;
 }
@@ -29,7 +28,7 @@ void gb_cart_ram_write(struct gb_t **gb, const uint32_t addr, const uint8_t val)
 /**
  * Ignore cart RAM reads, since the test doesn't require it.
  */
-uint8_t gb_cart_ram_read(struct gb_t **gb, const uint32_t addr)
+uint8_t gb_cart_ram_read(struct gb_t *gb, const uint32_t addr)
 {
 	return 0xFF;
 }
@@ -37,7 +36,7 @@ uint8_t gb_cart_ram_read(struct gb_t **gb, const uint32_t addr)
 /**
  * Ignore all errors.
  */
-void gb_error(struct gb_t **gb, const enum gb_error_e gb_err)
+void gb_error(struct gb_t *gb, const enum gb_error_e gb_err)
 {
 	return;
 }

@@ -28,28 +28,28 @@ struct priv_t
 /**
  * Returns a byte from the ROM file at the given address.
  */
-uint8_t gb_rom_read(struct gb_t **gb, const uint32_t addr)
+uint8_t gb_rom_read(struct gb_t *gb, const uint32_t addr)
 {
-    const struct priv_t * const p = (*gb)->priv;
+    const struct priv_t * const p = gb->priv;
     return p->rom[addr];
 }
 
 /**
  * Returns a byte from the cartridge RAM at the given address.
  */
-uint8_t gb_cart_ram_read(struct gb_t **gb, const uint32_t addr)
+uint8_t gb_cart_ram_read(struct gb_t *gb, const uint32_t addr)
 {
-	const struct priv_t * const p = (*gb)->priv;
+	const struct priv_t * const p = gb->priv;
 	return p->cart_ram[addr];
 }
 
 /**
  * Writes a given byte to the cartridge RAM at the given address.
  */
-void gb_cart_ram_write(struct gb_t **gb, const uint32_t addr,
+void gb_cart_ram_write(struct gb_t *gb, const uint32_t addr,
 	const uint8_t val)
 {
-	const struct priv_t * const p = (*gb)->priv;
+	const struct priv_t * const p = gb->priv;
 	p->cart_ram[addr] = val;
 }
 
@@ -57,15 +57,14 @@ void gb_cart_ram_write(struct gb_t **gb, const uint32_t addr,
  * Handles an error reported by the emulator. The emulator context may be used
  * to better understand why the error given in gb_err was reported.
  */
-void gb_error(struct gb_t **p, const enum gb_error_e gb_err)
+void gb_error(struct gb_t *gb, const enum gb_error_e gb_err)
 {
-	struct gb_t *gb = *p;
 	struct priv_t *priv = gb->priv;
 
 	switch(gb_err)
 	{
 		case GB_INVALID_OPCODE:
-			printf("Invalid opcode %#04x", __gb_read(&gb, gb->cpu_reg.pc));
+			printf("Invalid opcode %#04x", __gb_read(gb, gb->cpu_reg.pc));
 			break;
 
 		case GB_INVALID_WRITE:
