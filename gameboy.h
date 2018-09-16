@@ -588,6 +588,8 @@ void __gb_write(struct gb_t **p, const uint16_t addr, const uint8_t val)
 				case 0x00:
 					gb->gb_reg.P1 = val & 0x30;
 					/* TODO: Controls. */
+					/* Pressed == 0 */
+					gb->gb_reg.P1 |= 0b1111;
 					return;
 				case 0x01: gb->gb_reg.SB = val;		return;
 				case 0x02: gb->gb_reg.SC = val;		return;
