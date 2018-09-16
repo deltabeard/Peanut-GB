@@ -332,12 +332,14 @@ void __gb_process_joypad(struct gb_t **p)
 	
 	gb->gb_reg.P1 |= 0x0F;
 
+	/* TODO: Complete joypad states. */
+
 	/* Direction keys selected */
 	if((gb->gb_reg.P1 & 0b010000) == 0)
-		gb->gb_reg.P1 &= 0xF0 | (((gb->joypad >> 4) & 0x0F));
+		gb->gb_reg.P1 &= 0xF0 | (gb->joypad >> 4);
 	/* Button keys selected */
-	if((gb->gb_reg.P1 & 0b100000) == 0)
-		gb->gb_reg.P1 &= 0xF0 | ((gb->joypad & 0x0F));
+	else if((gb->gb_reg.P1 & 0b100000) == 0)
+		gb->gb_reg.P1 &= 0xF0 | (gb->joypad & 0x0F);
 }
 
 void gb_process_joypad(struct gb_t *gb)
