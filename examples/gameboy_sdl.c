@@ -15,8 +15,6 @@
 
 #include "../gameboy.h"
 
-//#define ENABLE_SOUND 1
-
 struct priv_t
 {
 	/* Pointer to allocated memory holding GB file. */
@@ -129,6 +127,7 @@ int main(int argc, char **argv)
 	SDL_Surface* screen;
 	SDL_Event event;
 	uint32_t fb[height][width];
+	uint32_t new_ticks, old_ticks;
 
 	/* Make sure a file name is given. */
 	if(argc != 2)
@@ -161,12 +160,15 @@ int main(int argc, char **argv)
 	screen = SDL_SetVideoMode(width, height, 32, SDL_HWSURFACE | SDL_DOUBLEBUF);
 	SDL_WM_SetCaption("DMG Emulator", 0);
 
+	new_ticks = SDL_GetTicks();
+
 	while(running)
 	{
 		const uint32_t palette[4] = {
 			0xFFFFFFFF, 0x99999999, 0x44444444, 0x00000000
 		};
 		uint32_t *screen_copy;
+		int32_t delay;
 		
 		/* TODO: Get joypad input. */
 		while(SDL_PollEvent(&event))
@@ -210,6 +212,10 @@ int main(int argc, char **argv)
 				running = 0;
 		}
 
+		/* Calculate the time taken to draw frame, then later add a delay to cap
+		 * at 60 fps. */
+		old_ticks = SDL_GetTicks();
+
 		gb_process_joypad(&gb);
 
 		/* Execute CPU cycles until the screen has to be redrawn. */
@@ -237,7 +243,9 @@ int main(int argc, char **argv)
 		SDL_Flip(screen);
 
 		/* Use a delay that will draw the screen at a rate of 59.73 Hz. */
-		SDL_Delay(10);
+		new_ticks = SDL_GetTicks();
+		delay = 16 - (new_ticks - old_ticks);
+		SDL_Delay(delay > 0 ? delay : 0);
 	}
 
 	SDL_Quit();
