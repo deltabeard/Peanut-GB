@@ -354,7 +354,7 @@ void gb_process_joypad(struct gb_t *gb)
 
 uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
 {
-	switch ((addr >> 12) & 0xF)
+	switch(addr >> 12)
 	{
 		case 0x0:
 		/* TODO: BIOS support. */
@@ -2818,7 +2818,7 @@ void __gb_step_cpu(struct gb_t *gb)
 	/* TIMA register timing */
 	if(gb->timer.tac_enable)
 	{
-		const unsigned int TAC_CYCLES[4] = {1024, 16, 64, 256};
+		static const unsigned int TAC_CYCLES[4] = {1024, 16, 64, 256};
 
 		gb->timer.tima_count += inst_cycles;
 		if(gb->timer.tima_count > TAC_CYCLES[gb->timer.tac_rate])
