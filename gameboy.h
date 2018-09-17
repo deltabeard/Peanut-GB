@@ -235,12 +235,24 @@ struct gb_registers_t
 	uint8_t IE;
 };
 
+/**
+ * Errors that may occur during emulation.
+ */
 enum gb_error_e
 {
 	GB_UNKNOWN_ERROR,
 	GB_INVALID_OPCODE,
 	GB_INVALID_READ,
 	GB_INVALID_WRITE
+};
+
+/**
+ * Errors that may occur during library initialisation.
+ */
+enum gb_init_error_e
+{
+	GB_INIT_NO_ERROR,
+	GB_INIT_CARTRIDGE_UNSUPPORTED
 };
 
 struct gb_t
@@ -792,6 +804,8 @@ void __gb_reset(struct gb_t *gb)
 	gb->gb_reg.WY        = 0x00;
 	gb->gb_reg.WX        = 0x00;
 	gb->gb_reg.IE        = 0x00;
+
+	gb->joypad = 0xFF;
 }
 
 void __gb_execute_cb(struct gb_t *gb)
@@ -2839,8 +2853,10 @@ uint32_t gb_get_save_size(struct gb_t *gb)
 	uint32_t ram_size = gb->gb_rom_read(gb, ram_size_location);
 	return ram_sizes[ram_size];
 }
-
-void gb_init(struct gb_t *gb,
+/**
+ * Initialise the emulator context.
+ */
+enum gb_init_error_e gb_init(struct gb_t *gb,
 	uint8_t (*gb_rom_read)(struct gb_t*, const uint32_t),
 	uint8_t (*gb_cart_ram_read)(struct gb_t*, const uint32_t),
 	void (*gb_cart_ram_write)(struct gb_t*, const uint32_t, const uint8_t val),
@@ -2850,9 +2866,19 @@ void gb_init(struct gb_t *gb,
 	const uint16_t mbc_location = 0x0147;
 	const uint16_t bank_count_location = 0x0148;
 	const uint16_t ram_size_location = 0x0149;
+	/**
+	 * Table for cartridge type (MBC). -1 if invalid.
+	 * TODO: MMM01 is untested.
+	 * TODO: MBC6 is untested.
+	 * TODO: MBC7 is unsupported.
+	 * TODO: POCKET CAMERA is unsupported.
+	 * TODO: BANDAI TAMA5 is unsupported.
+	 * TODO: HuC3 is unsupported.
+	 * TODO: HuC1 is unsupported.
+	 **/
 	const uint8_t cart_mbc[] = {
 		0, 1, 1, 1,-1, 2, 2,-1, 0, 0,-1, 0, 0, 0,-1, 3,
-		3, 3, 3, 3,-1,-1,-1,-1,-1, 5, 5, 5, 5, 5, 5, 0
+		3, 3, 3, 3,-1,-1,-1,-1,-1, 5, 5, 5, 5, 5, 5,-1
 	};
 	const uint8_t cart_ram[] = {
 		0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0,
@@ -2866,7 +2892,7 @@ void gb_init(struct gb_t *gb,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0,72,80,96, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 	};
-	const uint8_t num_ram_banks[] = { 0, 1, 1, 4, 16 };
+	const uint8_t num_ram_banks[] = { 0, 1, 1, 4, 16, 8 };
 
 	gb->gb_rom_read = gb_rom_read;
 	gb->gb_cart_ram_read = gb_cart_ram_read;
@@ -2874,12 +2900,19 @@ void gb_init(struct gb_t *gb,
 	gb->gb_error = gb_error;
 	gb->priv = priv;
 
-	gb->joypad = 0xFF;
-
-	gb->mbc = cart_mbc[gb->gb_rom_read(gb, mbc_location)];
+	/* Check if cartridge type is supported, and set MBC type. */
+	{
+		const uint8_t mbc_value = gb->gb_rom_read(gb, mbc_location);
+		if(mbc_value > sizeof(cart_mbc) - 1 ||
+				(gb->mbc = cart_mbc[gb->gb_rom_read(gb, mbc_location)]) == 255u)
+			return GB_INIT_CARTRIDGE_UNSUPPORTED;
+	}
+	
 	gb->cart_ram = cart_ram[gb->gb_rom_read(gb, mbc_location)];
 	gb->num_rom_banks = num_rom_banks[gb->gb_rom_read(gb, bank_count_location)];
 	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(gb, ram_size_location)];
 
 	__gb_reset(gb);
+
+	return GB_INIT_NO_ERROR;
 }

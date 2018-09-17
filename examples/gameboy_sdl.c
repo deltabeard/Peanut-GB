@@ -183,6 +183,7 @@ int main(int argc, char **argv)
 	uint32_t fb[height][width];
 	uint32_t new_ticks, old_ticks;
 	char *save_file_name;
+	enum gb_init_error_e ret;
 
 	/* Make sure a file name is given. */
 	if(argc != 2)
@@ -222,8 +223,14 @@ int main(int argc, char **argv)
 	/* TODO: Sanity check input GB file. */
 
     /* Initialise emulator context. */
-    gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error,
+    ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error,
 			&priv);
+
+	if(ret != GB_INIT_NO_ERROR)
+	{
+		printf("Unable to initialise context. Returned %d.\n", ret);
+		exit(EXIT_FAILURE);
+	}
 
 	/* Load Save File. */
 	read_cart_ram_file(save_file_name, &priv.cart_ram, gb_get_save_size(&gb));
@@ -317,7 +324,7 @@ int main(int argc, char **argv)
 
 		/* Use a delay that will draw the screen at a rate of 59.73 Hz. */
 		new_ticks = SDL_GetTicks();
-		delay = 16 - (new_ticks - old_ticks);
+		delay = 17 - (new_ticks - old_ticks);
 		SDL_Delay(delay > 0 ? delay : 0);
 	}
 
