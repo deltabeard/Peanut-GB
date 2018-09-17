@@ -117,6 +117,60 @@ uint8_t *read_rom_to_ram(const char *file_name)
 	return rom;
 }
 
+void read_cart_ram_file(const char *save_file_name, uint8_t **dest,
+	const size_t len)
+{
+	FILE *f;
+
+	/* If save file not required. */
+	if(len == 0)
+	{
+		*dest = NULL;
+		return;
+	}
+
+	/* Allocate enough memory to hold save file. */
+	if((*dest = malloc(len)) == NULL)
+	{
+		printf("%d: %s\n", __LINE__, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	f = fopen(save_file_name, "rb");
+
+	/* It doesn't matter if the save file doesn't exist. We initialise the
+	 * save memory allocated above. The save file will be created on exit. */
+	if(f == NULL)
+	{
+		memset(*dest, 0xFF, len);
+		return;
+	}
+
+	/* Read save file to allocated memory. */
+	fread(*dest, sizeof(uint8_t), len, f);
+	fclose(f);
+}
+
+void write_cart_ram_file(const char *save_file_name, uint8_t **dest,
+	const size_t len)
+{
+	FILE *f;
+
+	if(len == 0 || *dest == NULL)
+		return;
+
+	if((f = fopen(save_file_name, "wb")) == NULL)
+	{
+		puts("Unable to open save file.");
+		printf("%d: %s\n", __LINE__, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	/* Record save file. */
+	fwrite(*dest, sizeof(uint8_t), len, f);
+	fclose(f);
+}
+
 int main(int argc, char **argv)
 {
     struct gb_t gb;
@@ -128,6 +182,7 @@ int main(int argc, char **argv)
 	SDL_Event event;
 	uint32_t fb[height][width];
 	uint32_t new_ticks, old_ticks;
+	char *save_file_name;
 
 	/* Make sure a file name is given. */
 	if(argc != 2)
@@ -139,22 +194,40 @@ int main(int argc, char **argv)
 	/* Copy input ROM file to allocated memory. */
 	if((priv.rom = read_rom_to_ram(argv[1])) == NULL)
 	{
-		printf("%s\n", strerror(errno));
+		printf("%d: %s\n", __LINE__, strerror(errno));
 		return EXIT_FAILURE;
 	}
 
+	/* Copy save file (with specific name) to allocated memory. */
+	{
+		char *str_replace;
+		char extension[] = "sav";
+		save_file_name = malloc(strlen(argv[1]) + strlen(extension) + 1);
+
+		/* Generate name of save file. */
+		if((save_file_name = malloc(strlen(argv[1]) + 1)) == NULL)
+		{
+			printf("%d: %s\n", __LINE__, strerror(errno));
+			return EXIT_FAILURE;
+		}
+
+		strcpy(save_file_name, argv[1]);
+		str_replace = strrchr(save_file_name, '.');
+
+		/* Copy extension to string including terminating null byte. */
+		for(unsigned int i = 0; i < strlen(extension) + 1; i++)
+			*(++str_replace) = extension[i];
+	}
+	
 	/* TODO: Sanity check input GB file. */
 
     /* Initialise emulator context. */
     gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error,
 			&priv);
 
-	/* TODO: Load Save File. */
-
-	/* Allocate memory for save file if required. */
-	priv.cart_ram = malloc(gb_get_save_size(&gb));
-	memset(priv.cart_ram, 0xFF, gb_get_save_size(&gb));
-
+	/* Load Save File. */
+	read_cart_ram_file(save_file_name, &priv.cart_ram, gb_get_save_size(&gb));
+	
 	/* Initialise frontend implementation, in this case, SDL. */
 	SDL_Init(SDL_INIT_VIDEO);
 	screen = SDL_SetVideoMode(width, height, 32, SDL_HWSURFACE | SDL_DOUBLEBUF);
@@ -249,8 +322,13 @@ int main(int argc, char **argv)
 	}
 
 	SDL_Quit();
+
+	/* Record save file. */
+	write_cart_ram_file(save_file_name, &priv.cart_ram, gb_get_save_size(&gb));
+
 	free(priv.rom);
 	free(priv.cart_ram);
+	free(save_file_name);
 
 	return EXIT_SUCCESS;
 }
