@@ -578,7 +578,7 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 					gb->gb_cart_ram_write(gb,
 							addr - CART_RAM_ADDR + (gb->cart_ram_bank * CRAM_BANK_SIZE), val);
 				}
-				else
+				else if(gb->num_ram_banks)
 					gb->gb_cart_ram_write(gb, addr - CART_RAM_ADDR, val);
 			}
 			return;
