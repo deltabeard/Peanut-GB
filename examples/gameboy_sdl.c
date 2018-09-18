@@ -144,18 +144,18 @@ void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 	switch(gb_err)
 	{
 		case GB_INVALID_OPCODE:
-			fprintf(stderr, "Invalid opcode %#04x at PC: %#06x, SP: %#06x\n",
+			fprintf(stdout, "Invalid opcode %#04x at PC: %#06x, SP: %#06x\n",
                     __gb_read(gb, gb->cpu_reg.pc--),
                     gb->cpu_reg.pc,
                     gb->cpu_reg.sp);
 			break;
 
 		case GB_INVALID_WRITE:
-			fprintf(stderr, "Invalid write at address %#06x, PC: %#06x\n",
+			fprintf(stdout, "Invalid write at address %#06x, PC: %#06x\n",
                     val, gb->cpu_reg.pc);
             return;
 		case GB_INVALID_READ:
-			fprintf(stderr, "Invalid read at address %#06x, at PC: %#06x\n",
+			fprintf(stdout, "Invalid read at address %#06x, at PC: %#06x\n",
                     val, gb->cpu_reg.pc);
             return;
 
@@ -164,7 +164,7 @@ void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 			break;
 	}
 
-	fprintf(stderr, "Press q to exit, or any other key to continue.");
+	fprintf(stderr, "Error. Press q to exit, or any other key to continue.");
 	if(getchar() == 'q')
 	{
         /* Record save file. */
@@ -191,6 +191,7 @@ int main(int argc, char **argv)
 	uint32_t new_ticks, old_ticks;
 	char *save_file_name;
 	enum gb_init_error_e ret;
+    unsigned int fast_mode = 0;
 
 	/* Make sure a file name is given. */
 	if(argc < 2 || argc > 3)
@@ -282,6 +283,7 @@ int main(int argc, char **argv)
 						case SDLK_DOWN: gb.joypad_bits.down = 0; break;
 						case SDLK_LEFT: gb.joypad_bits.left = 0; break;
 						case SDLK_RIGHT: gb.joypad_bits.right = 0; break;
+						case SDLK_SPACE: fast_mode = !fast_mode; break;
 						default: break;
 					}
 					break;
@@ -349,7 +351,10 @@ int main(int argc, char **argv)
 
 		/* Use a delay that will draw the screen at a rate of 59.73 Hz. */
 		new_ticks = SDL_GetTicks();
-		delay = (17/3) - (new_ticks - old_ticks);
+        if(fast_mode)
+            continue;
+
+		delay = 17 - (new_ticks - old_ticks);
 		SDL_Delay(delay > 0 ? delay : 0);
 	}
 
