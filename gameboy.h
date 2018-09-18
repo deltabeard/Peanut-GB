@@ -215,7 +215,7 @@ struct gb_registers_t
 	uint8_t NR34;
 	uint8_t NR41;	uint8_t NR42;	uint8_t NR43;	uint8_t NR44;
 	uint8_t NR50;	uint8_t NR51;	uint8_t NR52;
-	uint8_t WAV[0xF];
+	uint8_t WAV[0x10];
 #endif
 	/* LCD */
 	uint8_t LCDC;	uint8_t STAT;	uint8_t SCY;	uint8_t SCX;

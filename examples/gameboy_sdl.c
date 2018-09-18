@@ -13,6 +13,8 @@
 #include <SDL/SDL.h>
 #include <SDL/SDL_main.h>
 
+#define ENABLE_SOUND 1
+
 #include "../gameboy.h"
 
 struct priv_t
