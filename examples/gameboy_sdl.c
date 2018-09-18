@@ -313,20 +313,7 @@ int main(int argc, char **argv)
 		gb_process_joypad(&gb);
 
 		/* Execute CPU cycles until the screen has to be redrawn. */
-		//gb_run_frame(&gb);
-
-	    gb.gb_frame = 0;
-        while(gb.gb_frame == 0)
-        {
-            __gb_step_cpu(&gb);
-            /* Debugging */
-            printf("OP: %#04X%s  PC: %#06X  SP: %#06X  A: %#04X\n",
-                    __gb_read(&gb, gb.cpu_reg.pc),
-                    gb.gb_halt ? "(HALTED)" : "",
-                    gb.cpu_reg.pc,
-                    gb.cpu_reg.sp,
-                    gb.cpu_reg.a);
-        }
+		gb_run_frame(&gb);
 
 		/* Copy frame buffer from emulator context, converting to colours
 		 * defined in the palette. */
@@ -351,6 +338,8 @@ int main(int argc, char **argv)
 
 		/* Use a delay that will draw the screen at a rate of 59.73 Hz. */
 		new_ticks = SDL_GetTicks();
+
+        /* Don't delay if fast mode is activated (toggle with space bar). */
         if(fast_mode)
             continue;
 
