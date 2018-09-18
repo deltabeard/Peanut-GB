@@ -144,19 +144,17 @@ void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 	switch(gb_err)
 	{
 		case GB_INVALID_OPCODE:
+            /* We compensate for the post-increment in the __gb_step_cpu
+             * function. */
 			fprintf(stdout, "Invalid opcode %#04x at PC: %#06x, SP: %#06x\n",
-                    __gb_read(gb, gb->cpu_reg.pc--),
-                    gb->cpu_reg.pc,
+                    __gb_read(gb, gb->cpu_reg.pc - 1),
+                    gb->cpu_reg.pc - 1,
                     gb->cpu_reg.sp);
 			break;
 
+            /* Ignoring non fatal errors. */
 		case GB_INVALID_WRITE:
-			fprintf(stdout, "Invalid write at address %#06x, PC: %#06x\n",
-                    val, gb->cpu_reg.pc);
-            return;
 		case GB_INVALID_READ:
-			fprintf(stdout, "Invalid read at address %#06x, at PC: %#06x\n",
-                    val, gb->cpu_reg.pc);
             return;
 
 		default:
