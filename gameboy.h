@@ -261,7 +261,7 @@ struct gb_t
 	uint8_t (*gb_cart_ram_read)(struct gb_t*, const uint32_t);
 	void (*gb_cart_ram_write)(struct gb_t*, const uint32_t,
 			const uint8_t val);
-	void (*gb_error)(struct gb_t*, const enum gb_error_e);
+	void (*gb_error)(struct gb_t*, const enum gb_error_e, const uint16_t);
 	void *priv;
 
 	struct
@@ -490,7 +490,7 @@ uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
 			}
 	}
 
-	(gb->gb_error)(gb, GB_INVALID_READ);
+	(gb->gb_error)(gb, GB_INVALID_READ, addr);
 	return 1;
 }
 
@@ -727,7 +727,7 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 			}
 	}
 
-	(gb->gb_error)(gb, GB_INVALID_WRITE);
+	(gb->gb_error)(gb, GB_INVALID_WRITE, addr);
 }
 
 /**
@@ -2738,7 +2738,7 @@ void __gb_step_cpu(struct gb_t *gb)
 			break;
 
 		default:
-			gb->gb_error(gb, GB_INVALID_OPCODE);
+			gb->gb_error(gb, GB_INVALID_OPCODE, opcode);
 	}
 
 	/* CPU Timing */
@@ -2859,8 +2859,8 @@ uint32_t gb_get_save_size(struct gb_t *gb)
 enum gb_init_error_e gb_init(struct gb_t *gb,
 	uint8_t (*gb_rom_read)(struct gb_t*, const uint32_t),
 	uint8_t (*gb_cart_ram_read)(struct gb_t*, const uint32_t),
-	void (*gb_cart_ram_write)(struct gb_t*, const uint32_t, const uint8_t val),
-	void (*gb_error)(struct gb_t*, const enum gb_error_e),
+	void (*gb_cart_ram_write)(struct gb_t*, const uint32_t, const uint8_t),
+	void (*gb_error)(struct gb_t*, const enum gb_error_e, const uint16_t),
 	void *priv)
 {
 	const uint16_t mbc_location = 0x0147;

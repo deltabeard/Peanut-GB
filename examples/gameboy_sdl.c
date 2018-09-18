@@ -52,44 +52,6 @@ void gb_cart_ram_write(struct gb_t *gb, const uint32_t addr,
 }
 
 /**
- * Handles an error reported by the emulator. The emulator context may be used
- * to better understand why the error given in gb_err was reported.
- */
-void gb_error(struct gb_t *gb, const enum gb_error_e gb_err)
-{
-	struct priv_t *priv = gb->priv;
-
-	switch(gb_err)
-	{
-		case GB_INVALID_OPCODE:
-			printf("Invalid opcode %#04x", __gb_read(gb, gb->cpu_reg.pc));
-			break;
-
-		case GB_INVALID_WRITE:
-		case GB_INVALID_READ:
-			return;
-			printf("Invalid write");
-			break;
-
-		default:
-			printf("Unknown error");
-			break;
-	}
-
-	printf(" at PC: %#06x, SP: %#06x\n", gb->cpu_reg.pc, gb->cpu_reg.sp);
-
-	puts("Press q to exit, or any other key to continue.");
-	if(getchar() == 'q')
-	{
-		free(priv->rom);
-		free(priv->cart_ram);
-		exit(EXIT_FAILURE);
-	}
-
-	return;
-}
-
-/**
  * Returns a pointer to the allocated space containing the ROM. Must be freed.
  */
 uint8_t *read_rom_to_ram(const char *file_name)
@@ -171,6 +133,51 @@ void write_cart_ram_file(const char *save_file_name, uint8_t **dest,
 	fclose(f);
 }
 
+/**
+ * Handles an error reported by the emulator. The emulator context may be used
+ * to better understand why the error given in gb_err was reported.
+ */
+void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
+{
+	struct priv_t *priv = gb->priv;
+
+	switch(gb_err)
+	{
+		case GB_INVALID_OPCODE:
+			fprintf(stderr, "Invalid opcode %#04x at PC: %#06x, SP: %#06x\n",
+                    __gb_read(gb, gb->cpu_reg.pc--),
+                    gb->cpu_reg.pc,
+                    gb->cpu_reg.sp);
+			break;
+
+		case GB_INVALID_WRITE:
+			fprintf(stderr, "Invalid write at address %#06x, PC: %#06x\n",
+                    val, gb->cpu_reg.pc);
+            return;
+		case GB_INVALID_READ:
+			fprintf(stderr, "Invalid read at address %#06x, at PC: %#06x\n",
+                    val, gb->cpu_reg.pc);
+            return;
+
+		default:
+			printf("Unknown error");
+			break;
+	}
+
+	fprintf(stderr, "Press q to exit, or any other key to continue.");
+	if(getchar() == 'q')
+	{
+        /* Record save file. */
+        write_cart_ram_file("recovery.sav", &priv->cart_ram, gb_get_save_size(gb));
+
+		free(priv->rom);
+		free(priv->cart_ram);
+		exit(EXIT_FAILURE);
+	}
+
+	return;
+}
+
 int main(int argc, char **argv)
 {
     struct gb_t gb;
@@ -186,9 +193,10 @@ int main(int argc, char **argv)
 	enum gb_init_error_e ret;
 
 	/* Make sure a file name is given. */
-	if(argc != 2)
+	if(argc < 2 || argc > 3)
 	{
-		printf("Usage: %s FILE\n", argv[0]);
+		printf("Usage: %s FILE [SAVE]\n", argv[0]);
+        puts("SAVE is set by default if not provided.");
 		return EXIT_FAILURE;
 	}
 
@@ -199,7 +207,9 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	/* Copy save file (with specific name) to allocated memory. */
+    /* If no save file is specified, copy save file (with specific name) to
+     * allocated memory. */
+    if(argc == 2)
 	{
 		char *str_replace;
 		char extension[] = "sav";
@@ -219,6 +229,8 @@ int main(int argc, char **argv)
 		for(unsigned int i = 0; i < strlen(extension) + 1; i++)
 			*(++str_replace) = extension[i];
 	}
+    else
+        save_file_name = argv[2];
 	
 	/* TODO: Sanity check input GB file. */
 
@@ -299,7 +311,20 @@ int main(int argc, char **argv)
 		gb_process_joypad(&gb);
 
 		/* Execute CPU cycles until the screen has to be redrawn. */
-		gb_run_frame(&gb);
+		//gb_run_frame(&gb);
+
+	    gb.gb_frame = 0;
+        while(gb.gb_frame == 0)
+        {
+            __gb_step_cpu(&gb);
+            /* Debugging */
+            printf("OP: %#04X%s  PC: %#06X  SP: %#06X  A: %#04X\n",
+                    __gb_read(&gb, gb.cpu_reg.pc),
+                    gb.gb_halt ? "(HALTED)" : "",
+                    gb.cpu_reg.pc,
+                    gb.cpu_reg.sp,
+                    gb.cpu_reg.a);
+        }
 
 		/* Copy frame buffer from emulator context, converting to colours
 		 * defined in the palette. */
@@ -324,7 +349,7 @@ int main(int argc, char **argv)
 
 		/* Use a delay that will draw the screen at a rate of 59.73 Hz. */
 		new_ticks = SDL_GetTicks();
-		delay = 17 - (new_ticks - old_ticks);
+		delay = (17/3) - (new_ticks - old_ticks);
 		SDL_Delay(delay > 0 ? delay : 0);
 	}
 

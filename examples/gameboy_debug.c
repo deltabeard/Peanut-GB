@@ -18,33 +18,31 @@ struct priv_t
 /**
  * Returns an byte from the ROM file at the given address.
  */
-uint8_t gb_rom_read(struct gb_t **gb, const uint32_t addr)
+uint8_t gb_rom_read(struct gb_t *gb, const uint32_t addr)
 {
-    const struct priv_t * const p = (*gb)->priv;
+    const struct priv_t * const p = gb->priv;
     return p->rom[addr];
 }
 
-uint8_t gb_cart_ram_read(struct gb_t **gb, const uint32_t addr)
+uint8_t gb_cart_ram_read(struct gb_t *gb, const uint32_t addr)
 {
-	const struct priv_t * const p = (*gb)->priv;
+	const struct priv_t * const p = gb->priv;
 	return p->cart_ram[addr];
 }
 
-void gb_cart_ram_write(struct gb_t **gb, const uint32_t addr,
+void gb_cart_ram_write(struct gb_t *gb, const uint32_t addr,
 	const uint8_t val)
 {
-	const struct priv_t * const p = (*gb)->priv;
+	const struct priv_t * const p = gb->priv;
 	p->cart_ram[addr] = val;
 }
 
-void gb_error(struct gb_t **p, const enum gb_error_e gb_err)
+void gb_error(struct gb_t *gb, const enum gb_error_e gb_err)
 {
-	struct gb_t *gb = *p;
-
 	switch(gb_err)
 	{
 		case GB_INVALID_OPCODE:
-			printf("Invalid opcode %#04x", __gb_read(&gb, gb->cpu_reg.pc));
+			printf("Invalid opcode %#04x", __gb_read(gb, gb->cpu_reg.pc));
 			break;
 
 		case GB_INVALID_WRITE:
@@ -120,19 +118,17 @@ int main(int argc, char **argv)
 	priv.cart_ram = malloc(gb_get_save_size(&gb));
 	memset(priv.cart_ram, 0xFF, gb_get_save_size(&gb));
 
-	struct gb_t *p = &gb;
-
 	while(running--)
 	{
-		__gb_step_cpu(&p);
+		__gb_step_cpu(&gb);
 		/* Debugging */
 		printf("OP: %#04X  PC: %#06X  SP: %#06X  A: %#04X  Stack: %#06X %#06X\n",
-			(gb.gb_halt ? 0x00 : __gb_read(&p, gb.cpu_reg.pc)),
+			(gb.gb_halt ? 0x00 : __gb_read(&gb, gb.cpu_reg.pc)),
 			gb.cpu_reg.pc,
 			gb.cpu_reg.sp,
 			gb.cpu_reg.a,
-			(__gb_read(&p, 0xDFFF - 4) + (__gb_read(&p, 0xDFFF - 3) << 8)),
-			(__gb_read(&p, 0xDFFF - 2) + (__gb_read(&p, 0xDFFF - 1) << 8)));
+			(__gb_read(&gb, 0xDFFF - 4) + (__gb_read(&gb, 0xDFFF - 3) << 8)),
+			(__gb_read(&gb, 0xDFFF - 2) + (__gb_read(&gb, 0xDFFF - 1) << 8)));
 	}
 
 	puts("Timeout");
