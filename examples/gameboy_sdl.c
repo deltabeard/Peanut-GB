@@ -191,7 +191,7 @@ int main(int argc, char **argv)
 	uint32_t new_ticks, old_ticks;
 	char *save_file_name;
 	enum gb_init_error_e ret;
-    unsigned int fast_mode = 0;
+    unsigned int fast_mode = 1;
 
 	/* Make sure a file name is given. */
 	if(argc < 2 || argc > 3)
@@ -236,8 +236,8 @@ int main(int argc, char **argv)
 	/* TODO: Sanity check input GB file. */
 
     /* Initialise emulator context. */
-    ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error,
-			&priv);
+    ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write,
+            &gb_error, &priv);
 
 	if(ret != GB_INIT_NO_ERROR)
 	{
@@ -263,7 +263,7 @@ int main(int argc, char **argv)
 		uint32_t *screen_copy;
 		int32_t delay;
 		
-		/* TODO: Get joypad input. */
+		/* Get joypad input. */
 		while(SDL_PollEvent(&event))
 		{
 			switch(event.type)
@@ -284,6 +284,10 @@ int main(int argc, char **argv)
 						case SDLK_LEFT: gb.joypad_bits.left = 0; break;
 						case SDLK_RIGHT: gb.joypad_bits.right = 0; break;
 						case SDLK_SPACE: fast_mode = !fast_mode; break;
+						case SDLK_1: fast_mode = 1; break;
+						case SDLK_2: fast_mode = 2; break;
+						case SDLK_3: fast_mode = 3; break;
+						case SDLK_4: fast_mode = 4; break;
 						default: break;
 					}
 					break;
@@ -313,20 +317,7 @@ int main(int argc, char **argv)
 		gb_process_joypad(&gb);
 
 		/* Execute CPU cycles until the screen has to be redrawn. */
-		//gb_run_frame(&gb);
-
-	    gb.gb_frame = 0;
-        while(gb.gb_frame == 0)
-        {
-            __gb_step_cpu(&gb);
-            /* Debugging */
-            printf("OP: %#04X%s  PC: %#06X  SP: %#06X  A: %#04X\n",
-                    __gb_read(&gb, gb.cpu_reg.pc),
-                    gb.gb_halt ? "(HALTED)" : "",
-                    gb.cpu_reg.pc,
-                    gb.cpu_reg.sp,
-                    gb.cpu_reg.a);
-        }
+        gb_run_frame(&gb);
 
 		/* Copy frame buffer from emulator context, converting to colours
 		 * defined in the palette. */
@@ -351,10 +342,8 @@ int main(int argc, char **argv)
 
 		/* Use a delay that will draw the screen at a rate of 59.73 Hz. */
 		new_ticks = SDL_GetTicks();
-        if(fast_mode)
-            continue;
 
-		delay = 17 - (new_ticks - old_ticks);
+		delay = (17/fast_mode) - (new_ticks - old_ticks);
 		SDL_Delay(delay > 0 ? delay : 0);
 	}
 
