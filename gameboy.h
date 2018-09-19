@@ -24,6 +24,7 @@
 
 #include <stdint.h> /* Required for int types */
 #include <string.h>	/* Required for memset() */
+#include <time.h>
 
 /* Enable sound support, including sound registers. Off by default due to no
  * implementation. */
@@ -295,7 +296,18 @@ struct gb_t
 	uint8_t enable_cart_ram;
 	/* Cartridge ROM/RAM mode select. */
 	uint8_t cart_mode_select;
-	uint8_t cart_rtc[5];
+    union
+    {
+        struct
+        {
+            uint8_t sec;
+            uint8_t min;
+            uint8_t hour;
+            uint8_t yday;
+            uint8_t high;
+        } rtc_bits;
+        uint8_t cart_rtc[5];
+    };
 
 	struct cpu_registers_t cpu_reg;
 	struct timer_t timer;
@@ -352,6 +364,49 @@ void gb_process_joypad(struct gb_t *gb)
 		gb->gb_reg.P1 &= 0xF0 | (gb->joypad & 0x0F);
 }
 
+/**
+ * Tick the internal RTC by one second.
+ */
+void gb_tick_rtc(struct gb_t *gb)
+{
+    /* is timer running? */
+    if((gb->cart_rtc[4] & 0x40) == 0)
+    {
+        if(++gb->rtc_bits.sec == 60)
+        {
+            gb->rtc_bits.sec = 0;
+            if(++gb->rtc_bits.min == 60)
+            {
+                gb->rtc_bits.min = 0;
+                if(++gb->rtc_bits.hour == 24)
+                {
+                    gb->rtc_bits.hour = 0;
+                    if(++gb->rtc_bits.yday == 0)
+                    {
+                        if (gb->rtc_bits.high & 1) /* Bit 8 of days*/
+                        {
+                            gb->rtc_bits.high |= 0x80; /* Overflow bit */
+                        }
+                        gb->rtc_bits.high ^= 1;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Set initial values in RTC.
+ */
+void gb_set_rtc(struct gb_t *gb, const struct tm * const time)
+{
+    gb->cart_rtc[0] = time->tm_sec;
+    gb->cart_rtc[1] = time->tm_min;
+    gb->cart_rtc[2] = time->tm_hour;
+    gb->cart_rtc[3] = time->tm_yday & 0xFF; /* Low 8 bits of day counter. */
+    gb->cart_rtc[4] = time->tm_yday >> 8; /* High 1 bit of day counter. */
+}
+
 uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
 {
 	switch(addr >> 12)
@@ -382,8 +437,12 @@ uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
 			{
 				if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
 					return gb->cart_rtc[gb->cart_ram_bank - 0x08];
-				else if((gb->cart_mode_select || gb->mbc != 1) && gb->cart_ram_bank < gb->num_ram_banks)
-					return gb->gb_cart_ram_read(gb, addr - CART_RAM_ADDR + (gb->cart_ram_bank * CRAM_BANK_SIZE));
+				else if((gb->cart_mode_select || gb->mbc != 1) &&
+                        gb->cart_ram_bank < gb->num_ram_banks)
+                {
+					return gb->gb_cart_ram_read(gb, addr - CART_RAM_ADDR +
+                            (gb->cart_ram_bank * CRAM_BANK_SIZE));
+                }
 				else
 					return gb->gb_cart_ram_read(gb, addr - CART_RAM_ADDR);
 			}
