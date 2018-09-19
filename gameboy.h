@@ -2743,8 +2743,10 @@ void __gb_step_cpu(struct gb_t *gb)
 
 	/* CPU Timing */
 	gb->timer.cpu_count += inst_cycles;
+
 	/* DIV register timing */
 	gb->timer.div_count += inst_cycles;
+
 	if(gb->timer.div_count > DIV_CYCLES)
 	{
 		gb->gb_reg.DIV++;
@@ -2769,13 +2771,13 @@ void __gb_step_cpu(struct gb_t *gb)
 		}
 	}
 
+	/* TODO Check behaviour of LCD during LCD power off state. */
+	/* If LCD is off, don't update LCD state. */
+	if((gb->gb_reg.LCDC & LCDC_ENABLE) == 0)
+		return;
+
 	/* LCD Timing */
 	gb->timer.lcd_count += inst_cycles;
-
-    /* TODO Check behaviour of LCD during LCD power off state. */
-    /* If LCD is off, don't update LCD state. */
-    if((gb->gb_reg.LCDC >> 7) == 0)
-        return;
 
 	/* New Scanline */
 	if(gb->timer.lcd_count > LCD_LINE_CYCLES)
@@ -2836,7 +2838,6 @@ void __gb_step_cpu(struct gb_t *gb)
 		__gb_draw_line(gb);
 #endif
 	}
-
 }
 
 void gb_run_frame(struct gb_t *gb)

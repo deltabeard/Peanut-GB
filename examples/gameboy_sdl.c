@@ -340,7 +340,7 @@ int main(int argc, char **argv)
 		SDL_UnlockSurface(screen);
 		SDL_Flip(screen);
 
-		/* Use a delay that will draw the screen at a rate of 59.73 Hz. */
+		/* Use a delay that will draw the screen at a rate of 59.7275 Hz. */
 		new_ticks = SDL_GetTicks();
 
 		delay = (17/fast_mode) - (new_ticks - old_ticks);
