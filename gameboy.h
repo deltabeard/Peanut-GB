@@ -684,7 +684,6 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 				/* DMA Register */
 				case 0x46:
 					gb->gb_reg.DMA = (val % 0xF1);
-					/* TODO: Check the 8 bit shift. */
 					for (uint8_t i = 0; i < OAM_SIZE; i++)
 						gb->oam[i] = __gb_read(gb, (gb->gb_reg.DMA << 8) + i);
 
