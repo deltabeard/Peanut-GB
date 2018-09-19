@@ -247,6 +247,17 @@ int main(int argc, char **argv)
 
 	/* Load Save File. */
 	read_cart_ram_file(save_file_name, &priv.cart_ram, gb_get_save_size(&gb));
+
+    /* Set the RTC of the game cartridge. Only used by games that support it. */
+    {
+        time_t rawtime;
+        struct tm * timeinfo;
+        time(&rawtime);
+        timeinfo = localtime(&rawtime);
+
+        /* Set RTC */
+        gb_set_rtc(&gb, timeinfo);
+    }
 	
 	/* Initialise frontend implementation, in this case, SDL. */
 	SDL_Init(SDL_INIT_VIDEO);
@@ -262,6 +273,7 @@ int main(int argc, char **argv)
 		};
 		uint32_t *screen_copy;
 		int32_t delay;
+        static unsigned int rtc_timer = 0;
 		
 		/* Get joypad input. */
 		while(SDL_PollEvent(&event))
@@ -345,6 +357,14 @@ int main(int argc, char **argv)
 
 		delay = (17/fast_mode) - (new_ticks - old_ticks);
 		SDL_Delay(delay > 0 ? delay : 0);
+
+        /* Tick the internal RTC when 1 second has passed. */
+        rtc_timer += 17/fast_mode;
+        if(rtc_timer >= 1000)
+        {
+            rtc_timer -= 1000;
+            gb_tick_rtc(&gb);
+        }
 	}
 
 	SDL_Quit();
