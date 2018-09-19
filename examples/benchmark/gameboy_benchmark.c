@@ -36,7 +36,7 @@ uint8_t gb_cart_ram_read(struct gb_t *gb, const uint32_t addr)
 /**
  * Ignore all errors.
  */
-void gb_error(struct gb_t *gb, const enum gb_error_e gb_err)
+void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 {
 	return;
 }
