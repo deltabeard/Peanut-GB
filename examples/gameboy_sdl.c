@@ -189,7 +189,7 @@ int main(int argc, char **argv)
 	SDL_Renderer *renderer;
 	SDL_Texture *texture;
 	SDL_Event event;
-	uint32_t fb[height][width];
+	uint16_t fb[height][width];
 	uint32_t new_ticks, old_ticks;
 	char *save_file_name;
 	enum gb_init_error_e ret;
@@ -313,7 +313,7 @@ int main(int argc, char **argv)
 	SDL_RenderPresent(renderer);
 
 	texture = SDL_CreateTexture(renderer,
-			SDL_PIXELFORMAT_RGBX8888,
+			SDL_PIXELFORMAT_RGB565,
 			SDL_TEXTUREACCESS_STREAMING,
 			width, height);
 	if(texture == NULL)
@@ -326,8 +326,8 @@ int main(int argc, char **argv)
 
 	while(running)
 	{
-		const uint32_t palette[4] = {
-			0xFFFFFFFF, 0x99999999, 0x44444444, 0x00000000
+		const uint16_t palette[4] = {
+			0xFFFF, 0x9CD3, 0x4228, 0x0000
 		};
 		int32_t delay;
 		static unsigned int rtc_timer = 0;
@@ -400,7 +400,7 @@ int main(int argc, char **argv)
 		}
 
 		/* Copy frame buffer to SDL screen. */
-		SDL_UpdateTexture(texture, NULL, &fb, width * sizeof(uint32_t));
+		SDL_UpdateTexture(texture, NULL, &fb, width * sizeof(uint16_t));
 		SDL_RenderClear(renderer);
 		SDL_RenderCopy(renderer, texture, NULL, NULL);
 		SDL_RenderPresent(renderer);
