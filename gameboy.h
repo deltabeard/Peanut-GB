@@ -256,6 +256,9 @@ enum gb_init_error_e
 	GB_INIT_CARTRIDGE_UNSUPPORTED
 };
 
+/**
+ * Emulator context.
+ */
 struct gb_t
 {
 	uint8_t (*gb_rom_read)(struct gb_t*, const uint32_t);
@@ -350,6 +353,11 @@ struct gb_t
 	uint8_t WYC;
 };
 
+/**
+ * Processes the values set in gb->joypad to the emulator.
+ * This function should be called when a button press should be registered.
+ * Before calling gb_run_frame() is good enough.
+ */
 void gb_process_joypad(struct gb_t *gb)
 {
 	gb->gb_reg.P1 |= 0x0F;
@@ -397,6 +405,7 @@ void gb_tick_rtc(struct gb_t *gb)
 
 /**
  * Set initial values in RTC.
+ * Should be called after gb_init().
  */
 void gb_set_rtc(struct gb_t *gb, const struct tm * const time)
 {
@@ -407,6 +416,9 @@ void gb_set_rtc(struct gb_t *gb, const struct tm * const time)
 	gb->cart_rtc[4] = time->tm_yday >> 8; /* High 1 bit of day counter. */
 }
 
+/**
+ * Internal function used to read bytes.
+ */
 uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
 {
 	switch(addr >> 12)
@@ -553,6 +565,9 @@ uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
 	return 1;
 }
 
+/**
+ * Internal function used to write bytes.
+ */
 void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 {
 	switch(addr >> 12)
@@ -789,9 +804,9 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 }
 
 /**
- * Initialises startup values.
+ * Resets the context, and initialises startup values.
  */
-void __gb_reset(struct gb_t *gb)
+void gb_reset(struct gb_t *gb)
 {
 	gb->gb_halt = 0;
 	gb->gb_ime = 1;
@@ -1198,6 +1213,9 @@ void __gb_draw_line(struct gb_t *gb)
 }
 #endif
 
+/**
+ * Internal function used to step the CPU.
+ */
 void __gb_step_cpu(struct gb_t *gb)
 {
 	uint8_t opcode, inst_cycles;
@@ -2918,7 +2936,8 @@ uint32_t gb_get_save_size(struct gb_t *gb)
 	return ram_sizes[ram_size];
 }
 /**
- * Initialise the emulator context.
+ * Initialise the emulator context. gb_reset() is also called to initialise
+ * the CPU.
  */
 enum gb_init_error_e gb_init(struct gb_t *gb,
 		uint8_t (*gb_rom_read)(struct gb_t*, const uint32_t),
@@ -2976,7 +2995,7 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 	gb->num_rom_banks = num_rom_banks[gb->gb_rom_read(gb, bank_count_location)];
 	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(gb, ram_size_location)];
 
-	__gb_reset(gb);
+	gb_reset(gb);
 
 	return GB_INIT_NO_ERROR;
 }

@@ -252,11 +252,24 @@ int main(int argc, char **argv)
 	/* Set the RTC of the game cartridge. Only used by games that support it. */
 	{
 		time_t rawtime;
-		struct tm * timeinfo;
+		struct tm *timeinfo;
 		time(&rawtime);
 		timeinfo = localtime(&rawtime);
 
-		/* Set RTC */
+		/* You could potentially force the game to allow the player to reset the
+		 * time by setting the RTC to invalid values.
+		 *
+		 * Using memset(&gb->cart_rtc, 0xFF, sizeof(gb->cart_rtc)) for example
+		 * causes Pokemon Gold/Silver to say "TIME NOT SET", allowing the player
+		 * to set the time without having some dumb password.
+		 *
+		 * The memset has to be done directly to gb->cart_rtc because
+		 * gb_set_rtc() processes the input values, which may cause games to not
+		 * detect invalid values.
+		 */
+
+		/* Set RTC. Only games that specify support for RTC will use these
+		 * values. */
 		gb_set_rtc(&gb, timeinfo);
 	}
 
@@ -301,6 +314,7 @@ int main(int argc, char **argv)
 						case SDLK_2: fast_mode = 2; break;
 						case SDLK_3: fast_mode = 3; break;
 						case SDLK_4: fast_mode = 4; break;
+						case SDLK_r: gb_reset(&gb); break;
 						default: break;
 					}
 					break;
@@ -327,6 +341,8 @@ int main(int argc, char **argv)
 		 * at 60 fps. */
 		old_ticks = SDL_GetTicks();
 
+		/* Tell the emulator to process the joypad variable modified above to
+		 * values that the Game Boy uses. */
 		gb_process_joypad(&gb);
 
 		/* Execute CPU cycles until the screen has to be redrawn. */
