@@ -13,7 +13,7 @@
 uint8_t gb_rom_read(struct gb_t *gb, const uint32_t addr)
 {
 	/* Import blarrg CPU test ROM. */
-	#include "../../test/cpu_instrs.h"
+#include "../../test/cpu_instrs.h"
 	return cpu_instrs_gb[addr];
 }
 
@@ -45,7 +45,7 @@ int main(void)
 {
 	unsigned long long benchmark_ticks_total = 0;
 	unsigned long long benchmark_fps_total = 0;
-	
+
 	const unsigned short pc_end = 0x06F1; /* Test ends when PC is this value. */
 
 	puts("Benchmark started");
@@ -60,8 +60,8 @@ int main(void)
 		unsigned long long frames = 0;
 
 		/* Initialise context. */
-    	gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write,
-			&gb_error, NULL);
+		gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write,
+				&gb_error, NULL);
 
 		/* Step CPU until test is complete. */
 		while(gb.cpu_reg.pc != pc_end)

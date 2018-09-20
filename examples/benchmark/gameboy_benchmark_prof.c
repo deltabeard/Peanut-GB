@@ -15,7 +15,7 @@
 uint8_t gb_rom_read(struct gb_t *gb, const uint32_t addr)
 {
 	/* Import blarrg CPU test ROM. */
-	#include "../../test/cpu_instrs.h"
+#include "../../test/cpu_instrs.h"
 	return cpu_instrs_gb[addr];
 }
 
