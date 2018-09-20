@@ -30,8 +30,8 @@ struct priv_t
  */
 uint8_t gb_rom_read(struct gb_t *gb, const uint32_t addr)
 {
-    const struct priv_t * const p = gb->priv;
-    return p->rom[addr];
+	const struct priv_t * const p = gb->priv;
+	return p->rom[addr];
 }
 
 /**
@@ -47,7 +47,7 @@ uint8_t gb_cart_ram_read(struct gb_t *gb, const uint32_t addr)
  * Writes a given byte to the cartridge RAM at the given address.
  */
 void gb_cart_ram_write(struct gb_t *gb, const uint32_t addr,
-	const uint8_t val)
+		const uint8_t val)
 {
 	const struct priv_t * const p = gb->priv;
 	p->cart_ram[addr] = val;
@@ -63,7 +63,7 @@ uint8_t *read_rom_to_ram(const char *file_name)
 	uint8_t *rom = NULL;
 
 	if(rom_file == NULL)
-        return NULL;
+		return NULL;
 
 	fseek(rom_file, 0, SEEK_END);
 	rom_size = ftell(rom_file);
@@ -71,7 +71,7 @@ uint8_t *read_rom_to_ram(const char *file_name)
 	rom = malloc(rom_size);
 
 	if(fread(rom, sizeof(uint8_t), rom_size, rom_file) != rom_size)
-    {
+	{
 		free(rom);
 		fclose(rom_file);
 		return NULL;
@@ -82,7 +82,7 @@ uint8_t *read_rom_to_ram(const char *file_name)
 }
 
 void read_cart_ram_file(const char *save_file_name, uint8_t **dest,
-	const size_t len)
+		const size_t len)
 {
 	FILE *f;
 
@@ -116,7 +116,7 @@ void read_cart_ram_file(const char *save_file_name, uint8_t **dest,
 }
 
 void write_cart_ram_file(const char *save_file_name, uint8_t **dest,
-	const size_t len)
+		const size_t len)
 {
 	FILE *f;
 
@@ -146,18 +146,18 @@ void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 	switch(gb_err)
 	{
 		case GB_INVALID_OPCODE:
-            /* We compensate for the post-increment in the __gb_step_cpu
-             * function. */
+			/* We compensate for the post-increment in the __gb_step_cpu
+			 * function. */
 			fprintf(stdout, "Invalid opcode %#04x at PC: %#06x, SP: %#06x\n",
-                    __gb_read(gb, gb->cpu_reg.pc - 1),
-                    gb->cpu_reg.pc - 1,
-                    gb->cpu_reg.sp);
+					__gb_read(gb, gb->cpu_reg.pc - 1),
+					gb->cpu_reg.pc - 1,
+					gb->cpu_reg.sp);
 			break;
 
-            /* Ignoring non fatal errors. */
+			/* Ignoring non fatal errors. */
 		case GB_INVALID_WRITE:
 		case GB_INVALID_READ:
-            return;
+			return;
 
 		default:
 			printf("Unknown error");
@@ -167,8 +167,9 @@ void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 	fprintf(stderr, "Error. Press q to exit, or any other key to continue.");
 	if(getchar() == 'q')
 	{
-        /* Record save file. */
-        write_cart_ram_file("recovery.sav", &priv->cart_ram, gb_get_save_size(gb));
+		/* Record save file. */
+		write_cart_ram_file("recovery.sav", &priv->cart_ram,
+				gb_get_save_size(gb));
 
 		free(priv->rom);
 		free(priv->cart_ram);
@@ -180,7 +181,7 @@ void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 
 int main(int argc, char **argv)
 {
-    struct gb_t gb;
+	struct gb_t gb;
 	struct priv_t priv;
 	const unsigned int height = 144;
 	const unsigned int width = 160;
@@ -191,13 +192,13 @@ int main(int argc, char **argv)
 	uint32_t new_ticks, old_ticks;
 	char *save_file_name;
 	enum gb_init_error_e ret;
-    unsigned int fast_mode = 1;
+	unsigned int fast_mode = 1;
 
 	/* Make sure a file name is given. */
 	if(argc < 2 || argc > 3)
 	{
 		printf("Usage: %s FILE [SAVE]\n", argv[0]);
-        puts("SAVE is set by default if not provided.");
+		puts("SAVE is set by default if not provided.");
 		return EXIT_FAILURE;
 	}
 
@@ -208,9 +209,9 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-    /* If no save file is specified, copy save file (with specific name) to
-     * allocated memory. */
-    if(argc == 2)
+	/* If no save file is specified, copy save file (with specific name) to
+	 * allocated memory. */
+	if(argc == 2)
 	{
 		char *str_replace;
 		char extension[] = "sav";
@@ -230,14 +231,14 @@ int main(int argc, char **argv)
 		for(unsigned int i = 0; i < strlen(extension) + 1; i++)
 			*(++str_replace) = extension[i];
 	}
-    else
-        save_file_name = argv[2];
-	
+	else
+		save_file_name = argv[2];
+
 	/* TODO: Sanity check input GB file. */
 
-    /* Initialise emulator context. */
-    ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write,
-            &gb_error, &priv);
+	/* Initialise emulator context. */
+	ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write,
+			&gb_error, &priv);
 
 	if(ret != GB_INIT_NO_ERROR)
 	{
@@ -248,17 +249,17 @@ int main(int argc, char **argv)
 	/* Load Save File. */
 	read_cart_ram_file(save_file_name, &priv.cart_ram, gb_get_save_size(&gb));
 
-    /* Set the RTC of the game cartridge. Only used by games that support it. */
-    {
-        time_t rawtime;
-        struct tm * timeinfo;
-        time(&rawtime);
-        timeinfo = localtime(&rawtime);
+	/* Set the RTC of the game cartridge. Only used by games that support it. */
+	{
+		time_t rawtime;
+		struct tm * timeinfo;
+		time(&rawtime);
+		timeinfo = localtime(&rawtime);
 
-        /* Set RTC */
-        gb_set_rtc(&gb, timeinfo);
-    }
-	
+		/* Set RTC */
+		gb_set_rtc(&gb, timeinfo);
+	}
+
 	/* Initialise frontend implementation, in this case, SDL. */
 	SDL_Init(SDL_INIT_VIDEO);
 	screen = SDL_SetVideoMode(width, height, 32, SDL_HWSURFACE | SDL_DOUBLEBUF);
@@ -273,8 +274,8 @@ int main(int argc, char **argv)
 		};
 		uint32_t *screen_copy;
 		int32_t delay;
-        static unsigned int rtc_timer = 0;
-		
+		static unsigned int rtc_timer = 0;
+
 		/* Get joypad input. */
 		while(SDL_PollEvent(&event))
 		{
@@ -283,7 +284,7 @@ int main(int argc, char **argv)
 				case SDL_QUIT:
 					running = 0;
 					break;
-				
+
 				case SDL_KEYDOWN:
 					switch(event.key.keysym.sym)
 					{
@@ -329,7 +330,7 @@ int main(int argc, char **argv)
 		gb_process_joypad(&gb);
 
 		/* Execute CPU cycles until the screen has to be redrawn. */
-        gb_run_frame(&gb);
+		gb_run_frame(&gb);
 
 		/* Copy frame buffer from emulator context, converting to colours
 		 * defined in the palette. */
@@ -358,13 +359,13 @@ int main(int argc, char **argv)
 		delay = (17/fast_mode) - (new_ticks - old_ticks);
 		SDL_Delay(delay > 0 ? delay : 0);
 
-        /* Tick the internal RTC when 1 second has passed. */
-        rtc_timer += 17/fast_mode;
-        if(rtc_timer >= 1000)
-        {
-            rtc_timer -= 1000;
-            gb_tick_rtc(&gb);
-        }
+		/* Tick the internal RTC when 1 second has passed. */
+		rtc_timer += 17/fast_mode;
+		if(rtc_timer >= 1000)
+		{
+			rtc_timer -= 1000;
+			gb_tick_rtc(&gb);
+		}
 	}
 
 	SDL_Quit();
