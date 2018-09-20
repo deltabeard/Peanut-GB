@@ -1,6 +1,9 @@
 /**
  * MIT License
  * Copyright (c) 2018 Mahyar Koshkouei
+ *
+ * An example of using the gameboy.h library. This example application uses SDL2
+ * to draw the screen and get input.
  */
 
 #include <errno.h>
