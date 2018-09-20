@@ -1204,10 +1204,10 @@ void __gb_draw_line(struct gb_t *gb)
 		}
 	}
 
-	/* Convert to 8-bit color. */
+	/* Convert shade to color number. */
 	for(uint8_t X = 0; X < LCD_WIDTH; X++)
 	{
-		if (SX[X] == 0xFE)
+		if(SX[X] == 0xFE)
 			gb->gb_fb[gb->gb_reg.LY][X] = gb->BGP[gb->gb_fb[gb->gb_reg.LY][X]];
 	}
 }
