@@ -427,7 +427,11 @@ int main(int argc, char **argv)
 
 	free(priv.rom);
 	free(priv.cart_ram);
-	free(save_file_name);
+	
+	/* If the save file name was automatically generated (which required memory
+	 * allocated on the help), then free it here. */
+	if(argc == 2)
+		free(save_file_name);
 
 	return EXIT_SUCCESS;
 }
