@@ -10,8 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <SDL/SDL.h>
-#include <SDL/SDL_main.h>
+#include <SDL2/SDL.h>
 
 #define ENABLE_SOUND 1
 
@@ -186,7 +185,9 @@ int main(int argc, char **argv)
 	const unsigned int height = 144;
 	const unsigned int width = 160;
 	unsigned int running = 1;
-	SDL_Surface* screen;
+	SDL_Window *window;
+	SDL_Renderer *renderer;
+	SDL_Texture *texture;
 	SDL_Event event;
 	uint32_t fb[height][width];
 	uint32_t new_ticks, old_ticks;
@@ -273,10 +274,53 @@ int main(int argc, char **argv)
 		gb_set_rtc(&gb, timeinfo);
 	}
 
-	/* Initialise frontend implementation, in this case, SDL. */
-	SDL_Init(SDL_INIT_VIDEO);
-	screen = SDL_SetVideoMode(width, height, 32, SDL_HWSURFACE | SDL_DOUBLEBUF);
-	SDL_WM_SetCaption("DMG Emulator", 0);
+	/* Initialise frontend implementation, in this case, SDL2. */
+	if(SDL_Init(SDL_INIT_VIDEO) < 0)
+	{
+		printf("Could not initialise SDL: %s\n", SDL_GetError());
+		return EXIT_FAILURE;
+	}
+
+	window = SDL_CreateWindow("DMG Emulator",
+			SDL_WINDOWPOS_UNDEFINED,
+			SDL_WINDOWPOS_UNDEFINED,
+			width, height,
+			0);
+	if(window == NULL)
+	{
+		printf("Could not create window: %s\n", SDL_GetError());
+		return EXIT_FAILURE;
+	}
+
+	renderer = SDL_CreateRenderer(window, -1, 0);
+	if(renderer == NULL)
+	{
+		printf("Could not create renderer: %s\n", SDL_GetError());
+		return EXIT_FAILURE;
+	}
+
+	if(SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255) < 0)
+	{
+		printf("Renderer could not draw color: %s\n", SDL_GetError());
+		return EXIT_FAILURE;
+	}
+
+	if(SDL_RenderClear(renderer) < 0)
+	{
+		printf("Renderer could not clear: %s\n", SDL_GetError());
+		return EXIT_FAILURE;
+	}
+	SDL_RenderPresent(renderer);
+
+	texture = SDL_CreateTexture(renderer,
+			SDL_PIXELFORMAT_RGBX8888,
+			SDL_TEXTUREACCESS_STREAMING,
+			width, height);
+	if(texture == NULL)
+	{
+		printf("Texture could not be created: %s\n", SDL_GetError());
+		return EXIT_FAILURE;
+	}
 
 	new_ticks = SDL_GetTicks();
 
@@ -285,7 +329,6 @@ int main(int argc, char **argv)
 		const uint32_t palette[4] = {
 			0xFFFFFFFF, 0x99999999, 0x44444444, 0x00000000
 		};
-		uint32_t *screen_copy;
 		int32_t delay;
 		static unsigned int rtc_timer = 0;
 
@@ -357,17 +400,10 @@ int main(int argc, char **argv)
 		}
 
 		/* Copy frame buffer to SDL screen. */
-		SDL_LockSurface(screen);
-		screen_copy = (uint32_t *) screen->pixels;
-		for(unsigned int y = 0; y < height; y++)
-		{
-			for (unsigned int x = 0; x < width; x++)
-				*(screen_copy + x) = fb[y][x];
-
-			screen_copy += screen->pitch / 4;
-		}
-		SDL_UnlockSurface(screen);
-		SDL_Flip(screen);
+		SDL_UpdateTexture(texture, NULL, &fb, width * sizeof(uint32_t));
+		SDL_RenderClear(renderer);
+		SDL_RenderCopy(renderer, texture, NULL, NULL);
+		SDL_RenderPresent(renderer);
 
 		/* Use a delay that will draw the screen at a rate of 59.7275 Hz. */
 		new_ticks = SDL_GetTicks();

@@ -2,7 +2,7 @@
 CC		= cc
 OPT		= -g -Og
 CFLAGS	= $(OPT) -std=c99 -Wall -Wextra
-LDLIBS	= -lSDL
+LDLIBS	= -lSDL2
 
 all: gameboy_sdl
 
