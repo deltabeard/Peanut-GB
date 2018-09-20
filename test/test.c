@@ -14,7 +14,7 @@
  */
 uint8_t gb_rom_read_cpu_instrs(struct gb_t *gb, const uint32_t addr)
 {
-	#include "cpu_instrs.h"
+#include "cpu_instrs.h"
 	assert(addr < cpu_instrs_gb_len);
 	return cpu_instrs_gb[addr];
 }
@@ -38,7 +38,7 @@ uint8_t gb_cart_ram_read(struct gb_t *gb, const uint32_t addr)
 /**
  * Ignore all errors.
  */
-void gb_error(struct gb_t *gb, const enum gb_error_e gb_err)
+void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 {
 	return;
 }
@@ -51,7 +51,7 @@ void test_cpu_inst(void)
 	const unsigned short pc_end = 0x06F1; /* Test ends when PC is this value. */
 
 	/* Run ROM test. */
-    gb_init(&gb, &gb_rom_read_cpu_instrs, &gb_cart_ram_read, &gb_cart_ram_write,
+	gb_init(&gb, &gb_rom_read_cpu_instrs, &gb_cart_ram_read, &gb_cart_ram_write,
 			&gb_error, NULL);
 
 	printf("Serial: ");
