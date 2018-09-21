@@ -218,22 +218,31 @@ int main(int argc, char **argv)
 	if(argc == 2)
 	{
 		char *str_replace;
-		char extension[] = "sav";
+		const char extension[] = ".sav";
+
+		/* Allocate enough space for the ROM file name, for the "sav" extension
+		 * and for the null terminator. */
 		save_file_name = malloc(strlen(argv[1]) + strlen(extension) + 1);
 
-		/* Generate name of save file. */
-		if((save_file_name = malloc(strlen(argv[1]) + 1)) == NULL)
+		if(save_file_name == NULL)
 		{
 			printf("%d: %s\n", __LINE__, strerror(errno));
 			return EXIT_FAILURE;
 		}
 
+		/* Copy the ROM file name to allocated space. */
 		strcpy(save_file_name, argv[1]);
-		str_replace = strrchr(save_file_name, '.');
+
+		/* If the file name does not have a dot, or the only dot is at the start
+		 * of the file name, set the pointer to begin replacing the string to
+		 * the end of the file name, otherwise set it to the dot. */
+		if((str_replace = strrchr(save_file_name, '.')) == NULL ||
+				str_replace == save_file_name)
+			str_replace = save_file_name + strlen(save_file_name);
 
 		/* Copy extension to string including terminating null byte. */
-		for(unsigned int i = 0; i < strlen(extension) + 1; i++)
-			*(++str_replace) = extension[i];
+		for(unsigned int i = 0; i <= strlen(extension); i++)
+			*(str_replace++) = extension[i];
 	}
 	else
 		save_file_name = argv[2];
