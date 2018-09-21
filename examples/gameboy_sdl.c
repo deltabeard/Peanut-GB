@@ -365,7 +365,7 @@ int main(int argc, char **argv)
 						case SDLK_DOWN: gb.joypad_bits.down = 0; break;
 						case SDLK_LEFT: gb.joypad_bits.left = 0; break;
 						case SDLK_RIGHT: gb.joypad_bits.right = 0; break;
-						case SDLK_SPACE: fast_mode = !fast_mode; break;
+						case SDLK_SPACE: fast_mode = 2; break;
 						case SDLK_1: fast_mode = 1; break;
 						case SDLK_2: fast_mode = 2; break;
 						case SDLK_3: fast_mode = 3; break;
@@ -389,6 +389,7 @@ int main(int argc, char **argv)
 						case SDLK_DOWN: gb.joypad_bits.down = 1; break;
 						case SDLK_LEFT: gb.joypad_bits.left = 1; break;
 						case SDLK_RIGHT: gb.joypad_bits.right = 1; break;
+						case SDLK_SPACE: fast_mode = 1; break;
 						default: break;
 					}
 					break;
