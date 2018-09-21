@@ -329,11 +329,21 @@ int main(int argc, char **argv)
 
 	while(running)
 	{
-		const uint16_t palette[4] = {
-			0xFFFF, 0x9CD3, 0x4228, 0x0000
-		};
 		int32_t delay;
 		static unsigned int rtc_timer = 0;
+		static uint8_t selected_palette = 4;
+#define MAX_PALETTE 6
+		const uint16_t palette[MAX_PALETTE][4] =
+		{										/* CGB Palette Entry (Notes) */
+			{ 0xFFFF, 0x57E0, 0xFA00, 0x0000 },	/* 0x05 */
+			{ 0xFFFF, 0xFFE0, 0xF800, 0x0000 },	/* 0x07 */
+			{ 0xFFFF, 0xFD6C, 0x8180, 0x0000 },	/* 0x12 */
+			{ 0x0000, 0x0430, 0xFEE0, 0xFFFF },	/* 0x13 */
+			{ 0xFFFF, 0xA534, 0x528A, 0x0000 },	/* 0x16 (DMG, Default) */
+			{ 0xFFF4, 0xFCB2, 0x94BF, 0x0000 }	/* 0x17 */
+			/* Entries with different palettes for BG, OBJ0 & OBJ1 are not
+			 * yet supported. */
+		};
 
 		/* Get joypad input. */
 		while(SDL_PollEvent(&event))
@@ -361,6 +371,10 @@ int main(int argc, char **argv)
 						case SDLK_3: fast_mode = 3; break;
 						case SDLK_4: fast_mode = 4; break;
 						case SDLK_r: gb_reset(&gb); break;
+						case SDLK_p:
+									 if(++selected_palette == MAX_PALETTE)
+										 selected_palette = 0;
+									 break;
 						default: break;
 					}
 					break;
@@ -399,7 +413,7 @@ int main(int argc, char **argv)
 		for (unsigned int y = 0; y < height; y++)
 		{
 			for (unsigned int x = 0; x < width; x++)
-				fb[y][x] = palette[gb.gb_fb[y][x] & 3];
+				fb[y][x] = palette[selected_palette][gb.gb_fb[y][x] & 3];
 		}
 
 		/* Copy frame buffer to SDL screen. */
