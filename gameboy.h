@@ -71,10 +71,6 @@
 #define CRAM_BANK_SIZE  0x2000
 #define VRAM_BANK_SIZE  0x2000
 
-/* TAC masks */
-#define TAC_ENABLE          0x04
-#define TAC_RATE            0x03
-
 /* DIV Register is incremented at rate of 16384Hz.
  * 4194304 / 16384 = 256 clock cycles for one increment. */
 #define DIV_CYCLES          256
@@ -193,19 +189,24 @@ struct cpu_registers_t
 
 struct timer_t
 {
-	uint16_t cpu_count; /* Unused currently */
 	uint16_t lcd_count;		/* LCD Timing */
 	uint16_t div_count;		/* Divider Register Counter */
 	uint16_t tima_count;	/* Timer Counter */
-	uint8_t tac_enable;		/* Timer enable */
-	uint8_t tac_rate;		/* Timer rate */
 };
 
 struct gb_registers_t
 {
 	/* TODO: Sort variables in address order. */
 	/* Timing */
-	uint8_t TIMA;	uint8_t TMA;	uint8_t TAC;	uint8_t DIV;
+	uint8_t TIMA, TMA, DIV;
+	union {
+		struct {
+			uint8_t tac_rate : 2;	/* Input clock select */
+			uint8_t tac_enable : 1;	/* Timer enable */
+			uint8_t unused : 5;
+		};
+		uint8_t TAC;
+	};
 
 #if ENABLE_SOUND
 	/* Sound */
@@ -711,11 +712,7 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 				case 0x04: gb->gb_reg.DIV = 0x00;	return;
 				case 0x05: gb->gb_reg.TIMA = val;	return;
 				case 0x06: gb->gb_reg.TMA = val;	return;
-				case 0x07:
-						   gb->gb_reg.TAC = val;
-						   gb->timer.tac_enable = gb->gb_reg.TAC & TAC_ENABLE;
-						   gb->timer.tac_rate = gb->gb_reg.TAC & TAC_RATE;
-						   return;
+				case 0x07: gb->gb_reg.TAC = val;	return;
 
 						   /* Interrupt Flag Register */
 				case 0x0F:
@@ -828,12 +825,9 @@ void gb_reset(struct gb_t *gb)
 	/* TODO: Add BIOS support. */
 	gb->cpu_reg.pc = 0x0100;
 
-	gb->timer.cpu_count = 0;
 	gb->timer.lcd_count = 0;
 	gb->timer.div_count = 0;
 	gb->timer.tima_count = 0;
-	gb->timer.tac_enable = 0;
-	gb->timer.tac_rate = 0;
 
 	gb->gb_reg.TIMA      = 0x00;
 	gb->gb_reg.TMA       = 0x00;
@@ -2816,31 +2810,30 @@ void __gb_step_cpu(struct gb_t *gb)
 			gb->gb_error(gb, GB_INVALID_OPCODE, opcode);
 	}
 
-	/* CPU Timing */
-	gb->timer.cpu_count += inst_cycles;
-
 	/* DIV register timing */
 	gb->timer.div_count += inst_cycles;
 
-	if(gb->timer.div_count > DIV_CYCLES)
+	if(gb->timer.div_count >= DIV_CYCLES)
 	{
 		gb->gb_reg.DIV++;
 		gb->timer.div_count -= DIV_CYCLES;
 	}
 
 	/* TIMA register timing */
-	if(gb->timer.tac_enable)
+	/* TODO: Change tac_enable to struct of TAC timer control bits. */
+	if(gb->gb_reg.tac_enable)
 	{
 		static const unsigned int TAC_CYCLES[4] = {1024, 16, 64, 256};
 
 		gb->timer.tima_count += inst_cycles;
-		if(gb->timer.tima_count > TAC_CYCLES[gb->timer.tac_rate])
+		if(gb->timer.tima_count >= TAC_CYCLES[gb->gb_reg.tac_rate])
 		{
-			gb->timer.tima_count -= TAC_CYCLES[gb->timer.tac_rate];
-			gb->gb_reg.TIMA++;
-			if(gb->gb_reg.TIMA == 0)
+			gb->timer.tima_count -= TAC_CYCLES[gb->gb_reg.tac_rate];
+
+			if(++gb->gb_reg.TIMA == 0)
 			{
 				gb->gb_reg.IF |= TIMER_INTR;
+				/* On overflow, set TMA to TIMA. */
 				gb->gb_reg.TIMA = gb->gb_reg.TMA;
 			}
 		}
