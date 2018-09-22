@@ -9,6 +9,12 @@
 #include <stdlib.h>
 #include <time.h>
 
+struct priv
+{
+	char str[1024];
+	unsigned int count;
+};
+
 /**
  * Return byte from blarrg test ROM.
  */
@@ -53,43 +59,41 @@ void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 	return;
 }
 
+uint8_t gb_serial_transfer(struct gb_t *gb, const uint8_t tx)
+{
+	struct priv *p = gb->priv;
+
+	/* Filter newlines to make test output cleaner. */
+	printf("%c", tx != '\n' ? tx : ' ');
+	p->str[p->count++] = tx;
+
+	if(p->count == 1024)
+		abort();
+
+	/* No 2nd player connected. */
+	return 0;
+}
+
 void test_cpu_inst(void)
 {
 	struct gb_t gb;
-	char str[1024];
-	unsigned int count = 0;
 	const unsigned short pc_end = 0x06F1; /* Test ends when PC is this value. */
+	struct priv p = { .count = 0 };
 
 	/* Run ROM test. */
-	gb_init(&gb, &gb_rom_read_cpu_instrs, &gb_cart_ram_read, &gb_cart_ram_write,
-			&gb_error, NULL);
+	gb_init(&gb, &gb_rom_read_cpu_instrs, &gb_cart_ram_read,
+			&gb_cart_ram_write, &gb_error, &gb_serial_transfer, &p);
 
 	printf("Serial: ");
 
 	/* Step CPU until test is complete. */
 	while(gb.cpu_reg.pc != pc_end)
-	{
 		__gb_step_cpu(&gb);
 
-		/* Detect serial transmission. Test status is pushed to serial by the
-		 * test ROM. */
-		if(gb.gb_reg.SC == 0x81)
-		{
-			printf("%c", gb.gb_reg.SB != '\n' ? gb.gb_reg.SB : ' ');
-			str[count++] = gb.gb_reg.SB;
-			if(count == 1024)
-				abort();
-
-			/* Simulate serial read, as emulator does not support serial
-			 * transmission yet. */
-			gb.gb_reg.SC = 0x01;
-		}
-	}
-
-	str[count++] = '\0';
+	p.str[p.count++] = '\0';
 
 	/* Check test results. */
-	lok(strstr(str, "Passed all tests") != NULL);
+	lok(strstr(p.str, "Passed all tests") != NULL);
 
 	return;
 }
@@ -97,40 +101,23 @@ void test_cpu_inst(void)
 void test_instr_timing(void)
 {
 	struct gb_t gb;
-	char str[1024];
-	unsigned int count = 0;
 	const unsigned short pc_end = 0xC8B0; /* Test ends when PC is this value. */
+	struct priv p = { .count = 0 };
 
 	/* Run ROM test. */
 	gb_init(&gb, &gb_rom_read_instr_timing, &gb_cart_ram_read,
-			&gb_cart_ram_write, &gb_error, NULL);
+			&gb_cart_ram_write, &gb_error, &gb_serial_transfer, &p);
 
 	printf("Serial: ");
 
 	/* Step CPU until test is complete. */
 	while(gb.cpu_reg.pc != pc_end)
-	{
 		__gb_step_cpu(&gb);
 
-		/* Detect serial transmission. Test status is pushed to serial by the
-		 * test ROM. */
-		if(gb.gb_reg.SC == 0x81)
-		{
-			printf("%c", gb.gb_reg.SB != '\n' ? gb.gb_reg.SB : ' ');
-			str[count++] = gb.gb_reg.SB;
-			if(count == 1024)
-				abort();
-
-			/* Simulate serial read, as emulator does not support serial
-			 * transmission yet. */
-			gb.gb_reg.SC = 0x01;
-		}
-	}
-
-	str[count++] = '\0';
+	p.str[p.count++] = '\0';
 
 	/* Check test results. */
-	lok(strstr(str, "Passed") != NULL);
+	lok(strstr(p.str, "Passed") != NULL);
 
 	return;
 }
