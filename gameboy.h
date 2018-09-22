@@ -745,11 +745,19 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 #endif
 
 						   /* LCD Registers */
-				case 0x40: gb->gb_reg.LCDC = val;	return;
-				case 0x41: gb->gb_reg.STAT = val;	return;
+				case 0x40:
+					gb->gb_reg.LCDC = val;
+					/* LY fixed to 0 when LCD turned off. */
+					if((gb->gb_reg.LCDC & LCDC_ENABLE) == 0)
+						gb->gb_reg.LY = 0;
+
+					return;
+				case 0x41:
+					gb->gb_reg.STAT = (val & 0b01111000);
+					return;
 				case 0x42: gb->gb_reg.SCY = val;	return;
 				case 0x43: gb->gb_reg.SCX = val;	return;
-				case 0x44: gb->gb_reg.LY = val;		return;
+						   /* LY (0xFF44) is read only. */
 				case 0x45: gb->gb_reg.LYC = val;	return;
 
 						   /* DMA Register */
