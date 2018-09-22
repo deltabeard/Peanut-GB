@@ -262,11 +262,23 @@ enum gb_init_error_e
  */
 struct gb_t
 {
+	/* Return byte from ROM at given address. */
 	uint8_t (*gb_rom_read)(struct gb_t*, const uint32_t);
+
+	/* Return byte from cart RAM at given address. */
 	uint8_t (*gb_cart_ram_read)(struct gb_t*, const uint32_t);
+
+	/* Write byte to cart RAM at given address. */
 	void (*gb_cart_ram_write)(struct gb_t*, const uint32_t,
 			const uint8_t val);
+
+	/* Notify front-end of error. */
 	void (*gb_error)(struct gb_t*, const enum gb_error_e, const uint16_t);
+
+	/* Transmit one byte and return the received byte. */
+	uint8_t (*gb_serial_transfer)(struct gb_t*, const uint8_t);
+
+	/* Implementation defined data. Set to NULL if not required. */
 	void *priv;
 
 	struct
@@ -2815,7 +2827,7 @@ void __gb_step_cpu(struct gb_t *gb)
 			break;
 
 		default:
-			gb->gb_error(gb, GB_INVALID_OPCODE, opcode);
+			(gb->gb_error)(gb, GB_INVALID_OPCODE, opcode);
 	}
 
 	/* DIV register timing */
@@ -2825,6 +2837,15 @@ void __gb_step_cpu(struct gb_t *gb)
 	{
 		gb->gb_reg.DIV++;
 		gb->timer.div_count -= DIV_CYCLES;
+	}
+
+	/* Check serial transfer. */
+	if(gb->gb_reg.SC & 0x80)
+	{
+		gb->gb_reg.SB = (gb->gb_serial_transfer)(gb, gb->gb_reg.SB);
+		/* Inform game of serial TX/RX completion. */
+		gb->gb_reg.SC &= 0x01;
+		gb->gb_reg.IF |= SERIAL_INTR;
 	}
 
 	/* TIMA register timing */
@@ -2944,6 +2965,7 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 		uint8_t (*gb_cart_ram_read)(struct gb_t*, const uint32_t),
 		void (*gb_cart_ram_write)(struct gb_t*, const uint32_t, const uint8_t),
 		void (*gb_error)(struct gb_t*, const enum gb_error_e, const uint16_t),
+		uint8_t (*gb_serial_transfer)(struct gb_t*, const uint8_t),
 		void *priv)
 {
 	const uint16_t mbc_location = 0x0147;
@@ -2981,6 +3003,7 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 	gb->gb_cart_ram_read = gb_cart_ram_read;
 	gb->gb_cart_ram_write = gb_cart_ram_write;
 	gb->gb_error = gb_error;
+	gb->gb_serial_transfer = gb_serial_transfer;
 	gb->priv = priv;
 
 	/* Check if cartridge type is supported, and set MBC type. */
