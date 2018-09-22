@@ -1,11 +1,16 @@
 # peanut-gb
 
-Presented is a single file header Game Boy emulator library based off of [this
+Peanut-gb is a single file header Game Boy emulator library based off of [this
 gameboy emulator](https://github.com/gregtour/gameboy). The aim is to make a
-portable implementation that may be used for any platform that has a C99
-compiler.
+high speed and portable Game Boy (DMG) emulator library that may be used for any
+platform that has a C99 compiler.
 
 Only the original Game Boy (DMG) is supported at this time.
+
+This emulator is *extremely* inaccurate and is very much a work in progress. As
+such, some games may run incorrectly or not run at all. High speed is important;
+changes that cause a loss of emulation speed but increase in accuracy, will be
+rejected. Please seek an alternative emulator if accuracy is important.
 
 ## Getting Started
 
@@ -15,6 +20,7 @@ These are:
 - gb_rom_read
 - gb_cart_ram_read
 - gb_cart_ram_write
+- gb_serial_transfer
 - gb_error
 
 ## SDL2 Example
