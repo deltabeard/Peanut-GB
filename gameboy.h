@@ -868,7 +868,6 @@ void gb_reset(struct gb_t *gb)
 	/* Appease valgrind for invalid reads and unconditional jumps. */
 	gb->gb_reg.SC = 0;
 	gb->gb_reg.STAT = 0;
-	gb->cpu_reg.f = 0;
 	gb->gb_reg.LY = 0;
 
 	__gb_write(gb, 0xFF47, 0xFC);    // BGP
