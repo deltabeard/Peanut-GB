@@ -79,6 +79,8 @@
  * Magic number 40 is compensation for innacurate timings used in this emulator,
  * and is used to pass the mooneye serial timing test
  * boot_sclk_align-dmgABCmgb.gb
+ * Magic number 8 is compensation for the fact that we send one byte at a time,
+ * instead of sending bit by bit.
  */
 #define SERIAL_CYCLES		((512 * 8) - 40)
 
