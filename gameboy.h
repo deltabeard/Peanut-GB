@@ -75,6 +75,9 @@
  * 4194304 / 16384 = 256 clock cycles for one increment. */
 #define DIV_CYCLES          256
 
+/* Serial clock locked to 8192Hz on DMG. */
+#define SERIAL_CYCLES		512
+
 /* STAT register masks */
 #define STAT_LYC_INTR       0x40
 #define STAT_MODE_2_INTR    0x20
@@ -192,6 +195,7 @@ struct timer_t
 	uint16_t lcd_count;		/* LCD Timing */
 	uint16_t div_count;		/* Divider Register Counter */
 	uint16_t tima_count;	/* Timer Counter */
+	uint16_t serial_count;
 };
 
 struct gb_registers_t
@@ -848,6 +852,7 @@ void gb_reset(struct gb_t *gb)
 	gb->timer.lcd_count = 0;
 	gb->timer.div_count = 0;
 	gb->timer.tima_count = 0;
+	gb->timer.serial_count = 0;
 
 	gb->gb_reg.TIMA      = 0x00;
 	gb->gb_reg.TMA       = 0x00;
@@ -2842,10 +2847,16 @@ void __gb_step_cpu(struct gb_t *gb)
 	/* Check serial transfer. */
 	if(gb->gb_reg.SC & 0x80)
 	{
-		gb->gb_reg.SB = (gb->gb_serial_transfer)(gb, gb->gb_reg.SB);
-		/* Inform game of serial TX/RX completion. */
-		gb->gb_reg.SC &= 0x01;
-		gb->gb_reg.IF |= SERIAL_INTR;
+		gb->timer.serial_count += inst_cycles;
+
+		if(gb->timer.serial_count >= SERIAL_CYCLES)
+		{
+			gb->gb_reg.SB = (gb->gb_serial_transfer)(gb, gb->gb_reg.SB);
+			/* Inform game of serial TX/RX completion. */
+			gb->gb_reg.SC &= 0x01;
+			gb->gb_reg.IF |= SERIAL_INTR;
+			gb->timer.serial_count -= SERIAL_CYCLES;
+		}
 	}
 
 	/* TIMA register timing */

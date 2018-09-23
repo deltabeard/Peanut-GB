@@ -181,7 +181,7 @@ void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 
 uint8_t gb_serial_transfer(struct gb_t *gb, const uint8_t tx)
 {
-	return 0;
+	return 0xFF;
 }
 
 int main(int argc, char **argv)
