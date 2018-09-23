@@ -198,6 +198,7 @@ int main(int argc, char **argv)
 	SDL_Renderer *renderer;
 	SDL_Texture *texture;
 	SDL_Event event;
+	SDL_Joystick *joystick;
 	uint16_t fb[height][width];
 	uint32_t new_ticks, old_ticks;
 	char *save_file_name;
@@ -293,11 +294,19 @@ int main(int argc, char **argv)
 	}
 
 	/* Initialise frontend implementation, in this case, SDL2. */
-	if(SDL_Init(SDL_INIT_VIDEO) < 0)
+	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) < 0)
 	{
 		printf("Could not initialise SDL: %s\n", SDL_GetError());
 		return EXIT_FAILURE;
 	}
+
+	/* Allow the joystick input even if game is in background. */
+	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+
+	/* If joystick is connected, attempt to use it. */
+	joystick = SDL_JoystickOpen(0);
+	if(joystick)
+		printf("Joystick %s connected.\n", SDL_JoystickNameForIndex(0));
 
 	window = SDL_CreateWindow("DMG Emulator",
 			SDL_WINDOWPOS_UNDEFINED,
@@ -369,6 +378,47 @@ int main(int argc, char **argv)
 					running = 0;
 					break;
 
+				case SDL_JOYHATMOTION:
+					/* Reset axis when joypad hat position changed. */
+					gb.joypad_bits.up = 1;
+					gb.joypad_bits.right = 1;
+					gb.joypad_bits.down = 1;
+					gb.joypad_bits.left = 1;
+
+					switch(event.jhat.value)
+					{
+						/* TODO: Diagonal cases. */
+						case SDL_HAT_UP: gb.joypad_bits.up = 0; break;
+						case SDL_HAT_RIGHT: gb.joypad_bits.up = 0; break;
+						case SDL_HAT_DOWN: gb.joypad_bits.up = 0; break;
+						case SDL_HAT_LEFT: gb.joypad_bits.up = 0; break;
+						default: break;
+					}
+					break;
+
+				case SDL_JOYBUTTONDOWN:
+					switch(event.jbutton.button)
+					{
+						case 0: gb.joypad_bits.start = 0; break;
+						case 1: gb.joypad_bits.select = 0; break;
+						case 2: gb.joypad_bits.a = 0; break;
+						case 3: gb.joypad_bits.b = 0; break;
+						default: print("Pressed: %d\n", event.jbutton.button);
+								 break;
+					}
+					break;
+
+				case SDL_JOYBUTTONUP:
+					switch(event.jbutton.button)
+					{
+						case 0: gb.joypad_bits.start = 1; break;
+						case 1: gb.joypad_bits.select = 1; break;
+						case 2: gb.joypad_bits.a = 1; break;
+						case 3: gb.joypad_bits.b = 1; break;
+						default: break;
+					}
+					break;
+
 				case SDL_KEYDOWN:
 					switch(event.key.keysym.sym)
 					{
@@ -377,9 +427,9 @@ int main(int argc, char **argv)
 						case SDLK_z: gb.joypad_bits.a = 0; break;
 						case SDLK_x: gb.joypad_bits.b = 0; break;
 						case SDLK_UP: gb.joypad_bits.up = 0; break;
+						case SDLK_RIGHT: gb.joypad_bits.right = 0; break;
 						case SDLK_DOWN: gb.joypad_bits.down = 0; break;
 						case SDLK_LEFT: gb.joypad_bits.left = 0; break;
-						case SDLK_RIGHT: gb.joypad_bits.right = 0; break;
 						case SDLK_SPACE: fast_mode = 2; break;
 						case SDLK_1: fast_mode = 1; break;
 						case SDLK_2: fast_mode = 2; break;
@@ -393,6 +443,7 @@ int main(int argc, char **argv)
 						default: break;
 					}
 					break;
+
 				case SDL_KEYUP:
 					switch(event.key.keysym.sym)
 					{
@@ -401,16 +452,14 @@ int main(int argc, char **argv)
 						case SDLK_z: gb.joypad_bits.a = 1; break;
 						case SDLK_x: gb.joypad_bits.b = 1; break;
 						case SDLK_UP: gb.joypad_bits.up = 1; break;
+						case SDLK_RIGHT: gb.joypad_bits.right = 1; break;
 						case SDLK_DOWN: gb.joypad_bits.down = 1; break;
 						case SDLK_LEFT: gb.joypad_bits.left = 1; break;
-						case SDLK_RIGHT: gb.joypad_bits.right = 1; break;
 						case SDLK_SPACE: fast_mode = 1; break;
 						default: break;
 					}
 					break;
 			}
-			if(event.type == SDL_QUIT)
-				running = 0;
 		}
 
 		/* Calculate the time taken to draw frame, then later add a delay to cap
@@ -456,6 +505,7 @@ int main(int argc, char **argv)
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 	SDL_DestroyTexture(texture);
+	SDL_JoystickClose(joystick);
 	SDL_Quit();
 
 	/* Record save file. */

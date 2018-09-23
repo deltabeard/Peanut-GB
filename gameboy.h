@@ -880,7 +880,7 @@ void gb_reset(struct gb_t *gb)
 	gb->gb_reg.LYC       = 0x00;
 
 	/* Appease valgrind for invalid reads and unconditional jumps. */
-	gb->gb_reg.SC = 0;
+	gb->gb_reg.SC = 0xFF;
 	gb->gb_reg.STAT = 0;
 	gb->gb_reg.LY = 0;
 
