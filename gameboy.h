@@ -135,55 +135,47 @@
 
 struct cpu_registers_t
 {
-	struct {
-		/* Combine A and F registers. */
-		union {
-			struct {
-				/* Define specific bits of Flag register. */
-				union {
-					struct {
-						uint8_t unused : 4;
-						uint8_t c : 1; /* Carry flag. */
-						uint8_t h : 1; /* Half carry flag. */
-						uint8_t n : 1; /* Add/sub flag. */
-						uint8_t z : 1; /* Zero flag. */
-					} f_bits;
-					uint8_t f;
-				};
-				uint8_t a;
+	/* Combine A and F registers. */
+	union {
+		struct {
+			/* Define specific bits of Flag register. */
+			union {
+				struct {
+					uint8_t unused : 4;
+					uint8_t c : 1; /* Carry flag. */
+					uint8_t h : 1; /* Half carry flag. */
+					uint8_t n : 1; /* Add/sub flag. */
+					uint8_t z : 1; /* Zero flag. */
+				} f_bits;
+				uint8_t f;
 			};
-			uint16_t af;
+			uint8_t a;
 		};
+		uint16_t af;
 	};
 
-	struct {
-		union {
-			struct {
-				uint8_t c;
-				uint8_t b;
-			};
-			uint16_t bc;
+	union {
+		struct {
+			uint8_t c;
+			uint8_t b;
 		};
+		uint16_t bc;
 	};
 
-	struct {
-		union {
-			struct {
-				uint8_t e;
-				uint8_t d;
-			};
-			uint16_t de;
+	union {
+		struct {
+			uint8_t e;
+			uint8_t d;
 		};
+		uint16_t de;
 	};
 
-	struct {
-		union {
-			struct {
-				uint8_t l;
-				uint8_t h;
-			};
-			uint16_t hl;
+	union {
+		struct {
+			uint8_t l;
+			uint8_t h;
 		};
+		uint16_t hl;
 	};
 
 	uint16_t sp; /* Stack pointer */
@@ -333,23 +325,20 @@ struct gb_t
 	struct timer_t timer;
 	struct gb_registers_t gb_reg;
 
-	struct
+	union
 	{
-		union
+		struct
 		{
-			struct
-			{
-				unsigned int a		: 1;
-				unsigned int b		: 1;
-				unsigned int select	: 1;
-				unsigned int start	: 1;
-				unsigned int right	: 1;
-				unsigned int left	: 1;
-				unsigned int up		: 1;
-				unsigned int down	: 1;
-			} joypad_bits;
-			uint8_t joypad;
-		};
+			unsigned int a		: 1;
+			unsigned int b		: 1;
+			unsigned int select	: 1;
+			unsigned int start	: 1;
+			unsigned int right	: 1;
+			unsigned int left	: 1;
+			unsigned int up		: 1;
+			unsigned int down	: 1;
+		} joypad_bits;
+		uint8_t joypad;
 	};
 
 	/* TODO: Allow implementation to allocate WRAM, VRAM and Frame Buffer. */
@@ -2960,7 +2949,7 @@ void gb_run_frame(struct gb_t *gb)
  */
 uint32_t gb_get_save_size(struct gb_t *gb)
 {
-	const unsigned int ram_size_location = 0x0149;
+	const uint16_t ram_size_location = 0x0149;
 	const uint32_t ram_sizes[] = {
 		0x00, 0x800, 0x2000, 0x8000, 0x20000
 	};
