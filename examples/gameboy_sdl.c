@@ -339,6 +339,10 @@ int main(int argc, char **argv)
 	}
 	SDL_RenderPresent(renderer);
 
+	/* Use integer scale. */
+	SDL_RenderSetLogicalSize(renderer, width, height);
+	SDL_RenderSetIntegerScale(renderer, 1);
+
 	texture = SDL_CreateTexture(renderer,
 			SDL_PIXELFORMAT_RGB565,
 			SDL_TEXTUREACCESS_STREAMING,
