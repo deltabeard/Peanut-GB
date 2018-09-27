@@ -223,13 +223,28 @@ struct gb_registers_t
 
 #if ENABLE_SOUND
 	/* Sound */
-	uint8_t NR10;	uint8_t NR11;	uint8_t NR12;	uint8_t NR13;
-	uint8_t NR14;
-	uint8_t NR21;	uint8_t NR22;	uint8_t NR23;	uint8_t NR24;
-	uint8_t NR30;	uint8_t NR31;	uint8_t NR32;	uint8_t NR33;
-	uint8_t NR34;
-	uint8_t NR41;	uint8_t NR42;	uint8_t NR43;	uint8_t NR44;
-	uint8_t NR50;	uint8_t NR51;
+	uint8_t NR10;
+	union {
+		struct { uint8_t length : 6; uint8_t duty : 2; } NR11_bits;
+		uint8_t NR11;
+	};
+	uint8_t NR12, NR13, NR14;
+
+	union {
+		struct { uint8_t length : 6; uint8_t duty : 2; } NR21_bits;
+		uint8_t NR21;
+	};
+	uint8_t NR22, NR23, NR24;
+
+	uint8_t NR30, NR31, NR32, NR33, NR34;
+
+	union {
+		struct { uint8_t length : 6; uint8_t unused : 2; } NR41_bits;
+		uint8_t NR41;
+	};
+	uint8_t NR42, NR43, NR44;
+
+	uint8_t NR50, NR51;
 	union {
 		struct {
 			uint8_t snd_1_on : 1;
@@ -241,6 +256,7 @@ struct gb_registers_t
 		} NR52_bits;
 		uint8_t NR52;
 	};
+
 	uint8_t WAV[0x10];
 #endif
 
@@ -771,7 +787,9 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 #if ENABLE_SOUND
 						   /* Sound registers */
 				case 0x10: gb->gb_reg.NR10 = val;	return;
-				case 0x11: gb->gb_reg.NR11 = val;	return;
+				case 0x11: gb->gb_reg.NR11 = val;
+						   printf("NR11 set to %#04x\n", val);
+						   return;
 				case 0x12: gb->gb_reg.NR12 = val;	return;
 				case 0x13: gb->gb_reg.NR13 = val;	return;
 				case 0x14: gb->gb_reg.NR14 = val;
@@ -779,7 +797,9 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 							* status register. */
 						   if(val & 0x80) gb->gb_reg.NR52_bits.snd_1_on = 1;
 						   return;
-				case 0x16: gb->gb_reg.NR21 = val;	return;
+				case 0x16: gb->gb_reg.NR21 = val;
+						   printf("NR21 set to %#04x\n", val);
+						   return;
 				case 0x17: gb->gb_reg.NR22 = val;	return;
 				case 0x18: gb->gb_reg.NR23 = val;	return;
 				case 0x19: gb->gb_reg.NR24 = val;
@@ -2909,6 +2929,75 @@ void __gb_step_cpu(struct gb_t *gb)
 			/* If the length counter for the channel is enabled, and the value
 			 * in the respective length counter is not zero, then decrement the
 			 * length counter for that channel. */
+#if 1
+			printf("   NRx0\t NRx1\t NRx2\t NRx3\t NRx4\n");
+			printf("1: %#04x\t %#04x\t %#04x\t %#04x\t %#04x\t\n",
+					gb->gb_reg.NR10, gb->gb_reg.NR11, gb->gb_reg.NR12,
+					gb->gb_reg.NR13, gb->gb_reg.NR14);
+			printf("2:  - \t %#04x\t %#04x\t %#04x\t %#04x\t\n",
+					gb->gb_reg.NR21, gb->gb_reg.NR22,
+					gb->gb_reg.NR23, gb->gb_reg.NR24);
+			printf("3: %#04x\t %#04x\t %#04x\t %#04x\t %#04x\t\n",
+					gb->gb_reg.NR30, gb->gb_reg.NR31, gb->gb_reg.NR32,
+					gb->gb_reg.NR33, gb->gb_reg.NR34);
+			printf("4:  - \t %#04x\t %#04x\t %#04x\t %#04x\t\n",
+					gb->gb_reg.NR41, gb->gb_reg.NR42,
+					gb->gb_reg.NR43, gb->gb_reg.NR44);
+			printf("NR50: %#04x\t NR51: %#04x\t NR52: %#04x\t\n\n",
+					gb->gb_reg.NR50, gb->gb_reg.NR51, gb->gb_reg.NR52);
+#else
+			printf("NR10: %d, NR11: %d, NR12: %d, NR13: %d, NR14: %d\n",
+					gb->gb_reg.NR10, gb->gb_reg.NR11, gb->gb_reg.NR12,
+					gb->gb_reg.NR13, gb->gb_reg.NR14);
+
+			printf("NR52: %d, NR24: %d, NR21: %d\t",
+					gb->gb_reg.NR52_bits.snd_2_on,
+					gb->gb_reg.NR24 & 0x40,
+					gb->gb_reg.NR21_bits.length);
+
+			printf("NR52: %d, NR34: %d, NR31: %d, NR30: %d\t",
+					gb->gb_reg.NR52_bits.snd_3_on,
+					gb->gb_reg.NR34 & 0x40,
+					gb->gb_reg.NR31,
+					gb->gb_reg.NR30 & 0x80);
+
+			printf("NR52: %d, NR44: %d, NR41: %d\n",
+					gb->gb_reg.NR52_bits.snd_4_on,
+					gb->gb_reg.NR44 & 0x40,
+					gb->gb_reg.NR41_bits.length);
+#endif
+
+			/* Channel 1 */
+			/* Check if channel is on,
+			 * Check if length counter is enabled for the channel,
+			 * Check if length counter is non-zero. */
+			if(gb->gb_reg.NR52_bits.snd_1_on &&
+					(gb->gb_reg.NR14 & 0x40) &&
+					gb->gb_reg.NR11_bits.length)
+			{
+				/* Turn off channel if length counter becomes 0. */
+				if(--gb->gb_reg.NR11_bits.length == 0)
+				{
+					gb->gb_reg.NR14 ^= 0x40;
+					gb->gb_reg.NR52_bits.snd_1_on = 0;
+				}
+			}
+
+			/* Channel 2 */
+			/* Check if channel is on,
+			 * Check if length counter is enabled for the channel,
+			 * Check if length counter is non-zero. */
+			if(gb->gb_reg.NR52_bits.snd_2_on &&
+					(gb->gb_reg.NR24 & 0x40) &&
+					gb->gb_reg.NR21_bits.length)
+			{
+				/* Turn off channel if length counter becomes 0. */
+				if(--gb->gb_reg.NR21_bits.length == 0)
+				{
+					gb->gb_reg.NR24 ^= 0x40;
+					gb->gb_reg.NR52_bits.snd_2_on = 0;
+				}
+			}
 
 			/* Channel 3 */
 			/* Check if channel is on,
@@ -2919,11 +3008,24 @@ void __gb_step_cpu(struct gb_t *gb)
 					gb->gb_reg.NR31)
 			{
 				/* Turn off channel if length counter becomes 0. */
-				if(--gb->gb_reg.NR31)
+				if(--gb->gb_reg.NR31 == 0)
 				{
 					gb->gb_reg.NR30 = 0;
 					gb->gb_reg.NR52_bits.snd_3_on = 0;
 				}
+			}
+
+			/* Channel 4 */
+			/* Check if channel is on,
+			 * Check if length counter is enabled for the channel,
+			 * Check if length counter is non-zero. */
+			if(gb->gb_reg.NR52_bits.snd_4_on &&
+					(gb->gb_reg.NR44 & 0x40) &&
+					gb->gb_reg.NR41)
+			{
+				/* Turn off channel if length counter becomes 0. */
+				if(--gb->gb_reg.NR41_bits.length == 0)
+					gb->gb_reg.NR52_bits.snd_4_on = 0;
 			}
 
 			/* Reset length counter. */
