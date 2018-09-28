@@ -17,6 +17,7 @@
 
 #define ENABLE_SOUND 1
 
+#include "audio.h"
 #include "../gameboy.h"
 
 struct priv_t
@@ -187,33 +188,6 @@ uint8_t gb_serial_transfer(struct gb_t *gb, const uint8_t tx)
 	return 0xFF;
 }
 
-void audio_callback(void *userdata, uint8_t *stream, int len)
-{
-	struct gb_t *gb = userdata;
-
-	memset(stream, 0, len);
-
-	for(int i = 0; i < len; i++)
-	{
-		const uint8_t duty[4] = { 32, 64, 128, 192 };
-
-		if(!gb->gb_reg.NR52_bits.all_on)
-			continue;
-
-		if(gb->gb_reg.NR52_bits.snd_1_on)
-		{
-			unsigned int f1 = (gb->gb_reg.NR14 & 0x7) << 8 | gb->gb_reg.NR13;
-			stream[i] = sin(i * 131072/(2048 - f1)) * duty[gb->gb_reg.NR11_bits.duty];
-		}
-
-		if(gb->gb_reg.NR52_bits.snd_2_on)
-		{
-			unsigned int f2 = (gb->gb_reg.NR24 & 0x7) << 8 | gb->gb_reg.NR23;
-			stream[i] = (((sin(i * 131072/(2048 - f2))) * duty[gb->gb_reg.NR21_bits.duty]) + stream[i])/2;
-		}
-	}
-}
-
 int main(int argc, char **argv)
 {
 	struct gb_t gb;
@@ -226,14 +200,11 @@ int main(int argc, char **argv)
 	SDL_Texture *texture;
 	SDL_Event event;
 	SDL_Joystick *joystick;
-	SDL_AudioSpec want, have;
-	SDL_AudioDeviceID dev;
 	uint16_t fb[height][width];
 	uint32_t new_ticks, old_ticks;
 	char *save_file_name;
 	enum gb_init_error_e ret;
 	unsigned int fast_mode = 1;
-	uint8_t audio_buffer[1024];
 
 	/* Make sure a file name is given. */
 	if(argc < 2 || argc > 3)
@@ -330,24 +301,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	SDL_zero(want);
-	want.freq = 16384;
-	want.format = AUDIO_S8;
-	want.channels = 1;
-	want.samples = 1024;
-	want.callback = audio_callback;
-	want.userdata = &gb;
-
-	printf("Audio driver: %s\n", SDL_GetAudioDeviceName(0, 0));
-
-	if((dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, SDL_AUDIO_ALLOW_ANY_CHANGE)) == 0)
-	{
-		printf("SDL could not open audio device: %s\n", SDL_GetError());
-		return EXIT_FAILURE;
-	}
-
-	SDL_PauseAudioDevice(dev, 0);
-
+	audio_init();
 	/* Allow the joystick input even if game is in background. */
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
 
@@ -525,6 +479,8 @@ int main(int argc, char **argv)
 		/* Execute CPU cycles until the screen has to be redrawn. */
 		gb_run_frame(&gb);
 
+		audio_frame();
+
 		/* Copy frame buffer from emulator context, converting to colours
 		 * defined in the palette. */
 		for (unsigned int y = 0; y < height; y++)
@@ -542,11 +498,11 @@ int main(int argc, char **argv)
 		/* Use a delay that will draw the screen at a rate of 59.7275 Hz. */
 		new_ticks = SDL_GetTicks();
 
-		delay = (17/fast_mode) - (new_ticks - old_ticks);
+		delay = (16/fast_mode) - (new_ticks - old_ticks);
 		SDL_Delay(delay > 0 ? delay : 0);
 
 		/* Tick the internal RTC when 1 second has passed. */
-		rtc_timer += 17/fast_mode;
+		rtc_timer += 16/fast_mode;
 		if(rtc_timer >= 1000)
 		{
 			rtc_timer -= 1000;
@@ -559,6 +515,7 @@ int main(int argc, char **argv)
 	SDL_DestroyTexture(texture);
 	SDL_JoystickClose(joystick);
 	SDL_Quit();
+	audio_cleanup();
 
 	/* Record save file. */
 	write_cart_ram_file(save_file_name, &priv.cart_ram, gb_get_save_size(&gb));

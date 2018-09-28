@@ -554,6 +554,10 @@ uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
 			/* HRAM */
 			if(HRAM_ADDR <= addr && addr < INTR_EN_ADDR)
 				return gb->hram[addr - HRAM_ADDR];
+
+			if((addr >= 0xFF10) && (addr <= 0xFF3F))
+				return audio_read(addr);
+
 			/* Wave pattern RAM */
 			if((addr & 0xFFF0) == 0xFF30)
 			{
@@ -762,6 +766,11 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 				gb->hram[addr - HRAM_ADDR] = val;
 				return;
 			}
+
+			if((addr >= 0xFF10) && (addr <= 0xFF3F))
+				audio_write(addr, val);
+
+			/* TODO: Remove */
 			/* Wave pattern RAM */
 			if((addr & 0xFFF0) == 0xFF30)
 			{
