@@ -19,9 +19,6 @@
 
 #include "../gameboy.h"
 
-/* SDL audio device. */
-SDL_AudioDeviceID dev;
-
 struct priv_t
 {
 	/* Pointer to allocated memory holding GB file. */
@@ -190,16 +187,15 @@ uint8_t gb_serial_transfer(struct gb_t *gb, const uint8_t tx)
 	return 0xFF;
 }
 
-void queue_audio(void *p, const uint8_t * const buffer,
-		const unsigned int len)
+void audio_callback(void *userdata, uint8_t *stream, int len)
 {
-	struct priv_t *priv = p;
-	if(SDL_QueueAudio(dev, buffer, len) < 0)
+	struct gb_t *gb = userdata;
+
+	for (unsigned int i = 0; i < len; i++)
 	{
-		printf("Could not queue audio: %s\n", SDL_GetError());
-		exit(EXIT_FAILURE);
+		int f1 = (gb->gb_reg.NR14 & 7) << 8 | gb->gb_reg.NR13;
+		stream[i] = sinf(i * 4194304 / 4 / (2048 - f1)) * 256 + 128;
 	}
-	return;
 }
 
 int main(int argc, char **argv)
@@ -215,6 +211,7 @@ int main(int argc, char **argv)
 	SDL_Event event;
 	SDL_Joystick *joystick;
 	SDL_AudioSpec want, have;
+	SDL_AudioDeviceID dev;
 	uint16_t fb[height][width];
 	uint32_t new_ticks, old_ticks;
 	char *save_file_name;
@@ -320,17 +317,20 @@ int main(int argc, char **argv)
 	SDL_zero(want);
 	want.freq = 16384;
 	want.format = AUDIO_S16;
-	want.channels = 2;
+	want.channels = 1;
 	want.samples = 1024;
-	want.callback = NULL;
+	want.callback = audio_callback;
+	want.userdata = &gb;
 
-	if((dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0)) == 0)
+	printf("Audio driver: %s\n", SDL_GetAudioDeviceName(0, 0));
+
+	if((dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, SDL_AUDIO_ALLOW_ANY_CHANGE)) == 0)
 	{
 		printf("SDL could not open audio device: %s\n", SDL_GetError());
 		return EXIT_FAILURE;
 	}
 
-	gb_init_audio(&gb, audio_buffer, 1024, 16384, queue_audio);
+	SDL_PauseAudioDevice(dev, 0);
 
 	/* Allow the joystick input even if game is in background. */
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");

@@ -3037,6 +3037,7 @@ void __gb_step_cpu(struct gb_t *gb)
 
 		/* Check if it's time to generate a new audio sample and that the audio
 		 * buffer is initialised. */
+#if 0
 		if((gb->counter.apu_sample_count += inst_cycles) >=
 				gb->counter.apu_sample_cycles && gb->audio.buffer != NULL)
 		{
@@ -3065,6 +3066,7 @@ void __gb_step_cpu(struct gb_t *gb)
 						gb->audio.len);
 			}
 		}
+#endif
 	}
 
 	/* Check serial transfer. */
