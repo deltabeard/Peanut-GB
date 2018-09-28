@@ -71,6 +71,8 @@
 #define CRAM_BANK_SIZE  0x2000
 #define VRAM_BANK_SIZE  0x2000
 
+#define DMG_CPU_CLOCK	4194304
+
 /* DIV Register is incremented at rate of 16384Hz.
  * 4194304 / 16384 = 256 clock cycles for one increment. */
 #define DIV_CYCLES          256
@@ -205,6 +207,16 @@ struct count_t
 	uint16_t apu_len_count;	/* Length counter */
 	uint16_t apu_swp_count;	/* Sweep counter */
 	uint32_t apu_env_count;	/* Volume envelope counter */
+	uint8_t apu_wav_count; /* Count which wav sample is set to be mixed. */
+
+	/* Counts when a new audio sample should be recorded. */
+	uint32_t apu_sample_count;
+	/* Number of cycles per new audio sample. When apu_sample_count >=
+	 * apu_sample_cycles, then a new audio sample must be taken. */
+	uint16_t apu_sample_cycles;
+	/* Counts the number of samples in audio buffer. Audio is queued to the
+	 * front-end when the buffer is filled. */
+	uint16_t apu_buffer_count;
 };
 
 struct gb_registers_t
@@ -787,9 +799,7 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 #if ENABLE_SOUND
 						   /* Sound registers */
 				case 0x10: gb->gb_reg.NR10 = val;	return;
-				case 0x11: gb->gb_reg.NR11 = val;
-						   printf("NR11 set to %#04x\n", val);
-						   return;
+				case 0x11: gb->gb_reg.NR11 = val;   return;
 				case 0x12: gb->gb_reg.NR12 = val;	return;
 				case 0x13: gb->gb_reg.NR13 = val;	return;
 				case 0x14: gb->gb_reg.NR14 = val;
@@ -797,9 +807,7 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 							* status register. */
 						   if(val & 0x80) gb->gb_reg.NR52_bits.snd_1_on = 1;
 						   return;
-				case 0x16: gb->gb_reg.NR21 = val;
-						   printf("NR21 set to %#04x\n", val);
-						   return;
+				case 0x16: gb->gb_reg.NR21 = val;   return;
 				case 0x17: gb->gb_reg.NR22 = val;	return;
 				case 0x18: gb->gb_reg.NR23 = val;	return;
 				case 0x19: gb->gb_reg.NR24 = val;
@@ -3026,6 +3034,37 @@ void __gb_step_cpu(struct gb_t *gb)
 		/* After processing events in the four channels, mix the channels
 		 * together, and record the output stereo audio sample in the buffer
 		 * provided in gb_init_audio() */
+
+		/* Check if it's time to generate a new audio sample and that the audio
+		 * buffer is initialised. */
+		if((gb->counter.apu_sample_count += inst_cycles) >=
+				gb->counter.apu_sample_cycles && gb->audio.buffer != NULL)
+		{
+			gb->counter.apu_sample_count -= gb->counter.apu_sample_cycles;
+
+			/* If channel 3 is enabled, mix it in to the output. */
+			if(gb->gb_reg.NR52_bits.snd_3_on )
+			{
+				//gb->audio.buffer[gb->counter.apu_buffer_count] = gb->gb_reg.WAV[gb->counter.apu_wav_count] << 4;
+				
+				gb->audio.buffer[gb->counter.apu_buffer_count] =
+					(uint8_t)(255.0 * (sin(gb->counter.apu_buffer_count) + 1.0));
+
+				printf("Buf: %d\n", gb->audio.buffer[gb->counter.apu_buffer_count]);
+				/* Mix channel 3 into audio buffer, keeping track of which
+				 * sample in the WAV RAM we are on. */
+				if(++gb->counter.apu_wav_count > 0xF)
+					gb->counter.apu_wav_count = 0;
+			}
+
+			/* If audio buffer is full, queue it to front-end. */
+			if(++gb->counter.apu_buffer_count == gb->audio.len)
+			{
+				gb->counter.apu_buffer_count = 0;
+				gb->audio.queue_audio(&gb->priv, gb->audio.buffer,
+						gb->audio.len);
+			}
+		}
 	}
 
 	/* Check serial transfer. */
@@ -3214,6 +3253,10 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 	gb->num_rom_banks = num_rom_banks[gb->gb_rom_read(gb, bank_count_location)];
 	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(gb, ram_size_location)];
 
+	/* Initialise the audio buffer to NULL in-case audio is not initialised when
+	 * the emulator starts stepping CPU. */
+	gb->audio.buffer = NULL;
+
 	gb_reset(gb);
 
 	return GB_INIT_NO_ERROR;
@@ -3240,6 +3283,9 @@ void gb_init_audio(struct gb_t *gb, uint8_t *buffer, unsigned int len,
 	gb->audio.len = len;
 	gb->audio.rate = rate;
 	gb->audio.queue_audio = queue_audio;
+	gb->counter.apu_sample_count = 0;
+	gb->counter.apu_buffer_count = 0;
+	gb->counter.apu_sample_cycles = DMG_CPU_CLOCK / rate;
 
 	return;
 }

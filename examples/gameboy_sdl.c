@@ -19,6 +19,9 @@
 
 #include "../gameboy.h"
 
+/* SDL audio device. */
+SDL_AudioDeviceID dev;
+
 struct priv_t
 {
 	/* Pointer to allocated memory holding GB file. */
@@ -187,10 +190,15 @@ uint8_t gb_serial_transfer(struct gb_t *gb, const uint8_t tx)
 	return 0xFF;
 }
 
-void queue_audio(void *priv, const uint8_t * const buffer,
+void queue_audio(void *p, const uint8_t * const buffer,
 		const unsigned int len)
 {
-	SDL_QueueAudio(1, buffer, len);
+	struct priv_t *priv = p;
+	if(SDL_QueueAudio(dev, buffer, len) < 0)
+	{
+		printf("Could not queue audio: %s\n", SDL_GetError());
+		exit(EXIT_FAILURE);
+	}
 	return;
 }
 
@@ -206,6 +214,7 @@ int main(int argc, char **argv)
 	SDL_Texture *texture;
 	SDL_Event event;
 	SDL_Joystick *joystick;
+	SDL_AudioSpec want, have;
 	uint16_t fb[height][width];
 	uint32_t new_ticks, old_ticks;
 	char *save_file_name;
@@ -274,8 +283,6 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
-	gb_init_audio(&gb, &audio_buffer, 1024, 16384, queue_audio);
-
 	/* Load Save File. */
 	read_cart_ram_file(save_file_name, &priv.cart_ram, gb_get_save_size(&gb));
 
@@ -304,11 +311,26 @@ int main(int argc, char **argv)
 	}
 
 	/* Initialise frontend implementation, in this case, SDL2. */
-	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) < 0)
+	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK | SDL_INIT_AUDIO) < 0)
 	{
 		printf("Could not initialise SDL: %s\n", SDL_GetError());
 		return EXIT_FAILURE;
 	}
+
+	SDL_zero(want);
+	want.freq = 16384;
+	want.format = AUDIO_S16;
+	want.channels = 2;
+	want.samples = 1024;
+	want.callback = NULL;
+
+	if((dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0)) == 0)
+	{
+		printf("SDL could not open audio device: %s\n", SDL_GetError());
+		return EXIT_FAILURE;
+	}
+
+	gb_init_audio(&gb, audio_buffer, 1024, 16384, queue_audio);
 
 	/* Allow the joystick input even if game is in background. */
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
