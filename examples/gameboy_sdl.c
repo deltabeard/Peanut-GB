@@ -187,6 +187,13 @@ uint8_t gb_serial_transfer(struct gb_t *gb, const uint8_t tx)
 	return 0xFF;
 }
 
+void queue_audio(void *priv, const uint8_t * const buffer,
+		const unsigned int len)
+{
+	SDL_QueueAudio(1, buffer, len);
+	return;
+}
+
 int main(int argc, char **argv)
 {
 	struct gb_t gb;
@@ -204,6 +211,7 @@ int main(int argc, char **argv)
 	char *save_file_name;
 	enum gb_init_error_e ret;
 	unsigned int fast_mode = 1;
+	uint8_t audio_buffer[1024];
 
 	/* Make sure a file name is given. */
 	if(argc < 2 || argc > 3)
@@ -265,6 +273,8 @@ int main(int argc, char **argv)
 		printf("Unable to initialise context. Returned %d.\n", ret);
 		exit(EXIT_FAILURE);
 	}
+
+	gb_init_audio(&gb, &audio_buffer, 1024, 16384, queue_audio);
 
 	/* Load Save File. */
 	read_cart_ram_file(save_file_name, &priv.cart_ram, gb_get_save_size(&gb));

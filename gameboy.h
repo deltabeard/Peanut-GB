@@ -2929,7 +2929,7 @@ void __gb_step_cpu(struct gb_t *gb)
 			/* If the length counter for the channel is enabled, and the value
 			 * in the respective length counter is not zero, then decrement the
 			 * length counter for that channel. */
-#if 1
+#if 0
 			printf("   NRx0\t NRx1\t NRx2\t NRx3\t NRx4\n");
 			printf("1: %#04x\t %#04x\t %#04x\t %#04x\t %#04x\t\n",
 					gb->gb_reg.NR10, gb->gb_reg.NR11, gb->gb_reg.NR12,
@@ -2945,26 +2945,6 @@ void __gb_step_cpu(struct gb_t *gb)
 					gb->gb_reg.NR43, gb->gb_reg.NR44);
 			printf("NR50: %#04x\t NR51: %#04x\t NR52: %#04x\t\n\n",
 					gb->gb_reg.NR50, gb->gb_reg.NR51, gb->gb_reg.NR52);
-#else
-			printf("NR10: %d, NR11: %d, NR12: %d, NR13: %d, NR14: %d\n",
-					gb->gb_reg.NR10, gb->gb_reg.NR11, gb->gb_reg.NR12,
-					gb->gb_reg.NR13, gb->gb_reg.NR14);
-
-			printf("NR52: %d, NR24: %d, NR21: %d\t",
-					gb->gb_reg.NR52_bits.snd_2_on,
-					gb->gb_reg.NR24 & 0x40,
-					gb->gb_reg.NR21_bits.length);
-
-			printf("NR52: %d, NR34: %d, NR31: %d, NR30: %d\t",
-					gb->gb_reg.NR52_bits.snd_3_on,
-					gb->gb_reg.NR34 & 0x40,
-					gb->gb_reg.NR31,
-					gb->gb_reg.NR30 & 0x80);
-
-			printf("NR52: %d, NR44: %d, NR41: %d\n",
-					gb->gb_reg.NR52_bits.snd_4_on,
-					gb->gb_reg.NR44 & 0x40,
-					gb->gb_reg.NR41_bits.length);
 #endif
 
 			/* Channel 1 */
