@@ -193,6 +193,8 @@ int main(int argc, char **argv)
 	struct priv_t priv;
 	const unsigned int height = 144;
 	const unsigned int width = 160;
+	const double target_speed_ms = 1000.0/60.0;
+	double speed_compensation = 0.0;
 	unsigned int running = 1;
 	SDL_Window *window;
 	SDL_Renderer *renderer;
@@ -319,7 +321,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	renderer = SDL_CreateRenderer(window, -1, 0);
+	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
 	if(renderer == NULL)
 	{
 		printf("Could not create renderer: %s\n", SDL_GetError());
@@ -494,11 +496,21 @@ int main(int argc, char **argv)
 		/* Use a delay that will draw the screen at a rate of 59.7275 Hz. */
 		new_ticks = SDL_GetTicks();
 
-		delay = (17/fast_mode) - (new_ticks - old_ticks);
+		/* Since the target delay is 16.6...ms, and SDL_Delay takes a parameter
+		 * in ms, we add up the missing 0.6ms each frame and compensate for it
+		 * when it goes over to 1.2ms. */
+		speed_compensation += (target_speed_ms/fast_mode) -
+			(unsigned int)(target_speed_ms/fast_mode);
+		if(speed_compensation >= 1.0)
+			speed_compensation -= 1.0;
+
+		delay = (target_speed_ms/fast_mode) +
+			(int)speed_compensation - (new_ticks - old_ticks);
+
 		SDL_Delay(delay > 0 ? delay : 0);
 
 		/* Tick the internal RTC when 1 second has passed. */
-		rtc_timer += 17/fast_mode;
+		rtc_timer += target_speed_ms/fast_mode;
 		if(rtc_timer >= 1000)
 		{
 			rtc_timer -= 1000;
