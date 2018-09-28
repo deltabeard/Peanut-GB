@@ -191,10 +191,26 @@ void audio_callback(void *userdata, uint8_t *stream, int len)
 {
 	struct gb_t *gb = userdata;
 
-	for (unsigned int i = 0; i < len; i++)
+	memset(stream, 0, len);
+
+	for(int i = 0; i < len; i++)
 	{
-		int f1 = (gb->gb_reg.NR14 & 7) << 8 | gb->gb_reg.NR13;
-		stream[i] = sinf(i * 4194304 / 4 / (2048 - f1)) * 256 + 128;
+		const uint8_t duty[4] = { 32, 64, 128, 192 };
+
+		if(!gb->gb_reg.NR52_bits.all_on)
+			continue;
+
+		if(gb->gb_reg.NR52_bits.snd_1_on)
+		{
+			unsigned int f1 = (gb->gb_reg.NR14 & 0x7) << 8 | gb->gb_reg.NR13;
+			stream[i] = sin(i * 131072/(2048 - f1)) * duty[gb->gb_reg.NR11_bits.duty];
+		}
+
+		if(gb->gb_reg.NR52_bits.snd_2_on)
+		{
+			unsigned int f2 = (gb->gb_reg.NR24 & 0x7) << 8 | gb->gb_reg.NR23;
+			stream[i] = (((sin(i * 131072/(2048 - f2))) * duty[gb->gb_reg.NR21_bits.duty]) + stream[i])/2;
+		}
 	}
 }
 
@@ -316,7 +332,7 @@ int main(int argc, char **argv)
 
 	SDL_zero(want);
 	want.freq = 16384;
-	want.format = AUDIO_S16;
+	want.format = AUDIO_S8;
 	want.channels = 1;
 	want.samples = 1024;
 	want.callback = audio_callback;
