@@ -205,6 +205,8 @@ int main(int argc, char **argv)
 	char *save_file_name;
 	enum gb_init_error_e ret;
 	unsigned int fast_mode = 1;
+	const double target_delay_ms = 1000.0/(4194304.0/70224.0);
+	double delay_comp = 0.0;
 
 	/* Make sure a file name is given. */
 	if(argc < 2 || argc > 3)
@@ -359,7 +361,7 @@ int main(int argc, char **argv)
 
 	while(running)
 	{
-		int32_t delay;
+		int delay;
 		static unsigned int rtc_timer = 0;
 		static uint8_t selected_palette = 4;
 #define MAX_PALETTE 6
@@ -498,11 +500,13 @@ int main(int argc, char **argv)
 		/* Use a delay that will draw the screen at a rate of 59.7275 Hz. */
 		new_ticks = SDL_GetTicks();
 
-		delay = (16/fast_mode) - (new_ticks - old_ticks);
+		delay_comp += target_delay_ms - (new_ticks - old_ticks);
+		delay = (int)(delay_comp);
+		delay_comp -= delay;
 		SDL_Delay(delay > 0 ? delay : 0);
 
 		/* Tick the internal RTC when 1 second has passed. */
-		rtc_timer += 16/fast_mode;
+		rtc_timer += delay > 0 ? delay : 0;
 		if(rtc_timer >= 1000)
 		{
 			rtc_timer -= 1000;
