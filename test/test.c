@@ -64,14 +64,17 @@ uint8_t gb_serial_transfer(struct gb_t *gb, const uint8_t tx)
 	struct priv *p = gb->priv;
 
 	/* Filter newlines to make test output cleaner. */
-	printf("%c", tx != '\n' ? tx : ' ');
+	if(tx < 32)
+		return 0xFF;
+
+	printf("%c", tx);
 	p->str[p->count++] = tx;
 
 	if(p->count == 1024)
 		abort();
 
 	/* No 2nd player connected. */
-	return 0;
+	return 0xFF;
 }
 
 void test_cpu_inst(void)
