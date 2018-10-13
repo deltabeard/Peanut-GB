@@ -206,6 +206,7 @@ int main(int argc, char **argv)
 	char *save_file_name;
 	enum gb_init_error_e ret;
 	unsigned int fast_mode = 1;
+	unsigned int fast_mode_timer = 1;
 
 	/* Make sure a file name is given. */
 	if(argc < 2 || argc > 3)
@@ -479,6 +480,25 @@ int main(int argc, char **argv)
 		/* Execute CPU cycles until the screen has to be redrawn. */
 		gb_run_frame(&gb);
 
+		/* Tick the internal RTC when 1 second has passed. */
+		rtc_timer += target_speed_ms/fast_mode;
+		if(rtc_timer >= 1000)
+		{
+			rtc_timer -= 1000;
+			gb_tick_rtc(&gb);
+		}
+
+		/* Skip frames during fast mode. */
+		if(fast_mode_timer > 1)
+		{
+			fast_mode_timer--;
+			/* We continue here since the rest of the logic in the loop is for
+			 * drawing the screen and delaying. */
+			continue;
+		}
+
+		fast_mode_timer = fast_mode;
+
 		/* Copy frame buffer from emulator context, converting to colours
 		 * defined in the palette. */
 		for (unsigned int y = 0; y < height; y++)
@@ -508,14 +528,6 @@ int main(int argc, char **argv)
 			(int)speed_compensation - (new_ticks - old_ticks);
 
 		SDL_Delay(delay > 0 ? delay : 0);
-
-		/* Tick the internal RTC when 1 second has passed. */
-		rtc_timer += target_speed_ms/fast_mode;
-		if(rtc_timer >= 1000)
-		{
-			rtc_timer -= 1000;
-			gb_tick_rtc(&gb);
-		}
 	}
 
 	SDL_DestroyRenderer(renderer);
