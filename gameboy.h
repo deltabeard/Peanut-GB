@@ -22,9 +22,9 @@
  * IN THE SOFTWARE.
  */
 
-#include <stdint.h> /* Required for int types */
+#include <stdint.h>	/* Required for int types */
 #include <string.h>	/* Required for memset() */
-#include <time.h>
+#include <time.h>	/* Required for tm struct */
 
 /* Enable sound support, including sound registers. Off by default due to no
  * implementation. */
