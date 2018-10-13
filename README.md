@@ -34,7 +34,7 @@ create the save file `game.sav` for the game if one isn't found. Or run with
 
 ### Screenshot
 
-![Screenshot of SDL2 frontend](/examples/sdl2_example_screenshot.png)
+![Screenshot of SDL2 frontend](/examples/sdl2/sdl2_example_screenshot.png)
 
 ### Controls
 
