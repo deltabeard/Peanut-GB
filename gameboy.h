@@ -76,13 +76,9 @@
 #define DIV_CYCLES          256
 
 /* Serial clock locked to 8192Hz on DMG.
- * Magic number 40 is compensation for innacurate timings used in this emulator,
- * and is used to pass the mooneye serial timing test
- * boot_sclk_align-dmgABCmgb.gb
- * Magic number 8 is compensation for the fact that we send one byte at a time,
- * instead of sending bit by bit.
- */
-#define SERIAL_CYCLES		((512 * 8) - 40)
+ * 4194304 / (8192 / 8) = 4096 clock cycles for sending 1 byte. */
+#define SERIAL_CYCLES		4096
+
 
 /* STAT register masks */
 #define STAT_LYC_INTR       0x40
