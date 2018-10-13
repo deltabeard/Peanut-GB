@@ -754,9 +754,22 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 						   /* LCD Registers */
 				case 0x40:
 					gb->gb_reg.LCDC = val;
+
 					/* LY fixed to 0 when LCD turned off. */
 					if((gb->gb_reg.LCDC & LCDC_ENABLE) == 0)
+					{
+						/* Do not turn off LCD outside of VBLANK. This may
+						 * happen due to poor timing in this emulator. */
+						if(gb->lcd_mode != LCD_VBLANK)
+						{
+							gb->gb_reg.LCDC |= LCDC_ENABLE;
+							return;
+						}
+
+						gb->gb_reg.STAT = (gb->gb_reg.STAT & ~0x03) | LCD_VBLANK;
 						gb->gb_reg.LY = 0;
+						gb->timer.lcd_count = 0;
+					}
 
 					return;
 				case 0x41:
