@@ -181,12 +181,6 @@ void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 	return;
 }
 
-uint8_t gb_serial_transfer(struct gb_t *gb, const uint8_t tx)
-{
-	/* No 2nd player connected. */
-	return 0xFF;
-}
-
 int main(int argc, char **argv)
 {
 	struct gb_t gb;
@@ -261,7 +255,7 @@ int main(int argc, char **argv)
 
 	/* Initialise emulator context. */
 	ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write,
-			&gb_error, &gb_serial_transfer, &priv);
+			&gb_error, &priv);
 
 	if(ret != GB_INIT_NO_ERROR)
 	{

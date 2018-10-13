@@ -85,7 +85,9 @@ void test_cpu_inst(void)
 
 	/* Run ROM test. */
 	gb_init(&gb, &gb_rom_read_cpu_instrs, &gb_cart_ram_read,
-			&gb_cart_ram_write, &gb_error, &gb_serial_transfer, &p);
+			&gb_cart_ram_write, &gb_error, &p);
+
+	gb_init_serial(&gb, &gb_serial_transfer);
 
 	printf("Serial: ");
 
@@ -109,7 +111,9 @@ void test_instr_timing(void)
 
 	/* Run ROM test. */
 	gb_init(&gb, &gb_rom_read_instr_timing, &gb_cart_ram_read,
-			&gb_cart_ram_write, &gb_error, &gb_serial_transfer, &p);
+			&gb_cart_ram_write, &gb_error, &p);
+
+	gb_init_serial(&gb, &gb_serial_transfer);
 
 	printf("Serial: ");
 

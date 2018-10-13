@@ -2842,7 +2842,11 @@ void __gb_step_cpu(struct gb_t *gb)
 
 		if(gb->timer.serial_count >= SERIAL_CYCLES)
 		{
-			gb->gb_reg.SB = (gb->gb_serial_transfer)(gb, gb->gb_reg.SB);
+			if(gb->gb_serial_transfer == NULL)
+				gb->gb_reg.SB = 0xFF;
+			else
+				gb->gb_reg.SB = (gb->gb_serial_transfer)(gb, gb->gb_reg.SB);
+
 			/* Inform game of serial TX/RX completion. */
 			gb->gb_reg.SC &= 0x01;
 			gb->gb_reg.IF |= SERIAL_INTR;
@@ -2958,6 +2962,19 @@ uint32_t gb_get_save_size(struct gb_t *gb)
 	uint32_t ram_size = gb->gb_rom_read(gb, ram_size_location);
 	return ram_sizes[ram_size];
 }
+
+/**
+ * Set the function used to handle serial transfer in the front-end. This is
+ * optional.
+ * gb_serial_transfer takes a byte to transmit and returns the received byte. If
+ * no cable is connected to the console, return 0xFF.
+ */
+void gb_init_serial(struct gb_t *gb,
+		uint8_t (*gb_serial_transfer)(struct gb_t*, const uint8_t))
+{
+	gb->gb_serial_transfer = gb_serial_transfer;
+}
+
 /**
  * Initialise the emulator context. gb_reset() is also called to initialise
  * the CPU.
@@ -2967,7 +2984,6 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 		uint8_t (*gb_cart_ram_read)(struct gb_t*, const uint32_t),
 		void (*gb_cart_ram_write)(struct gb_t*, const uint32_t, const uint8_t),
 		void (*gb_error)(struct gb_t*, const enum gb_error_e, const uint16_t),
-		uint8_t (*gb_serial_transfer)(struct gb_t*, const uint8_t),
 		void *priv)
 {
 	const uint16_t mbc_location = 0x0147;
@@ -3005,8 +3021,12 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 	gb->gb_cart_ram_read = gb_cart_ram_read;
 	gb->gb_cart_ram_write = gb_cart_ram_write;
 	gb->gb_error = gb_error;
-	gb->gb_serial_transfer = gb_serial_transfer;
 	gb->priv = priv;
+
+	/* Initialise serial transfer function to NULL. If the front-end does not
+	 * provide serial support, peanut-gb will emulate no cable connected
+	 * automatically. */
+	gb->gb_serial_transfer = NULL;
 
 	/* Check if cartridge type is supported, and set MBC type. */
 	{
