@@ -2,8 +2,8 @@
  * MIT License
  * Copyright (c) 2018 Mahyar Koshkouei
  *
- * An example of using the gameboy.h library. This example application uses SDL2
- * to draw the screen and get input.
+ * An example of using the peanut_gb.h library. This example application uses
+ * SDL2 to draw the screen and get input.
  */
 
 #include <errno.h>
@@ -17,7 +17,7 @@
 
 #define ENABLE_SOUND 1
 
-#include "../gameboy.h"
+#include "../peanut_gb.h"
 
 struct priv_t
 {

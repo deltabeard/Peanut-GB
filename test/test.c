@@ -2,7 +2,7 @@
 
 #define ENABLE_SOUND 0
 #define ENABLE_LCD 0
-#include "../gameboy.h"
+#include "../peanut_gb.h"
 
 #include <assert.h>
 #include <string.h>

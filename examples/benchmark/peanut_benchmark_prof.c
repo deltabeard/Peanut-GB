@@ -2,7 +2,7 @@
 #define ENABLE_LCD 0
 
 /* Import emulator library. */
-#include "../../gameboy.h"
+#include "../../peanut_gb.h"
 
 #include "prof.h"
 

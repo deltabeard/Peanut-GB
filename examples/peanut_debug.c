@@ -16,7 +16,7 @@
 
 #define ENABLE_SOUND 1
 
-#include "../gameboy.h"
+#include "../peanut_gb.h"
 
 struct priv_t
 {

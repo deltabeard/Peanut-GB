@@ -4,13 +4,13 @@ OPT		= -g -Og
 CFLAGS	= $(OPT) -std=c99 -Wall -Wextra
 LDLIBS	= -lSDL2
 
-all: gameboy_sdl
+all: peanut-sdl
 
-gameboy_sdl: ../gameboy.h gameboy_sdl.c
-	$(CC) gameboy_sdl.c -o gameboy_sdl $(CFLAGS) $(LDLIBS)
+peanut-sdl: ../peanut_gb.h peanut_sdl.c
+	$(CC) peanut_sdl.c -o peanut-sdl $(CFLAGS) $(LDLIBS)
 
-gameboy_debug: ../gameboy.h gameboy_debug.c
-	$(CC) gameboy_debug.c -o gameboy_debug $(CFLAGS) $(LDLIBS)
+peanut-debug: ../peanut-gb.h peanut_debug.c
+	$(CC) peanut_debug.c -o peanut-debug $(CFLAGS) $(LDLIBS)
 
 clean:
-	rm -f gameboy_sdl gameboy_debug
+	rm -f peanut-sdl peanut-debug
