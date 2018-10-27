@@ -260,18 +260,42 @@ enum gb_init_error_e
  */
 struct gb_t
 {
-	/* Return byte from ROM at given address. */
-	uint8_t (*gb_rom_read)(struct gb_t*, const uint32_t);
+	/**
+	 * Return byte from ROM at given address.
+	 *
+	 * \param gb_t	emulator context
+	 * \param addr	address
+	 * \return		byte at address in ROM
+	 */
+	uint8_t (*gb_rom_read)(struct gb_t*, const uint32_t addr);
 
-	/* Return byte from cart RAM at given address. */
-	uint8_t (*gb_cart_ram_read)(struct gb_t*, const uint32_t);
+	/**
+	 * Return byte from cart RAM at given address.
+	 *
+	 * \param gb_t	emulator context
+	 * \param addr	address
+	 * \return		byte at address in RAM
+	 */
+	uint8_t (*gb_cart_ram_read)(struct gb_t*, const uint32_t addr);
 
-	/* Write byte to cart RAM at given address. */
-	void (*gb_cart_ram_write)(struct gb_t*, const uint32_t,
+	/**
+	 * Write byte to cart RAM at given address.
+	 *
+	 * \param gb_t	emulator context
+	 * \param addr	address
+	 * \param val	value to write to address in RAM
+	 */
+	void (*gb_cart_ram_write)(struct gb_t*, const uint32_t addr,
 			const uint8_t val);
 
-	/* Notify front-end of error. */
-	void (*gb_error)(struct gb_t*, const enum gb_error_e, const uint16_t);
+	/**
+	 * Notify front-end of error.
+	 *
+	 * \param gb_t			emulator context
+	 * \param gb_error_e	error code
+	 * \param val			arbitrary value related to error
+	 */
+	void (*gb_error)(struct gb_t*, const enum gb_error_e, const uint16_t val);
 
 	/* Transmit one byte and return the received byte. */
 	uint8_t (*gb_serial_transfer)(struct gb_t*, const uint8_t);

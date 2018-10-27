@@ -151,7 +151,7 @@ void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 			/* We compensate for the post-increment in the __gb_step_cpu
 			 * function. */
 			fprintf(stdout, "Invalid opcode %#04x at PC: %#06x, SP: %#06x\n",
-					__gb_read(gb, gb->cpu_reg.pc - 1),
+					val,
 					gb->cpu_reg.pc - 1,
 					gb->cpu_reg.sp);
 			break;
