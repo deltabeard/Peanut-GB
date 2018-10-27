@@ -362,25 +362,6 @@ struct gb_t
 };
 
 /**
- * Processes the values set in gb->joypad to the emulator.
- * This function should be called when a button press should be registered.
- * Before calling gb_run_frame() is good enough.
- */
-void gb_process_joypad(struct gb_t *gb)
-{
-	gb->gb_reg.P1 |= 0x0F;
-
-	/* TODO: Complete joypad states. */
-
-	/* Direction keys selected */
-	if((gb->gb_reg.P1 & 0b010000) == 0)
-		gb->gb_reg.P1 &= 0xF0 | (gb->joypad >> 4);
-	/* Button keys selected */
-	else if((gb->gb_reg.P1 & 0b100000) == 0)
-		gb->gb_reg.P1 &= 0xF0 | (gb->joypad & 0x0F);
-}
-
-/**
  * Tick the internal RTC by one second.
  */
 void gb_tick_rtc(struct gb_t *gb)
@@ -719,8 +700,17 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 			{
 							/* Joypad */
 				case 0x00:
-					gb->gb_reg.P1 = val & 0x30;
-					gb_process_joypad(gb);
+					/* Only bits 5 and 4 are R/W.
+					 * The lower bits are overwritten later, and the two most
+					 * significant bits are unused. */
+					gb->gb_reg.P1 = val;
+
+					/* Direction keys selected */
+					if((gb->gb_reg.P1 & 0b010000) == 0)
+						gb->gb_reg.P1 |= (gb->joypad >> 4);
+					/* Button keys selected */
+					else
+						gb->gb_reg.P1 |= (gb->joypad & 0x0F);
 					return;
 
 							/* Serial */

@@ -366,8 +366,6 @@ int main(int argc, char **argv)
 		 * at 60 fps. */
 		old_ticks = SDL_GetTicks();
 
-		gb_process_joypad(&gb);
-
 		/* Execute CPU cycles until the screen has to be redrawn. */
 		//gb_run_frame(&gb);
 
