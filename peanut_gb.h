@@ -480,14 +480,18 @@ uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
 		case 0xF:
 			if(addr < OAM_ADDR)
 				return gb->wram[addr - ECHO_ADDR];
+
 			if(addr < UNUSED_ADDR)
 				return gb->oam[addr - OAM_ADDR];
+
 			/* Unusable memory area. Reading from this area returns 0.*/
 			if(addr < IO_ADDR)
 				return 0;
+
 			/* HRAM */
 			if(HRAM_ADDR <= addr && addr < INTR_EN_ADDR)
 				return gb->hram[addr - HRAM_ADDR];
+
 			/* Wave pattern RAM */
 			if((addr & 0xFFF0) == 0xFF30)
 			{
@@ -497,6 +501,7 @@ uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
 				return 1;
 #endif
 			}
+
 			/* IO and Interrupts. */
 			switch (addr & 0xFF)
 			{
@@ -683,19 +688,23 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 				gb->wram[addr - ECHO_ADDR] = val;
 				return;
 			}
+
 			if(addr < UNUSED_ADDR)
 			{
 				gb->oam[addr - OAM_ADDR] = val;
 				return;
 			}
+
 			/* Unusable memory area. */
 			if(addr < IO_ADDR)
 				return;
+
 			if(HRAM_ADDR <= addr && addr < INTR_EN_ADDR)
 			{
 				gb->hram[addr - HRAM_ADDR] = val;
 				return;
 			}
+
 			/* Wave pattern RAM */
 			if((addr & 0xFFF0) == 0xFF30)
 			{
@@ -704,14 +713,17 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 #endif
 				return;
 			}
-			/* IO, HRAM, and Interrupts. */
+
+			/* IO and Interrupts. */
 			switch(addr & 0xFF)
 			{
-				/* IO Registers */
+							/* Joypad */
 				case 0x00:
 					gb->gb_reg.P1 = val & 0x30;
 					gb_process_joypad(gb);
 					return;
+
+							/* Serial */
 				case 0x01: gb->gb_reg.SB = val;		return;
 				case 0x02: gb->gb_reg.SC = val;		return;
 
