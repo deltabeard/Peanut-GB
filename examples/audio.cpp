@@ -10,7 +10,7 @@
 static Basic_Gb_Apu apu;
 SDL_AudioDeviceID dev;
 
-const long sample_rate = 16384;
+const long sample_rate = 48000;
 void fill_audio( void *userdata, uint8_t *stream, int len );
 
 int audio_init(void)
@@ -23,7 +23,7 @@ int audio_init(void)
     want.freq = sample_rate;
     want.format = AUDIO_S16SYS;
     want.channels = 2;
-    want.samples = 1024;
+    want.samples = 1024 * 4;
     want.callback = fill_audio;
     want.userdata = NULL;
 
