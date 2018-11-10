@@ -187,7 +187,7 @@ int main(int argc, char **argv)
 	struct priv_t priv;
 	const unsigned int height = 144;
 	const unsigned int width = 160;
-	const double target_speed_ms = 1000.0/60.0;
+	const double target_speed_ms = 1000.0/VERTICAL_SYNC;
 	double speed_compensation = 0.0;
 	unsigned int running = 1;
 	SDL_Window *window;
