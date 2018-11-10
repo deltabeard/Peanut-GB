@@ -2,7 +2,7 @@
 
 #define ENABLE_SOUND 0
 #define ENABLE_LCD 0
-#include "../gameboy.h"
+#include "../peanut_gb.h"
 
 #include <assert.h>
 #include <string.h>
@@ -64,14 +64,17 @@ uint8_t gb_serial_transfer(struct gb_t *gb, const uint8_t tx)
 	struct priv *p = gb->priv;
 
 	/* Filter newlines to make test output cleaner. */
-	printf("%c", tx != '\n' ? tx : ' ');
+	if(tx < 32)
+		return 0xFF;
+
+	printf("%c", tx);
 	p->str[p->count++] = tx;
 
 	if(p->count == 1024)
 		abort();
 
 	/* No 2nd player connected. */
-	return 0;
+	return 0xFF;
 }
 
 void test_cpu_inst(void)
@@ -82,7 +85,9 @@ void test_cpu_inst(void)
 
 	/* Run ROM test. */
 	gb_init(&gb, &gb_rom_read_cpu_instrs, &gb_cart_ram_read,
-			&gb_cart_ram_write, &gb_error, &gb_serial_transfer, &p);
+			&gb_cart_ram_write, &gb_error, &p);
+
+	gb_init_serial(&gb, &gb_serial_transfer);
 
 	printf("Serial: ");
 
@@ -106,7 +111,9 @@ void test_instr_timing(void)
 
 	/* Run ROM test. */
 	gb_init(&gb, &gb_rom_read_instr_timing, &gb_cart_ram_read,
-			&gb_cart_ram_write, &gb_error, &gb_serial_transfer, &p);
+			&gb_cart_ram_write, &gb_error, &p);
+
+	gb_init_serial(&gb, &gb_serial_transfer);
 
 	printf("Serial: ");
 

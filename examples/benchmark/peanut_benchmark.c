@@ -2,7 +2,7 @@
 #define ENABLE_LCD 0
 
 /* Import emulator library. */
-#include "../../gameboy.h"
+#include "../../peanut_gb.h"
 
 #include <stdio.h>
 #include <time.h>
@@ -41,11 +41,6 @@ void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 	return;
 }
 
-uint8_t gb_serial_transfer(struct gb_t *gb, const uint8_t tx)
-{
-	return 0xFF;
-}
-
 int main(void)
 {
 	unsigned long long benchmark_ticks_total = 0;
@@ -66,7 +61,7 @@ int main(void)
 
 		/* Initialise context. */
 		gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write,
-				&gb_error, &gb_serial_transfer, NULL);
+				&gb_error, NULL);
 
 		/* Step CPU until test is complete. */
 		while(gb.cpu_reg.pc != pc_end)

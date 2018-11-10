@@ -2,8 +2,7 @@
  * MIT License
  * Copyright (c) 2018 Mahyar Koshkouei
  *
- * An example of using the gameboy.h library. This example application uses SDL2
- * to draw the screen and get input.
+ * A more bare-bones application to help with debugging.
  */
 
 #include <errno.h>
@@ -17,8 +16,7 @@
 
 #define ENABLE_SOUND 1
 
-#include "audio.h"
-#include "../gameboy.h"
+#include "../../peanut_gb.h"
 
 struct priv_t
 {
@@ -33,8 +31,8 @@ struct priv_t
  */
 uint8_t gb_rom_read(struct gb_t *gb, const uint32_t addr)
 {
-	const struct priv_t * const p = gb->priv;
-	return p->rom[addr];
+    const struct priv_t * const p = gb->priv;
+    return p->rom[addr];
 }
 
 /**
@@ -50,7 +48,7 @@ uint8_t gb_cart_ram_read(struct gb_t *gb, const uint32_t addr)
  * Writes a given byte to the cartridge RAM at the given address.
  */
 void gb_cart_ram_write(struct gb_t *gb, const uint32_t addr,
-		const uint8_t val)
+	const uint8_t val)
 {
 	const struct priv_t * const p = gb->priv;
 	p->cart_ram[addr] = val;
@@ -66,7 +64,7 @@ uint8_t *read_rom_to_ram(const char *file_name)
 	uint8_t *rom = NULL;
 
 	if(rom_file == NULL)
-		return NULL;
+        return NULL;
 
 	fseek(rom_file, 0, SEEK_END);
 	rom_size = ftell(rom_file);
@@ -74,7 +72,7 @@ uint8_t *read_rom_to_ram(const char *file_name)
 	rom = malloc(rom_size);
 
 	if(fread(rom, sizeof(uint8_t), rom_size, rom_file) != rom_size)
-	{
+    {
 		free(rom);
 		fclose(rom_file);
 		return NULL;
@@ -85,7 +83,7 @@ uint8_t *read_rom_to_ram(const char *file_name)
 }
 
 void read_cart_ram_file(const char *save_file_name, uint8_t **dest,
-		const size_t len)
+	const size_t len)
 {
 	FILE *f;
 
@@ -119,7 +117,7 @@ void read_cart_ram_file(const char *save_file_name, uint8_t **dest,
 }
 
 void write_cart_ram_file(const char *save_file_name, uint8_t **dest,
-		const size_t len)
+	const size_t len)
 {
 	FILE *f;
 
@@ -149,18 +147,18 @@ void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 	switch(gb_err)
 	{
 		case GB_INVALID_OPCODE:
-			/* We compensate for the post-increment in the __gb_step_cpu
-			 * function. */
+            /* We compensate for the post-increment in the __gb_step_cpu
+             * function. */
 			fprintf(stdout, "Invalid opcode %#04x at PC: %#06x, SP: %#06x\n",
-					__gb_read(gb, gb->cpu_reg.pc - 1),
-					gb->cpu_reg.pc - 1,
-					gb->cpu_reg.sp);
+                    __gb_read(gb, gb->cpu_reg.pc - 1),
+                    gb->cpu_reg.pc - 1,
+                    gb->cpu_reg.sp);
 			break;
 
-			/* Ignoring non fatal errors. */
+            /* Ignoring non fatal errors. */
 		case GB_INVALID_WRITE:
 		case GB_INVALID_READ:
-			return;
+            return;
 
 		default:
 			printf("Unknown error");
@@ -170,9 +168,8 @@ void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 	fprintf(stderr, "Error. Press q to exit, or any other key to continue.");
 	if(getchar() == 'q')
 	{
-		/* Record save file. */
-		write_cart_ram_file("recovery.sav", &priv->cart_ram,
-				gb_get_save_size(gb));
+        /* Record save file. */
+        write_cart_ram_file("recovery.sav", &priv->cart_ram, gb_get_save_size(gb));
 
 		free(priv->rom);
 		free(priv->cart_ram);
@@ -182,15 +179,9 @@ void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 	return;
 }
 
-uint8_t gb_serial_transfer(struct gb_t *gb, const uint8_t tx)
-{
-	/* No 2nd player connected. */
-	return 0xFF;
-}
-
 int main(int argc, char **argv)
 {
-	struct gb_t gb;
+    struct gb_t gb;
 	struct priv_t priv;
 	const unsigned int height = 144;
 	const unsigned int width = 160;
@@ -199,20 +190,18 @@ int main(int argc, char **argv)
 	SDL_Renderer *renderer;
 	SDL_Texture *texture;
 	SDL_Event event;
-	SDL_Joystick *joystick;
 	uint16_t fb[height][width];
 	uint32_t new_ticks, old_ticks;
 	char *save_file_name;
 	enum gb_init_error_e ret;
-	unsigned int fast_mode = 1;
-	const double target_delay_ms = 1000.0/(4194304.0/70224.0);
-	double delay_comp = 0.0;
+    unsigned int fast_mode = 0;
+    unsigned int debug_mode = 0;
 
 	/* Make sure a file name is given. */
 	if(argc < 2 || argc > 3)
 	{
 		printf("Usage: %s FILE [SAVE]\n", argv[0]);
-		puts("SAVE is set by default if not provided.");
+        puts("SAVE is set by default if not provided.");
 		return EXIT_FAILURE;
 	}
 
@@ -256,12 +245,12 @@ int main(int argc, char **argv)
 	}
 	else
 		save_file_name = argv[2];
-
+	
 	/* TODO: Sanity check input GB file. */
 
-	/* Initialise emulator context. */
+    /* Initialise emulator context. */
 	ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write,
-			&gb_error, &gb_serial_transfer, &priv);
+			&gb_error, &priv);
 
 	if(ret != GB_INIT_NO_ERROR)
 	{
@@ -272,45 +261,12 @@ int main(int argc, char **argv)
 	/* Load Save File. */
 	read_cart_ram_file(save_file_name, &priv.cart_ram, gb_get_save_size(&gb));
 
-	/* Set the RTC of the game cartridge. Only used by games that support it. */
-	{
-		time_t rawtime;
-		struct tm *timeinfo;
-		time(&rawtime);
-		timeinfo = localtime(&rawtime);
-
-		/* You could potentially force the game to allow the player to reset the
-		 * time by setting the RTC to invalid values.
-		 *
-		 * Using memset(&gb->cart_rtc, 0xFF, sizeof(gb->cart_rtc)) for example
-		 * causes Pokemon Gold/Silver to say "TIME NOT SET", allowing the player
-		 * to set the time without having some dumb password.
-		 *
-		 * The memset has to be done directly to gb->cart_rtc because
-		 * gb_set_rtc() processes the input values, which may cause games to not
-		 * detect invalid values.
-		 */
-
-		/* Set RTC. Only games that specify support for RTC will use these
-		 * values. */
-		gb_set_rtc(&gb, timeinfo);
-	}
-
 	/* Initialise frontend implementation, in this case, SDL2. */
-	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK | SDL_INIT_AUDIO) < 0)
+	if(SDL_Init(SDL_INIT_VIDEO) < 0)
 	{
 		printf("Could not initialise SDL: %s\n", SDL_GetError());
 		return EXIT_FAILURE;
 	}
-
-	audio_init();
-	/* Allow the joystick input even if game is in background. */
-	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
-
-	/* If joystick is connected, attempt to use it. */
-	joystick = SDL_JoystickOpen(0);
-	if(joystick)
-		printf("Joystick %s connected.\n", SDL_JoystickNameForIndex(0));
 
 	window = SDL_CreateWindow("DMG Emulator",
 			SDL_WINDOWPOS_UNDEFINED,
@@ -343,10 +299,6 @@ int main(int argc, char **argv)
 	}
 	SDL_RenderPresent(renderer);
 
-	/* Use integer scale. */
-	SDL_RenderSetLogicalSize(renderer, width, height);
-	SDL_RenderSetIntegerScale(renderer, 1);
-
 	texture = SDL_CreateTexture(renderer,
 			SDL_PIXELFORMAT_RGB565,
 			SDL_TEXTUREACCESS_STREAMING,
@@ -357,29 +309,16 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
+	new_ticks = SDL_GetTicks();
+
 	while(running)
 	{
-		int delay;
-		static unsigned int rtc_timer = 0;
-		static uint8_t selected_palette = 4;
-#define MAX_PALETTE 6
-		const uint16_t palette[MAX_PALETTE][4] =
-		{										/* CGB Palette Entry (Notes) */
-			{ 0xFFFF, 0x57E0, 0xFA00, 0x0000 },	/* 0x05 */
-			{ 0xFFFF, 0xFFE0, 0xF800, 0x0000 },	/* 0x07 */
-			{ 0xFFFF, 0xFD6C, 0x8180, 0x0000 },	/* 0x12 */
-			{ 0x0000, 0x0430, 0xFEE0, 0xFFFF },	/* 0x13 */
-			{ 0xFFFF, 0xA534, 0x528A, 0x0000 },	/* 0x16 (DMG, Default) */
-			{ 0xFFF4, 0xFCB2, 0x94BF, 0x0000 }	/* 0x17 */
-			/* Entries with different palettes for BG, OBJ0 & OBJ1 are not
-			 * yet supported. */
+		const uint16_t palette[4] = {
+			0xFFFF, 0x9CD3, 0x4228, 0x0000
 		};
-
-		/* Calculate the time taken to draw frame, then later add a
-		 * delay to cap at 60 fps. */
-		old_ticks = SDL_GetTicks();
-
-		/* Get joypad input. */
+		int32_t delay;
+		
+		/* TODO: Get joypad input. */
 		while(SDL_PollEvent(&event))
 		{
 			switch(event.type)
@@ -387,48 +326,7 @@ int main(int argc, char **argv)
 				case SDL_QUIT:
 					running = 0;
 					break;
-
-				case SDL_JOYHATMOTION:
-					/* Reset axis when joypad hat position changed. */
-					gb.joypad_bits.up = 1;
-					gb.joypad_bits.right = 1;
-					gb.joypad_bits.down = 1;
-					gb.joypad_bits.left = 1;
-
-					switch(event.jhat.value)
-					{
-						/* TODO: Diagonal cases. */
-						case SDL_HAT_UP: gb.joypad_bits.up = 0; break;
-						case SDL_HAT_RIGHT: gb.joypad_bits.right = 0; break;
-						case SDL_HAT_DOWN: gb.joypad_bits.down = 0; break;
-						case SDL_HAT_LEFT: gb.joypad_bits.left = 0; break;
-						default: break;
-					}
-					break;
-
-				case SDL_JOYBUTTONDOWN:
-					switch(event.jbutton.button)
-					{
-						/* Button mappings I use for X-Box 360 controller. */
-						case 0: gb.joypad_bits.a = 0; break;
-						case 1: gb.joypad_bits.b = 0; break;
-						case 6: gb.joypad_bits.select = 0; break;
-						case 7: gb.joypad_bits.start = 0; break;
-						default: break;
-					}
-					break;
-
-				case SDL_JOYBUTTONUP:
-					switch(event.jbutton.button)
-					{
-						case 0: gb.joypad_bits.a = 1; break;
-						case 1: gb.joypad_bits.b = 1; break;
-						case 6: gb.joypad_bits.select = 1; break;
-						case 7: gb.joypad_bits.start = 1; break;
-						default: break;
-					}
-					break;
-
+				
 				case SDL_KEYDOWN:
 					switch(event.key.keysym.sym)
 					{
@@ -437,23 +335,14 @@ int main(int argc, char **argv)
 						case SDLK_z: gb.joypad_bits.a = 0; break;
 						case SDLK_x: gb.joypad_bits.b = 0; break;
 						case SDLK_UP: gb.joypad_bits.up = 0; break;
-						case SDLK_RIGHT: gb.joypad_bits.right = 0; break;
 						case SDLK_DOWN: gb.joypad_bits.down = 0; break;
 						case SDLK_LEFT: gb.joypad_bits.left = 0; break;
-						case SDLK_SPACE: fast_mode = 2; break;
-						case SDLK_1: fast_mode = 1; break;
-						case SDLK_2: fast_mode = 2; break;
-						case SDLK_3: fast_mode = 3; break;
-						case SDLK_4: fast_mode = 4; break;
-						case SDLK_r: gb_reset(&gb); break;
-						case SDLK_p:
-									 if(++selected_palette == MAX_PALETTE)
-										 selected_palette = 0;
-									 break;
+						case SDLK_RIGHT: gb.joypad_bits.right = 0; break;
+						case SDLK_SPACE: fast_mode = !fast_mode; break;
+						case SDLK_d: debug_mode = !debug_mode; break;
 						default: break;
 					}
 					break;
-
 				case SDL_KEYUP:
 					switch(event.key.keysym.sym)
 					{
@@ -462,31 +351,54 @@ int main(int argc, char **argv)
 						case SDLK_z: gb.joypad_bits.a = 1; break;
 						case SDLK_x: gb.joypad_bits.b = 1; break;
 						case SDLK_UP: gb.joypad_bits.up = 1; break;
-						case SDLK_RIGHT: gb.joypad_bits.right = 1; break;
 						case SDLK_DOWN: gb.joypad_bits.down = 1; break;
 						case SDLK_LEFT: gb.joypad_bits.left = 1; break;
-						case SDLK_SPACE: fast_mode = 1; break;
+						case SDLK_RIGHT: gb.joypad_bits.right = 1; break;
 						default: break;
 					}
 					break;
 			}
+			if(event.type == SDL_QUIT)
+				running = 0;
 		}
 
-		/* Tell the emulator to process the joypad variable modified above to
-		 * values that the Game Boy uses. */
-		gb_process_joypad(&gb);
+		/* Calculate the time taken to draw frame, then later add a delay to cap
+		 * at 60 fps. */
+		old_ticks = SDL_GetTicks();
 
 		/* Execute CPU cycles until the screen has to be redrawn. */
-		gb_run_frame(&gb);
+		//gb_run_frame(&gb);
 
-		audio_frame();
+	    gb.gb_frame = 0;
+        while(gb.gb_frame == 0)
+        {
+            const char *lcd_mode_str[4] = {
+                "HBLANK", "VBLANK", "OAM", "TRANSFER"
+            };
+            __gb_step_cpu(&gb);
+
+            if(debug_mode == 0)
+                continue;
+
+            /* Debugging */
+            printf("OP: %#04X%s  PC: %#06X  SP: %#06X  A: %#04X  HL: %#06X  ",
+                    __gb_read(&gb, gb.cpu_reg.pc),
+                    gb.gb_halt ? "(HALTED)" : "",
+                    gb.cpu_reg.pc,
+                    gb.cpu_reg.sp,
+                    gb.cpu_reg.a,
+                    gb.cpu_reg.hl);
+            printf("LCD Mode: %s, LCD Power: %s\n",
+                    lcd_mode_str[gb.lcd_mode],
+                    (gb.gb_reg.LCDC >> 7) ? "ON" : "OFF");
+        }
 
 		/* Copy frame buffer from emulator context, converting to colours
 		 * defined in the palette. */
 		for (unsigned int y = 0; y < height; y++)
 		{
 			for (unsigned int x = 0; x < width; x++)
-				fb[y][x] = palette[selected_palette][gb.gb_fb[y][x] & 3];
+				fb[y][x] = palette[gb.gb_fb[y][x] & 3];
 		}
 
 		/* Copy frame buffer to SDL screen. */
@@ -495,68 +407,24 @@ int main(int argc, char **argv)
 		SDL_RenderCopy(renderer, texture, NULL, NULL);
 		SDL_RenderPresent(renderer);
 
-		/* Use a delay that will draw the screen at a rate of 59.7275 Hz. */
+		/* Use a delay that will draw the screen at a rate of 59.73 Hz. */
 		new_ticks = SDL_GetTicks();
 
-		/* Since we can only delay for a maximum resolution of 1ms, we
-		 * can accumulate the error and compensate for the delay
-		 * accuracy when the delay compensation surpasses 1ms. */
-		delay_comp += target_delay_ms - (new_ticks - old_ticks);
+        if(fast_mode)
+            continue;
 
-		/* We cast the delay compensation value to an integer, since it
-		 * is the type used by SDL_Delay. This is where delay accuracy
-		 * is lost. */
-		delay = (int)(delay_comp);
-
-		/* We then subtract the actual delay value by the requested
-		 * delay value. */
-		delay_comp -= delay;
-		printf("delay: %d\t\tdelay_comp: %f\t\taudio_len:%d",
-				delay, delay_comp, audio_length());
-
-		/* Only run delay logic if required. */
-		if(delay > 0)
-		{
-			uint32_t delay_ticks = SDL_GetTicks();
-			uint32_t after_delay_ticks;
-
-			/* Tick the internal RTC when 1 second has passed. */
-			rtc_timer += delay;
-			if(rtc_timer >= 1000)
-			{
-				rtc_timer -= 1000;
-				gb_tick_rtc(&gb);
-			}
-
-			/* This will delay for at least the number of
-			 * milliseconds requested, so we have to compensate for
-			 * error here too. */
-			SDL_Delay(delay);
-
-			after_delay_ticks = SDL_GetTicks();
-			delay_comp += (double)delay - (int)(after_delay_ticks -
-					delay_ticks);
-			printf("\t\tdelay_comp: %f\n", delay_comp);
-		}
+		delay = 17 - (new_ticks - old_ticks);
+		SDL_Delay(delay > 0 ? delay : 0);
 	}
 
-	SDL_DestroyRenderer(renderer);
-	SDL_DestroyWindow(window);
-	SDL_DestroyTexture(texture);
-	SDL_JoystickClose(joystick);
 	SDL_Quit();
-	audio_cleanup();
 
 	/* Record save file. */
 	write_cart_ram_file(save_file_name, &priv.cart_ram, gb_get_save_size(&gb));
 
 	free(priv.rom);
 	free(priv.cart_ram);
-	
-	/* If the save file name was automatically generated (which required memory
-	 * allocated on the help), then free it here. */
-	if(argc == 2)
-		free(save_file_name);
+	free(save_file_name);
 
 	return EXIT_SUCCESS;
 }

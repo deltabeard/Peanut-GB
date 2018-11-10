@@ -22,9 +22,9 @@
  * IN THE SOFTWARE.
  */
 
-#include <stdint.h> /* Required for int types */
+#include <stdint.h>	/* Required for int types */
 #include <string.h>	/* Required for memset() */
-#include <time.h>
+#include <time.h>	/* Required for tm struct */
 
 /* Enable sound support, including sound registers. Off by default due to no
  * implementation. */
@@ -85,13 +85,13 @@
 #define APU_ENV_CYCLES		65536	/* Volume Envelope counter 64Hz */
 
 /* Serial clock locked to 8192Hz on DMG.
- * Magic number 40 is compensation for innacurate timings used in this emulator,
- * and is used to pass the mooneye serial timing test
- * boot_sclk_align-dmgABCmgb.gb
- * Magic number 8 is compensation for the fact that we send one byte at a time,
- * instead of sending bit by bit.
- */
-#define SERIAL_CYCLES		((512 * 8) - 40)
+ * 4194304 / (8192 / 8) = 4096 clock cycles for sending 1 byte. */
+#define SERIAL_CYCLES		4096
+
+/* Calculating VSYNC. */
+#define DMG_CLOCK_FREQ		4194304.0
+#define SCREEN_REFRESH_CYCLES	70224.0
+#define VERTICAL_SYNC		(DMG_CLOCK_FREQ/SCREEN_REFRESH_CYCLES)
 
 /* STAT register masks */
 #define STAT_LYC_INTR       0x40
@@ -233,45 +233,6 @@ struct gb_registers_t
 		uint8_t TAC;
 	};
 
-#if ENABLE_SOUND
-	/* Sound */
-	uint8_t NR10;
-	union {
-		struct { uint8_t length : 6; uint8_t duty : 2; } NR11_bits;
-		uint8_t NR11;
-	};
-	uint8_t NR12, NR13, NR14;
-
-	union {
-		struct { uint8_t length : 6; uint8_t duty : 2; } NR21_bits;
-		uint8_t NR21;
-	};
-	uint8_t NR22, NR23, NR24;
-
-	uint8_t NR30, NR31, NR32, NR33, NR34;
-
-	union {
-		struct { uint8_t length : 6; uint8_t unused : 2; } NR41_bits;
-		uint8_t NR41;
-	};
-	uint8_t NR42, NR43, NR44;
-
-	uint8_t NR50, NR51;
-	union {
-		struct {
-			uint8_t snd_1_on : 1;
-			uint8_t snd_2_on : 1;
-			uint8_t snd_3_on : 1;
-			uint8_t snd_4_on : 1;
-			uint8_t unused : 3;
-			uint8_t all_on : 1;
-		} NR52_bits;
-		uint8_t NR52;
-	};
-
-	uint8_t WAV[0x10];
-#endif
-
 	/* LCD */
 	uint8_t LCDC;	uint8_t STAT;	uint8_t SCY;	uint8_t SCX;
 	uint8_t LY;		uint8_t LYC;	uint8_t DMA;	uint8_t BGP;
@@ -324,18 +285,42 @@ enum gb_init_error_e
  */
 struct gb_t
 {
-	/* Return byte from ROM at given address. */
-	uint8_t (*gb_rom_read)(struct gb_t*, const uint32_t);
+	/**
+	 * Return byte from ROM at given address.
+	 *
+	 * \param gb_t	emulator context
+	 * \param addr	address
+	 * \return		byte at address in ROM
+	 */
+	uint8_t (*gb_rom_read)(struct gb_t*, const uint32_t addr);
 
-	/* Return byte from cart RAM at given address. */
-	uint8_t (*gb_cart_ram_read)(struct gb_t*, const uint32_t);
+	/**
+	 * Return byte from cart RAM at given address.
+	 *
+	 * \param gb_t	emulator context
+	 * \param addr	address
+	 * \return		byte at address in RAM
+	 */
+	uint8_t (*gb_cart_ram_read)(struct gb_t*, const uint32_t addr);
 
-	/* Write byte to cart RAM at given address. */
-	void (*gb_cart_ram_write)(struct gb_t*, const uint32_t,
+	/**
+	 * Write byte to cart RAM at given address.
+	 *
+	 * \param gb_t	emulator context
+	 * \param addr	address
+	 * \param val	value to write to address in RAM
+	 */
+	void (*gb_cart_ram_write)(struct gb_t*, const uint32_t addr,
 			const uint8_t val);
 
-	/* Notify front-end of error. */
-	void (*gb_error)(struct gb_t*, const enum gb_error_e, const uint16_t);
+	/**
+	 * Notify front-end of error.
+	 *
+	 * \param gb_t			emulator context
+	 * \param gb_error_e	error code
+	 * \param val			arbitrary value related to error
+	 */
+	void (*gb_error)(struct gb_t*, const enum gb_error_e, const uint16_t val);
 
 	/* Transmit one byte and return the received byte. */
 	uint8_t (*gb_serial_transfer)(struct gb_t*, const uint8_t);
@@ -426,25 +411,6 @@ struct gb_t
 	/* Audio */
 	struct audio_t audio;
 };
-
-/**
- * Processes the values set in gb->joypad to the emulator.
- * This function should be called when a button press should be registered.
- * Before calling gb_run_frame() is good enough.
- */
-void gb_process_joypad(struct gb_t *gb)
-{
-	gb->gb_reg.P1 |= 0x0F;
-
-	/* TODO: Complete joypad states. */
-
-	/* Direction keys selected */
-	if((gb->gb_reg.P1 & 0b010000) == 0)
-		gb->gb_reg.P1 &= 0xF0 | (gb->joypad >> 4);
-	/* Button keys selected */
-	else if((gb->gb_reg.P1 & 0b100000) == 0)
-		gb->gb_reg.P1 &= 0xF0 | (gb->joypad & 0x0F);
-}
 
 /**
  * Tick the internal RTC by one second.
@@ -546,11 +512,14 @@ uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
 		case 0xF:
 			if(addr < OAM_ADDR)
 				return gb->wram[addr - ECHO_ADDR];
+
 			if(addr < UNUSED_ADDR)
 				return gb->oam[addr - OAM_ADDR];
+
 			/* Unusable memory area. Reading from this area returns 0.*/
 			if(addr < IO_ADDR)
 				return 0;
+
 			/* HRAM */
 			if(HRAM_ADDR <= addr && addr < INTR_EN_ADDR)
 				return gb->hram[addr - HRAM_ADDR];
@@ -558,15 +527,6 @@ uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
 			if((addr >= 0xFF10) && (addr <= 0xFF3F))
 				return audio_read(addr);
 
-			/* Wave pattern RAM */
-			if((addr & 0xFFF0) == 0xFF30)
-			{
-#if ENABLE_SOUND
-				return gb->gb_reg.WAV[addr & 0xF];
-#else
-				return 0xFF;
-#endif
-			}
 			/* IO and Interrupts. */
 			switch (addr & 0xFF)
 			{
@@ -583,31 +543,6 @@ uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
 
 						   /* Interrupt Flag Register */
 				case 0x0F: return gb->gb_reg.IF;
-
-#if ENABLE_SOUND
-						   /* Sound registers */
-				case 0x10: return gb->gb_reg.NR10 | 0x80;
-				case 0x11: return gb->gb_reg.NR11 | 0x3F;
-				case 0x12: return gb->gb_reg.NR12;
-				case 0x13: return gb->gb_reg.NR13 | 0xFF;
-				case 0x14: return gb->gb_reg.NR14 | 0xBF;
-				case 0x16: return gb->gb_reg.NR21 | 0x3F;
-				case 0x17: return gb->gb_reg.NR22;
-				case 0x18: return gb->gb_reg.NR23 | 0xFF;
-				case 0x19: return gb->gb_reg.NR24 | 0xBF;
-				case 0x1A: return gb->gb_reg.NR30 | 0x7F;
-				case 0x1B: return gb->gb_reg.NR31 | 0xFF;
-				case 0x1C: return gb->gb_reg.NR32 | 0x9F;
-				case 0x1D: return gb->gb_reg.NR33 | 0xFF;
-				case 0x1E: return gb->gb_reg.NR34 | 0xBF;
-				case 0x20: return gb->gb_reg.NR41 | 0xFF;
-				case 0x21: return gb->gb_reg.NR42;
-				case 0x22: return gb->gb_reg.NR43;
-				case 0x23: return gb->gb_reg.NR44 | 0xBF;
-				case 0x24: return gb->gb_reg.NR50;
-				case 0x25: return gb->gb_reg.NR51;
-				case 0x26: return gb->gb_reg.NR52 | 0x70;
-#endif
 
 						   /* LCD Registers */
 				case 0x40: return gb->gb_reg.LCDC;
@@ -753,14 +688,17 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 				gb->wram[addr - ECHO_ADDR] = val;
 				return;
 			}
+
 			if(addr < UNUSED_ADDR)
 			{
 				gb->oam[addr - OAM_ADDR] = val;
 				return;
 			}
+
 			/* Unusable memory area. */
 			if(addr < IO_ADDR)
 				return;
+
 			if(HRAM_ADDR <= addr && addr < INTR_EN_ADDR)
 			{
 				gb->hram[addr - HRAM_ADDR] = val;
@@ -770,29 +708,25 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 			if((addr >= 0xFF10) && (addr <= 0xFF3F))
 				audio_write(addr, val);
 
-			/* TODO: Remove */
-			/* Wave pattern RAM */
-			if((addr & 0xFFF0) == 0xFF30)
-			{
-#if ENABLE_SOUND
-				gb->gb_reg.WAV[addr & 0xF] = val;
-#endif
-				return;
-			}
-			/* If sound is off, ignore writes to APU registers (but not WAV
-			 * RAM). */
-			if((addr & 0xFF) >= 0x10 && (addr & 0xFF) <= 0x25 &&
-					(gb->gb_reg.NR52 & 0x80) == 0)
-				return;
-
-			/* IO, HRAM, and Interrupts. */
+			/* IO and Interrupts. */
 			switch(addr & 0xFF)
 			{
-				/* IO Registers */
+							/* Joypad */
 				case 0x00:
-					gb->gb_reg.P1 = val & 0x30;
-					gb_process_joypad(gb);
+					/* Only bits 5 and 4 are R/W.
+					 * The lower bits are overwritten later, and the two most
+					 * significant bits are unused. */
+					gb->gb_reg.P1 = val;
+
+					/* Direction keys selected */
+					if((gb->gb_reg.P1 & 0b010000) == 0)
+						gb->gb_reg.P1 |= (gb->joypad >> 4);
+					/* Button keys selected */
+					else
+						gb->gb_reg.P1 |= (gb->joypad & 0x0F);
 					return;
+
+							/* Serial */
 				case 0x01: gb->gb_reg.SB = val;		return;
 				case 0x02: gb->gb_reg.SC = val;		return;
 
@@ -805,56 +739,25 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 						   /* Interrupt Flag Register */
 				case 0x0F: gb->gb_reg.IF = val;	   return;
 
-#if ENABLE_SOUND
-						   /* Sound registers */
-				case 0x10: gb->gb_reg.NR10 = val;	return;
-				case 0x11: gb->gb_reg.NR11 = val;   return;
-				case 0x12: gb->gb_reg.NR12 = val;	return;
-				case 0x13: gb->gb_reg.NR13 = val;	return;
-				case 0x14: gb->gb_reg.NR14 = val;
-						   /* If the initial flag is being set, update the
-							* status register. */
-						   if(val & 0x80) gb->gb_reg.NR52_bits.snd_1_on = 1;
-						   return;
-				case 0x16: gb->gb_reg.NR21 = val;   return;
-				case 0x17: gb->gb_reg.NR22 = val;	return;
-				case 0x18: gb->gb_reg.NR23 = val;	return;
-				case 0x19: gb->gb_reg.NR24 = val;
-						   if(val & 0x80) gb->gb_reg.NR52_bits.snd_2_on = 1;
-						   return;
-				case 0x1A: gb->gb_reg.NR30 = val;	return;
-				case 0x1B: gb->gb_reg.NR31 = val;	return;
-				case 0x1C: gb->gb_reg.NR32 = val;	return;
-				case 0x1D: gb->gb_reg.NR33 = val;	return;
-				case 0x1E: gb->gb_reg.NR34 = val;
-						   if(val & 0x80) gb->gb_reg.NR52_bits.snd_3_on = 1;
-						   return;
-				case 0x20: gb->gb_reg.NR41 = val;	return;
-				case 0x21: gb->gb_reg.NR42 = val;	return;
-				case 0x22: gb->gb_reg.NR43 = val;	return;
-				case 0x23: gb->gb_reg.NR44 = val;
-						   if(val & 0x80) gb->gb_reg.NR52_bits.snd_4_on = 1;
-						   return;
-				case 0x24: gb->gb_reg.NR50 = val;	return;
-				case 0x25: gb->gb_reg.NR51 = val;	return;
-				case 0x26: 
-						   /* Sound off clears all APU registers apart from WAV
-							* RAM. */
-						   if((val & 0x80) == 0)
-						   {
-							   for(uint16_t i = 0xFF10; i < 0xFF26; i++)
-								   __gb_write(gb, i, 0x00);
-						   }
-						   gb->gb_reg.NR52 = (val & 0x80);
-						   return;
-#endif
-
 						   /* LCD Registers */
 				case 0x40:
 					gb->gb_reg.LCDC = val;
+
 					/* LY fixed to 0 when LCD turned off. */
 					if((gb->gb_reg.LCDC & LCDC_ENABLE) == 0)
+					{
+						/* Do not turn off LCD outside of VBLANK. This may
+						 * happen due to poor timing in this emulator. */
+						if(gb->lcd_mode != LCD_VBLANK)
+						{
+							gb->gb_reg.LCDC |= LCDC_ENABLE;
+							return;
+						}
+
+						gb->gb_reg.STAT = (gb->gb_reg.STAT & ~0x03) | LCD_VBLANK;
 						gb->gb_reg.LY = 0;
+						gb->counter.lcd_count = 0;
+					}
 
 					return;
 				case 0x41:
@@ -949,27 +852,6 @@ void gb_reset(struct gb_t *gb)
 	gb->gb_reg.TIMA      = 0x00;
 	gb->gb_reg.TMA       = 0x00;
 	gb->gb_reg.TAC       = 0x00;
-
-#if ENABLE_SOUND
-	gb->gb_reg.NR10      = 0x80;
-	gb->gb_reg.NR11      = 0xBF;
-	gb->gb_reg.NR12      = 0xF3;
-	gb->gb_reg.NR14      = 0xBF;
-	gb->gb_reg.NR21      = 0x3F;
-	gb->gb_reg.NR22      = 0x00;
-	gb->gb_reg.NR24      = 0xBF;
-	gb->gb_reg.NR30      = 0x7F;
-	gb->gb_reg.NR31      = 0xFF;
-	gb->gb_reg.NR32      = 0x9F;
-	gb->gb_reg.NR33      = 0xBF;
-	gb->gb_reg.NR41      = 0xFF;
-	gb->gb_reg.NR42      = 0x00;
-	gb->gb_reg.NR43      = 0x00;
-	gb->gb_reg.NR44      = 0xBF;
-	gb->gb_reg.NR50      = 0x77;
-	gb->gb_reg.NR51      = 0xF3;
-	gb->gb_reg.NR52      = 0xF1;
-#endif
 
 	gb->gb_reg.LCDC      = 0x91;
 	gb->gb_reg.SCY       = 0x00;
@@ -2936,148 +2818,6 @@ void __gb_step_cpu(struct gb_t *gb)
 		gb->counter.div_count -= DIV_CYCLES;
 	}
 
-	/* Check if sound is enabled. If so, run APU logic */
-	if(gb->gb_reg.NR52_bits.all_on)
-	{
-		/* The length counter disables a channel when its respective length
-		 * counter decrements to 0. */
-		if((gb->counter.apu_len_count += inst_cycles) >= APU_LEN_CYCLES)
-		{
-			/* If the length counter for the channel is enabled, and the value
-			 * in the respective length counter is not zero, then decrement the
-			 * length counter for that channel. */
-#if 0
-			printf("   NRx0\t NRx1\t NRx2\t NRx3\t NRx4\n");
-			printf("1: %#04x\t %#04x\t %#04x\t %#04x\t %#04x\t\n",
-					gb->gb_reg.NR10, gb->gb_reg.NR11, gb->gb_reg.NR12,
-					gb->gb_reg.NR13, gb->gb_reg.NR14);
-			printf("2:  - \t %#04x\t %#04x\t %#04x\t %#04x\t\n",
-					gb->gb_reg.NR21, gb->gb_reg.NR22,
-					gb->gb_reg.NR23, gb->gb_reg.NR24);
-			printf("3: %#04x\t %#04x\t %#04x\t %#04x\t %#04x\t\n",
-					gb->gb_reg.NR30, gb->gb_reg.NR31, gb->gb_reg.NR32,
-					gb->gb_reg.NR33, gb->gb_reg.NR34);
-			printf("4:  - \t %#04x\t %#04x\t %#04x\t %#04x\t\n",
-					gb->gb_reg.NR41, gb->gb_reg.NR42,
-					gb->gb_reg.NR43, gb->gb_reg.NR44);
-			printf("NR50: %#04x\t NR51: %#04x\t NR52: %#04x\t\n\n",
-					gb->gb_reg.NR50, gb->gb_reg.NR51, gb->gb_reg.NR52);
-#endif
-
-			/* Channel 1 */
-			/* Check if channel is on,
-			 * Check if length counter is enabled for the channel,
-			 * Check if length counter is non-zero. */
-			if(gb->gb_reg.NR52_bits.snd_1_on &&
-					(gb->gb_reg.NR14 & 0x40) &&
-					gb->gb_reg.NR11_bits.length)
-			{
-				/* Turn off channel if length counter becomes 0. */
-				if(--gb->gb_reg.NR11_bits.length == 0)
-				{
-					gb->gb_reg.NR14 ^= 0x40;
-					gb->gb_reg.NR52_bits.snd_1_on = 0;
-				}
-			}
-
-			/* Channel 2 */
-			/* Check if channel is on,
-			 * Check if length counter is enabled for the channel,
-			 * Check if length counter is non-zero. */
-			if(gb->gb_reg.NR52_bits.snd_2_on &&
-					(gb->gb_reg.NR24 & 0x40) &&
-					gb->gb_reg.NR21_bits.length)
-			{
-				/* Turn off channel if length counter becomes 0. */
-				if(--gb->gb_reg.NR21_bits.length == 0)
-				{
-					gb->gb_reg.NR24 ^= 0x40;
-					gb->gb_reg.NR52_bits.snd_2_on = 0;
-				}
-			}
-
-			/* Channel 3 */
-			/* Check if channel is on,
-			 * Check if length counter is enabled for the channel,
-			 * Check if length counter is non-zero. */
-			if((gb->gb_reg.NR30 & 0x80) &&
-					(gb->gb_reg.NR34 & 0x40) &&
-					gb->gb_reg.NR31)
-			{
-				/* Turn off channel if length counter becomes 0. */
-				if(--gb->gb_reg.NR31 == 0)
-				{
-					gb->gb_reg.NR30 = 0;
-					gb->gb_reg.NR52_bits.snd_3_on = 0;
-				}
-			}
-
-			/* Channel 4 */
-			/* Check if channel is on,
-			 * Check if length counter is enabled for the channel,
-			 * Check if length counter is non-zero. */
-			if(gb->gb_reg.NR52_bits.snd_4_on &&
-					(gb->gb_reg.NR44 & 0x40) &&
-					gb->gb_reg.NR41)
-			{
-				/* Turn off channel if length counter becomes 0. */
-				if(--gb->gb_reg.NR41_bits.length == 0)
-					gb->gb_reg.NR52_bits.snd_4_on = 0;
-			}
-
-			/* Reset length counter. */
-			gb->counter.apu_len_count -= APU_LEN_CYCLES;
-
-			/* TODO: Implement other channels. Only working on Channel 3 (WAVE)
-			 * for now. */
-		}
-
-		/* TODO */
-		if((gb->counter.apu_swp_count += inst_cycles) >= APU_SWP_CYCLES)
-			;
-
-		/* TODO */
-		if((gb->counter.apu_env_count += inst_cycles) >= APU_ENV_CYCLES)
-			;
-
-		/* After processing events in the four channels, mix the channels
-		 * together, and record the output stereo audio sample in the buffer
-		 * provided in gb_init_audio() */
-
-		/* Check if it's time to generate a new audio sample and that the audio
-		 * buffer is initialised. */
-#if 0
-		if((gb->counter.apu_sample_count += inst_cycles) >=
-				gb->counter.apu_sample_cycles && gb->audio.buffer != NULL)
-		{
-			gb->counter.apu_sample_count -= gb->counter.apu_sample_cycles;
-
-			/* If channel 3 is enabled, mix it in to the output. */
-			if(gb->gb_reg.NR52_bits.snd_3_on )
-			{
-				//gb->audio.buffer[gb->counter.apu_buffer_count] = gb->gb_reg.WAV[gb->counter.apu_wav_count] << 4;
-				
-				gb->audio.buffer[gb->counter.apu_buffer_count] =
-					(uint8_t)(255.0 * (sin(gb->counter.apu_buffer_count) + 1.0));
-
-				printf("Buf: %d\n", gb->audio.buffer[gb->counter.apu_buffer_count]);
-				/* Mix channel 3 into audio buffer, keeping track of which
-				 * sample in the WAV RAM we are on. */
-				if(++gb->counter.apu_wav_count > 0xF)
-					gb->counter.apu_wav_count = 0;
-			}
-
-			/* If audio buffer is full, queue it to front-end. */
-			if(++gb->counter.apu_buffer_count == gb->audio.len)
-			{
-				gb->counter.apu_buffer_count = 0;
-				gb->audio.queue_audio(&gb->priv, gb->audio.buffer,
-						gb->audio.len);
-			}
-		}
-#endif
-	}
-
 	/* Check serial transfer. */
 	if(gb->gb_reg.SC & 0x80)
 	{
@@ -3085,7 +2825,11 @@ void __gb_step_cpu(struct gb_t *gb)
 
 		if(gb->counter.serial_count >= SERIAL_CYCLES)
 		{
-			gb->gb_reg.SB = (gb->gb_serial_transfer)(gb, gb->gb_reg.SB);
+			if(gb->gb_serial_transfer == NULL)
+				gb->gb_reg.SB = 0xFF;
+			else
+				gb->gb_reg.SB = (gb->gb_serial_transfer)(gb, gb->gb_reg.SB);
+
 			/* Inform game of serial TX/RX completion. */
 			gb->gb_reg.SC &= 0x01;
 			gb->gb_reg.IF |= SERIAL_INTR;
@@ -3203,6 +2947,18 @@ uint32_t gb_get_save_size(struct gb_t *gb)
 }
 
 /**
+ * Set the function used to handle serial transfer in the front-end. This is
+ * optional.
+ * gb_serial_transfer takes a byte to transmit and returns the received byte. If
+ * no cable is connected to the console, return 0xFF.
+ */
+void gb_init_serial(struct gb_t *gb,
+		uint8_t (*gb_serial_transfer)(struct gb_t*, const uint8_t))
+{
+	gb->gb_serial_transfer = gb_serial_transfer;
+}
+
+/**
  * Initialise the emulator context. gb_reset() is also called to initialise
  * the CPU.
  */
@@ -3211,7 +2967,6 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 		uint8_t (*gb_cart_ram_read)(struct gb_t*, const uint32_t),
 		void (*gb_cart_ram_write)(struct gb_t*, const uint32_t, const uint8_t),
 		void (*gb_error)(struct gb_t*, const enum gb_error_e, const uint16_t),
-		uint8_t (*gb_serial_transfer)(struct gb_t*, const uint8_t),
 		void *priv)
 {
 	const uint16_t mbc_location = 0x0147;
@@ -3249,8 +3004,12 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 	gb->gb_cart_ram_read = gb_cart_ram_read;
 	gb->gb_cart_ram_write = gb_cart_ram_write;
 	gb->gb_error = gb_error;
-	gb->gb_serial_transfer = gb_serial_transfer;
 	gb->priv = priv;
+
+	/* Initialise serial transfer function to NULL. If the front-end does not
+	 * provide serial support, peanut-gb will emulate no cable connected
+	 * automatically. */
+	gb->gb_serial_transfer = NULL;
 
 	/* Check if cartridge type is supported, and set MBC type. */
 	{

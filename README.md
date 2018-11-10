@@ -25,16 +25,16 @@ These are:
 
 ## SDL2 Example
 
-An example implementation is given in gameboy_sdl.c, which uses SDL2 to draw the
+An example implementation is given in peanut_sdl.c, which uses SDL2 to draw the
 screen and take input. Run `make` in the example folder to compile.
 
-Execute in command line with `gameboy_sdl game.gb` which will automatically
+Execute in command line with `peanut-sdl game.gb` which will automatically
 create the save file `game.sav` for the game if one isn't found. Or run with
-`gameboy_sdl game.gb save.sav` to specify a save file.
+`peanut-sdl game.gb save.sav` to specify a save file.
 
 ### Screenshot
 
-![Screenshot of SDL2 frontend](/examples/sdl2_example_screenshot.png)
+![Screenshot of SDL2 frontend](/examples/sdl2/sdl2_example_screenshot.png)
 
 ### Controls
 
