@@ -8,28 +8,28 @@
 #define debugprintf(...)
 
 static Basic_Gb_Apu apu;
-SDL_AudioDeviceID dev;
 
-const long sample_rate = 48000;
 void fill_audio( void *userdata, uint8_t *stream, int len );
 
 int audio_init(void)
 {
+	const long default_sample_rate = 48000;
+	SDL_AudioDeviceID dev;
 	SDL_AudioSpec want, have;
 
-    debugprintf("audio was initialised\n");
-    apu.set_sample_rate( sample_rate );
+	debugprintf("audio was initialised\n");
+	apu.set_sample_rate( default_sample_rate );
 
-    want.freq = sample_rate;
-    want.format = AUDIO_S16SYS;
-    want.channels = 2;
-    want.samples = 1024 * 4;
-    want.callback = fill_audio;
-    want.userdata = NULL;
+	want.freq = default_sample_rate;
+	want.format = AUDIO_S16SYS;
+	want.channels = 2;
+	want.samples = 1024;
+	want.callback = fill_audio;
+	want.userdata = NULL;
 
 	printf("Audio driver: %s\n", SDL_GetAudioDeviceName(0, 0));
 
-	if((dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, SDL_AUDIO_ALLOW_ANY_CHANGE)) == 0)
+	if((dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0)) == 0)
 	{
 		printf("SDL could not open audio device: %s\n", SDL_GetError());
 		return EXIT_FAILURE;
@@ -37,7 +37,7 @@ int audio_init(void)
 
 	SDL_PauseAudioDevice(dev, 0);
 
-    return 0;
+	return 0;
 }
 
 void fill_audio( void *userdata, uint8_t *stream, int len )
@@ -68,3 +68,12 @@ void audio_frame(void)
     apu.end_frame();
 }
 
+int audio_length(void)
+{
+    return apu.samples_avail();
+}
+
+void audio_sample_rate_set(unsigned int sample_rate)
+{
+	apu.set_sample_rate( sample_rate );
+}

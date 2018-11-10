@@ -11,6 +11,7 @@ uint8_t audio_read( uint16_t address );
 void audio_write( uint16_t address, uint8_t data );
 void audio_cleanup(void);
 void audio_frame(void);
+int audio_length(void);
 
 #ifdef __cplusplus
 }

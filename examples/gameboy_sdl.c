@@ -357,8 +357,6 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	new_ticks = SDL_GetTicks();
-
 	while(running)
 	{
 		int delay;
@@ -376,6 +374,10 @@ int main(int argc, char **argv)
 			/* Entries with different palettes for BG, OBJ0 & OBJ1 are not
 			 * yet supported. */
 		};
+
+		/* Calculate the time taken to draw frame, then later add a
+		 * delay to cap at 60 fps. */
+		old_ticks = SDL_GetTicks();
 
 		/* Get joypad input. */
 		while(SDL_PollEvent(&event))
@@ -470,10 +472,6 @@ int main(int argc, char **argv)
 			}
 		}
 
-		/* Calculate the time taken to draw frame, then later add a delay to cap
-		 * at 60 fps. */
-		old_ticks = SDL_GetTicks();
-
 		/* Tell the emulator to process the joypad variable modified above to
 		 * values that the Game Boy uses. */
 		gb_process_joypad(&gb);
@@ -500,17 +498,45 @@ int main(int argc, char **argv)
 		/* Use a delay that will draw the screen at a rate of 59.7275 Hz. */
 		new_ticks = SDL_GetTicks();
 
+		/* Since we can only delay for a maximum resolution of 1ms, we
+		 * can accumulate the error and compensate for the delay
+		 * accuracy when the delay compensation surpasses 1ms. */
 		delay_comp += target_delay_ms - (new_ticks - old_ticks);
-		delay = (int)(delay_comp);
-		delay_comp -= delay;
-		SDL_Delay(delay > 0 ? delay : 0);
 
-		/* Tick the internal RTC when 1 second has passed. */
-		rtc_timer += delay > 0 ? delay : 0;
-		if(rtc_timer >= 1000)
+		/* We cast the delay compensation value to an integer, since it
+		 * is the type used by SDL_Delay. This is where delay accuracy
+		 * is lost. */
+		delay = (int)(delay_comp);
+
+		/* We then subtract the actual delay value by the requested
+		 * delay value. */
+		delay_comp -= delay;
+		printf("delay: %d\t\tdelay_comp: %f\t\taudio_len:%d",
+				delay, delay_comp, audio_length());
+
+		/* Only run delay logic if required. */
+		if(delay > 0)
 		{
-			rtc_timer -= 1000;
-			gb_tick_rtc(&gb);
+			uint32_t delay_ticks = SDL_GetTicks();
+			uint32_t after_delay_ticks;
+
+			/* Tick the internal RTC when 1 second has passed. */
+			rtc_timer += delay;
+			if(rtc_timer >= 1000)
+			{
+				rtc_timer -= 1000;
+				gb_tick_rtc(&gb);
+			}
+
+			/* This will delay for at least the number of
+			 * milliseconds requested, so we have to compensate for
+			 * error here too. */
+			SDL_Delay(delay);
+
+			after_delay_ticks = SDL_GetTicks();
+			delay_comp += (double)delay - (int)(after_delay_ticks -
+					delay_ticks);
+			printf("\t\tdelay_comp: %f\n", delay_comp);
 		}
 	}
 
