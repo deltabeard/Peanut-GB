@@ -1,7 +1,8 @@
 target = peanut_sdl
 objects = peanut_sdl.o audio.o Basic_Gb_Apu.o gb_apu/libgb_apu.a
-CFLAGS	:= $(shell sdl2-config --cflags) -std=c99 -s -Os -W -Wall -Wextra
-CXXFLAGS= $(shell sdl2-config --cflags) -s -Os -Wall
+OPT	:= -s -Os
+CFLAGS	:= $(shell sdl2-config --cflags) -std=c99 $(OPT) -W -Wall -Wextra
+CXXFLAGS := $(shell sdl2-config --cflags) $(OPT) -Wall
 LDFLAGS	:= $(shell sdl2-config --libs) -lm
 
 .PHONY: all
