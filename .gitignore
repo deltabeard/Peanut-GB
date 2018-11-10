@@ -1,0 +1,6 @@
+*.o
+*.gch
+*.gcda
+*.a
+*.exe
+peanut_sdl

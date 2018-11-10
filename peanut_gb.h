@@ -71,9 +71,18 @@
 #define CRAM_BANK_SIZE  0x2000
 #define VRAM_BANK_SIZE  0x2000
 
+#define DMG_CPU_CLOCK	4194304
+
 /* DIV Register is incremented at rate of 16384Hz.
  * 4194304 / 16384 = 256 clock cycles for one increment. */
 #define DIV_CYCLES          256
+
+/* Sound timers */
+/* TODO: Possibility of combining these APU timers. Using the faster 256Hz
+ * timer, then deriving the other two counters from that. */
+#define APU_LEN_CYCLES		16384	/* Length counter 256Hz */
+#define APU_SWP_CYCLES		32768	/* Sweep counter 128Hz */
+#define APU_ENV_CYCLES		65536	/* Volume Envelope counter 64Hz */
 
 /* Serial clock locked to 8192Hz on DMG.
  * 4194304 / (8192 / 8) = 4096 clock cycles for sending 1 byte. */
@@ -188,12 +197,26 @@ struct cpu_registers_t
 	uint16_t pc; /* Program counter */
 };
 
-struct timer_t
+struct count_t
 {
 	uint16_t lcd_count;		/* LCD Timing */
 	uint16_t div_count;		/* Divider Register Counter */
 	uint16_t tima_count;	/* Timer Counter */
 	uint16_t serial_count;
+
+	uint16_t apu_len_count;	/* Length counter */
+	uint16_t apu_swp_count;	/* Sweep counter */
+	uint32_t apu_env_count;	/* Volume envelope counter */
+	uint8_t apu_wav_count; /* Count which wav sample is set to be mixed. */
+
+	/* Counts when a new audio sample should be recorded. */
+	uint32_t apu_sample_count;
+	/* Number of cycles per new audio sample. When apu_sample_count >=
+	 * apu_sample_cycles, then a new audio sample must be taken. */
+	uint16_t apu_sample_cycles;
+	/* Counts the number of samples in audio buffer. Audio is queued to the
+	 * front-end when the buffer is filled. */
+	uint16_t apu_buffer_count;
 };
 
 struct gb_registers_t
@@ -210,17 +233,6 @@ struct gb_registers_t
 		uint8_t TAC;
 	};
 
-#if ENABLE_SOUND
-	/* Sound */
-	uint8_t NR10;	uint8_t NR11;	uint8_t NR12;	uint8_t NR13;
-	uint8_t NR14;
-	uint8_t NR21;	uint8_t NR22;	uint8_t NR23;	uint8_t NR24;
-	uint8_t NR30;	uint8_t NR31;	uint8_t NR32;	uint8_t NR33;
-	uint8_t NR34;
-	uint8_t NR41;	uint8_t NR42;	uint8_t NR43;	uint8_t NR44;
-	uint8_t NR50;	uint8_t NR51;	uint8_t NR52;
-	uint8_t WAV[0x10];
-#endif
 	/* LCD */
 	uint8_t LCDC;	uint8_t STAT;	uint8_t SCY;	uint8_t SCX;
 	uint8_t LY;		uint8_t LYC;	uint8_t DMA;	uint8_t BGP;
@@ -237,6 +249,15 @@ struct gb_registers_t
 
 	/* Interrupt enable. */
 	uint8_t IE;
+};
+
+struct audio_t
+{
+	uint8_t *buffer;
+	unsigned int len;
+	unsigned int rate;
+	void (*queue_audio)(void *priv, const uint8_t * const buffer,
+			const unsigned int len);
 };
 
 /**
@@ -352,8 +373,8 @@ struct gb_t
 	};
 
 	struct cpu_registers_t cpu_reg;
-	struct timer_t timer;
 	struct gb_registers_t gb_reg;
+	struct count_t counter;
 
 	union
 	{
@@ -383,10 +404,12 @@ struct gb_t
 
 	/* screen */
 	uint8_t gb_fb[LCD_HEIGHT][LCD_WIDTH];
-
 	/* TODO: Move this */
 	uint8_t WY;
 	uint8_t WYC;
+
+	/* Audio */
+	struct audio_t audio;
 };
 
 /**
@@ -501,15 +524,8 @@ uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
 			if(HRAM_ADDR <= addr && addr < INTR_EN_ADDR)
 				return gb->hram[addr - HRAM_ADDR];
 
-			/* Wave pattern RAM */
-			if((addr & 0xFFF0) == 0xFF30)
-			{
-#if ENABLE_SOUND
-				return gb->gb_reg.WAV[addr & 0xF];
-#else
-				return 1;
-#endif
-			}
+			if((addr >= 0xFF10) && (addr <= 0xFF3F))
+				return audio_read(addr);
 
 			/* IO and Interrupts. */
 			switch (addr & 0xFF)
@@ -527,31 +543,6 @@ uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
 
 						   /* Interrupt Flag Register */
 				case 0x0F: return gb->gb_reg.IF;
-
-#if ENABLE_SOUND
-						   /* Sound registers */
-				case 0x10: return gb->gb_reg.NR10;
-				case 0x11: return gb->gb_reg.NR11;
-				case 0x12: return gb->gb_reg.NR12;
-				case 0x13: return gb->gb_reg.NR13;
-				case 0x14: return gb->gb_reg.NR14;
-				case 0x16: return gb->gb_reg.NR21;
-				case 0x17: return gb->gb_reg.NR22;
-				case 0x18: return gb->gb_reg.NR23;
-				case 0x19: return gb->gb_reg.NR24;
-				case 0x1A: return gb->gb_reg.NR30;
-				case 0x1B: return gb->gb_reg.NR31;
-				case 0x1C: return gb->gb_reg.NR32;
-				case 0x1D: return gb->gb_reg.NR33;
-				case 0x1E: return gb->gb_reg.NR34;
-				case 0x20: return gb->gb_reg.NR41;
-				case 0x21: return gb->gb_reg.NR42;
-				case 0x22: return gb->gb_reg.NR43;
-				case 0x23: return gb->gb_reg.NR44;
-				case 0x24: return gb->gb_reg.NR50;
-				case 0x25: return gb->gb_reg.NR51;
-				case 0x26: return gb->gb_reg.NR52;
-#endif
 
 						   /* LCD Registers */
 				case 0x40: return gb->gb_reg.LCDC;
@@ -579,7 +570,7 @@ uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
 				case 0xFF: return gb->gb_reg.IE;
 
 						   /* Unused registers return 1 */
-				default: return 1;
+				default: return 0xFF;
 			}
 	}
 
@@ -714,14 +705,8 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 				return;
 			}
 
-			/* Wave pattern RAM */
-			if((addr & 0xFFF0) == 0xFF30)
-			{
-#if ENABLE_SOUND
-				gb->gb_reg.WAV[addr & 0xF] = val;
-#endif
-				return;
-			}
+			if((addr >= 0xFF10) && (addr <= 0xFF3F))
+				audio_write(addr, val);
 
 			/* IO and Interrupts. */
 			switch(addr & 0xFF)
@@ -752,34 +737,7 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 				case 0x07: gb->gb_reg.TAC = val;	return;
 
 						   /* Interrupt Flag Register */
-				case 0x0F:
-						   gb->gb_reg.IF = val;
-						   return;
-
-#if ENABLE_SOUND
-						   /* Sound registers */
-				case 0x10: gb->gb_reg.NR10 = val;	return;
-				case 0x11: gb->gb_reg.NR11 = val;	return;
-				case 0x12: gb->gb_reg.NR12 = val;	return;
-				case 0x13: gb->gb_reg.NR13 = val;	return;
-				case 0x14: gb->gb_reg.NR14 = val;	return;
-				case 0x16: gb->gb_reg.NR21 = val;	return;
-				case 0x17: gb->gb_reg.NR22 = val;	return;
-				case 0x18: gb->gb_reg.NR23 = val;	return;
-				case 0x19: gb->gb_reg.NR24 = val;	return;
-				case 0x1A: gb->gb_reg.NR30 = val;	return;
-				case 0x1B: gb->gb_reg.NR31 = val;	return;
-				case 0x1C: gb->gb_reg.NR32 = val;	return;
-				case 0x1D: gb->gb_reg.NR33 = val;	return;
-				case 0x1E: gb->gb_reg.NR34 = val;	return;
-				case 0x20: gb->gb_reg.NR41 = val;	return;
-				case 0x21: gb->gb_reg.NR42 = val;	return;
-				case 0x22: gb->gb_reg.NR43 = val;	return;
-				case 0x23: gb->gb_reg.NR44 = val;	return;
-				case 0x24: gb->gb_reg.NR50 = val;	return;
-				case 0x25: gb->gb_reg.NR51 = val;	return;
-				case 0x26: gb->gb_reg.NR52 = val;	return;
-#endif
+				case 0x0F: gb->gb_reg.IF = val;	   return;
 
 						   /* LCD Registers */
 				case 0x40:
@@ -798,7 +756,7 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 
 						gb->gb_reg.STAT = (gb->gb_reg.STAT & ~0x03) | LCD_VBLANK;
 						gb->gb_reg.LY = 0;
-						gb->timer.lcd_count = 0;
+						gb->counter.lcd_count = 0;
 					}
 
 					return;
@@ -883,35 +841,17 @@ void gb_reset(struct gb_t *gb)
 	/* TODO: Add BIOS support. */
 	gb->cpu_reg.pc = 0x0100;
 
-	gb->timer.lcd_count = 0;
-	gb->timer.div_count = 0;
-	gb->timer.tima_count = 0;
-	gb->timer.serial_count = 0;
+	gb->counter.lcd_count = 0;
+	gb->counter.div_count = 0;
+	gb->counter.tima_count = 0;
+	gb->counter.serial_count = 0;
+	gb->counter.apu_len_count = 0;
+	gb->counter.apu_swp_count = 0;
+	gb->counter.apu_env_count = 0;
 
 	gb->gb_reg.TIMA      = 0x00;
 	gb->gb_reg.TMA       = 0x00;
 	gb->gb_reg.TAC       = 0x00;
-
-#if ENABLE_SOUND
-	gb->gb_reg.NR10      = 0x80;
-	gb->gb_reg.NR11      = 0xBF;
-	gb->gb_reg.NR12      = 0xF3;
-	gb->gb_reg.NR14      = 0xBF;
-	gb->gb_reg.NR21      = 0x3F;
-	gb->gb_reg.NR22      = 0x00;
-	gb->gb_reg.NR24      = 0xBF;
-	gb->gb_reg.NR30      = 0x7F;
-	gb->gb_reg.NR31      = 0xFF;
-	gb->gb_reg.NR32      = 0x9F;
-	gb->gb_reg.NR33      = 0xBF;
-	gb->gb_reg.NR41      = 0xFF;
-	gb->gb_reg.NR42      = 0x00;
-	gb->gb_reg.NR43      = 0x00;
-	gb->gb_reg.NR44      = 0xBF;
-	gb->gb_reg.NR50      = 0x77;
-	gb->gb_reg.NR51      = 0xF3;
-	gb->gb_reg.NR52      = 0xF1;
-#endif
 
 	gb->gb_reg.LCDC      = 0x91;
 	gb->gb_reg.SCY       = 0x00;
@@ -2870,20 +2810,20 @@ void __gb_step_cpu(struct gb_t *gb)
 	}
 
 	/* DIV register timing */
-	gb->timer.div_count += inst_cycles;
+	gb->counter.div_count += inst_cycles;
 
-	if(gb->timer.div_count >= DIV_CYCLES)
+	if(gb->counter.div_count >= DIV_CYCLES)
 	{
 		gb->gb_reg.DIV++;
-		gb->timer.div_count -= DIV_CYCLES;
+		gb->counter.div_count -= DIV_CYCLES;
 	}
 
 	/* Check serial transfer. */
 	if(gb->gb_reg.SC & 0x80)
 	{
-		gb->timer.serial_count += inst_cycles;
+		gb->counter.serial_count += inst_cycles;
 
-		if(gb->timer.serial_count >= SERIAL_CYCLES)
+		if(gb->counter.serial_count >= SERIAL_CYCLES)
 		{
 			if(gb->gb_serial_transfer == NULL)
 				gb->gb_reg.SB = 0xFF;
@@ -2893,7 +2833,7 @@ void __gb_step_cpu(struct gb_t *gb)
 			/* Inform game of serial TX/RX completion. */
 			gb->gb_reg.SC &= 0x01;
 			gb->gb_reg.IF |= SERIAL_INTR;
-			gb->timer.serial_count -= SERIAL_CYCLES;
+			gb->counter.serial_count -= SERIAL_CYCLES;
 		}
 	}
 
@@ -2903,10 +2843,10 @@ void __gb_step_cpu(struct gb_t *gb)
 	{
 		static const unsigned int TAC_CYCLES[4] = {1024, 16, 64, 256};
 
-		gb->timer.tima_count += inst_cycles;
-		if(gb->timer.tima_count >= TAC_CYCLES[gb->gb_reg.tac_rate])
+		gb->counter.tima_count += inst_cycles;
+		if(gb->counter.tima_count >= TAC_CYCLES[gb->gb_reg.tac_rate])
 		{
-			gb->timer.tima_count -= TAC_CYCLES[gb->gb_reg.tac_rate];
+			gb->counter.tima_count -= TAC_CYCLES[gb->gb_reg.tac_rate];
 
 			if(++gb->gb_reg.TIMA == 0)
 			{
@@ -2923,12 +2863,12 @@ void __gb_step_cpu(struct gb_t *gb)
 		return;
 
 	/* LCD Timing */
-	gb->timer.lcd_count += inst_cycles;
+	gb->counter.lcd_count += inst_cycles;
 
 	/* New Scanline */
-	if(gb->timer.lcd_count > LCD_LINE_CYCLES)
+	if(gb->counter.lcd_count > LCD_LINE_CYCLES)
 	{
-		gb->timer.lcd_count -= LCD_LINE_CYCLES;
+		gb->counter.lcd_count -= LCD_LINE_CYCLES;
 
 		/* LYC Update */
 		if(gb->gb_reg.LY == gb->gb_reg.LYC)
@@ -2969,14 +2909,14 @@ void __gb_step_cpu(struct gb_t *gb)
 		}
 	}
 	/* OAM access */
-	else if(gb->lcd_mode == LCD_HBLANK && gb->timer.lcd_count >= LCD_MODE_2_CYCLES)
+	else if(gb->lcd_mode == LCD_HBLANK && gb->counter.lcd_count >= LCD_MODE_2_CYCLES)
 	{
 		gb->lcd_mode = LCD_SEARCH_OAM;
 		if(gb->gb_reg.STAT & STAT_MODE_2_INTR)
 			gb->gb_reg.IF |= LCDC_INTR;
 	}
 	/* Update LCD */
-	else if(gb->lcd_mode == LCD_SEARCH_OAM && gb->timer.lcd_count >= LCD_MODE_3_CYCLES)
+	else if(gb->lcd_mode == LCD_SEARCH_OAM && gb->counter.lcd_count >= LCD_MODE_3_CYCLES)
 	{
 		gb->lcd_mode = LCD_TRANSFER;
 		/* TODO: LCD_DRAW_LINE(); */
@@ -3083,7 +3023,39 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 	gb->num_rom_banks = num_rom_banks[gb->gb_rom_read(gb, bank_count_location)];
 	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(gb, ram_size_location)];
 
+	/* Initialise the audio buffer to NULL in-case audio is not initialised when
+	 * the emulator starts stepping CPU. */
+	gb->audio.buffer = NULL;
+
 	gb_reset(gb);
 
 	return GB_INIT_NO_ERROR;
+}
+
+/**
+ * Used to initialise audio. Must be called after gb_init().
+ * TODO: Make gb_init_audio() optional.
+ * TODO: Don't pass gb_t to front-end functions elsewhere.
+ *
+ * @param gb		Emulator context.
+ * @param buffer	Buffer to store u8 stereo audio samples.
+ * @param len		Length of buffer in bytes.
+ * @param rate		Sampling rate of audio to be stored in buffer.
+ * @param queue_audio	Function to call to queue buffer filled with new
+ * 						samples.
+ */
+void gb_init_audio(struct gb_t *gb, uint8_t *buffer, unsigned int len,
+		unsigned int rate,
+		void (*queue_audio)(void *priv, const uint8_t * const buffer,
+			const unsigned int len))
+{
+	gb->audio.buffer = buffer;
+	gb->audio.len = len;
+	gb->audio.rate = rate;
+	gb->audio.queue_audio = queue_audio;
+	gb->counter.apu_sample_count = 0;
+	gb->counter.apu_buffer_count = 0;
+	gb->counter.apu_sample_cycles = DMG_CPU_CLOCK / rate;
+
+	return;
 }

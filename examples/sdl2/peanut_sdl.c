@@ -17,7 +17,11 @@
 
 #define ENABLE_SOUND 1
 
+#include "audio.h"
 #include "../../peanut_gb.h"
+
+//#define debugprintf printf
+#define debugprintf(...)
 
 struct priv_t
 {
@@ -291,12 +295,13 @@ int main(int argc, char **argv)
 	}
 
 	/* Initialise frontend implementation, in this case, SDL2. */
-	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) < 0)
+	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK | SDL_INIT_AUDIO) < 0)
 	{
 		printf("Could not initialise SDL: %s\n", SDL_GetError());
 		return EXIT_FAILURE;
 	}
 
+	audio_init();
 	/* Allow the joystick input even if game is in background. */
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
 
@@ -350,11 +355,9 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	new_ticks = SDL_GetTicks();
-
 	while(running)
 	{
-		int32_t delay;
+		int delay;
 		static unsigned int rtc_timer = 0;
 		static uint8_t selected_palette = 4;
 #define MAX_PALETTE 6
@@ -369,6 +372,10 @@ int main(int argc, char **argv)
 			/* Entries with different palettes for BG, OBJ0 & OBJ1 are not
 			 * yet supported. */
 		};
+
+		/* Calculate the time taken to draw frame, then later add a
+		 * delay to cap at 60 fps. */
+		old_ticks = SDL_GetTicks();
 
 		/* Get joypad input. */
 		while(SDL_PollEvent(&event))
@@ -463,8 +470,8 @@ int main(int argc, char **argv)
 			}
 		}
 
-		/* Calculate the time taken to draw frame, then later add a delay to cap
-		 * at 60 fps. */
+		/* Calculate the time taken to draw frame, then later add a
+		 * delay to cap at 60 fps. */
 		old_ticks = SDL_GetTicks();
 
 		/* Execute CPU cycles until the screen has to be redrawn. */
@@ -482,12 +489,15 @@ int main(int argc, char **argv)
 		if(fast_mode_timer > 1)
 		{
 			fast_mode_timer--;
-			/* We continue here since the rest of the logic in the loop is for
-			 * drawing the screen and delaying. */
+			/* We continue here since the rest of the logic in the
+			 * loop is for drawing the screen and delaying. */
 			continue;
 		}
 
 		fast_mode_timer = fast_mode;
+
+		/* Process audio. */
+		audio_frame();
 
 		/* Copy frame buffer from emulator context, converting to colours
 		 * defined in the palette. */
@@ -506,18 +516,47 @@ int main(int argc, char **argv)
 		/* Use a delay that will draw the screen at a rate of 59.7275 Hz. */
 		new_ticks = SDL_GetTicks();
 
-		/* Since the target delay is 16.6...ms, and SDL_Delay takes a parameter
-		 * in ms, we add up the missing 0.6ms each frame and compensate for it
-		 * when it goes over to 1.2ms. */
-		speed_compensation += (target_speed_ms/fast_mode) -
-			(unsigned int)(target_speed_ms/fast_mode);
-		if(speed_compensation >= 1.0)
-			speed_compensation -= 1.0;
+		/* Since we can only delay for a maximum resolution of 1ms, we
+		 * can accumulate the error and compensate for the delay
+		 * accuracy when the delay compensation surpasses 1ms. */
+		speed_compensation += target_speed_ms - (new_ticks - old_ticks);
 
-		delay = (target_speed_ms/fast_mode) +
-			(int)speed_compensation - (new_ticks - old_ticks);
+		/* We cast the delay compensation value to an integer, since it
+		 * is the type used by SDL_Delay. This is where delay accuracy
+		 * is lost. */
+		delay = (int)(speed_compensation);
 
-		SDL_Delay(delay > 0 ? delay : 0);
+		/* We then subtract the actual delay value by the requested
+		 * delay value. */
+		speed_compensation -= delay;
+		debugprintf("delay: %d\t\tspeed_compensation: %f\t\taudio_len:%d",
+				delay, speed_compensation, audio_length());
+
+		/* Only run delay logic if required. */
+		if(delay > 0)
+		{
+			uint32_t delay_ticks = SDL_GetTicks();
+			uint32_t after_delay_ticks;
+
+			/* Tick the internal RTC when 1 second has passed. */
+			rtc_timer += delay;
+			if(rtc_timer >= 1000)
+			{
+				rtc_timer -= 1000;
+				gb_tick_rtc(&gb);
+			}
+
+			/* This will delay for at least the number of
+			 * milliseconds requested, so we have to compensate for
+			 * error here too. */
+			SDL_Delay(delay);
+
+			after_delay_ticks = SDL_GetTicks();
+			speed_compensation += (double)delay -
+				(int)(after_delay_ticks - delay_ticks);
+			debugprintf("\t\tspeed_compensation: %f\n",
+					speed_compensation);
+		}
 	}
 
 	SDL_DestroyRenderer(renderer);
@@ -525,6 +564,7 @@ int main(int argc, char **argv)
 	SDL_DestroyTexture(texture);
 	SDL_JoystickClose(joystick);
 	SDL_Quit();
+	audio_cleanup();
 
 	/* Record save file. */
 	write_cart_ram_file(save_file_name, &priv.cart_ram, gb_get_save_size(&gb));
