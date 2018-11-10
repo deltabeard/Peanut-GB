@@ -1,16 +1,20 @@
-.POSIX:
-CC		= cc
-OPT		= -g -Og
-CFLAGS	= $(OPT) -std=c99 -Wall -Wextra
-LDLIBS	= -lSDL2
+target = gameboy_sdl
+objects = gameboy_sdl.o audio.o Basic_Gb_Apu.o gb_apu/libgb_apu.a
+CFLAGS	:= $(shell sdl2-config --cflags) -std=c99 -s -Os -W -Wall -Wextra
+CXXFLAGS= $(shell sdl2-config --cflags) -s -Os -Wall
+LDFLAGS	:= $(shell sdl2-config --libs) -lm
 
-all: gameboy_sdl
+.PHONY: all
+all: $(target)
 
-gameboy_sdl: ../gameboy.h gameboy_sdl.c
-	$(CC) gameboy_sdl.c -o gameboy_sdl $(CFLAGS) $(LDLIBS)
+$(target): Makefile $(objects)
+	$(CXX) $(CFLAGS) $(objects) $(LDFLAGS) -o $(target)
 
-gameboy_debug: ../gameboy.h gameboy_debug.c
-	$(CC) gameboy_debug.c -o gameboy_debug $(CFLAGS) $(LDLIBS)
-
+.PHONY: clean
 clean:
-	rm -f gameboy_sdl gameboy_debug
+	rm -Rf $(target) *.o
+	$(MAKE) -C gb_apu clean
+
+gb_apu/libgb_apu.a: Makefile
+	$(MAKE) -C gb_apu
+

@@ -1,6 +1,6 @@
 target = libgb_apu.a
 sources = $(wildcard *.cpp)
-CXXFLAGS = -ggdb
+CXXFLAGS = -s -Os
 
 .PHONY: all
 all: $(target)
