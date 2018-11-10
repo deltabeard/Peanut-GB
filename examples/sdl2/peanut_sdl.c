@@ -20,6 +20,9 @@
 #include "audio.h"
 #include "../../peanut_gb.h"
 
+//#define debugprintf printf
+#define debugprintf(...)
+
 struct priv_t
 {
 	/* Pointer to allocated memory holding GB file. */
@@ -526,7 +529,7 @@ int main(int argc, char **argv)
 		/* We then subtract the actual delay value by the requested
 		 * delay value. */
 		speed_compensation -= delay;
-		printf("delay: %d\t\tspeed_compensation: %f\t\taudio_len:%d",
+		debugprintf("delay: %d\t\tspeed_compensation: %f\t\taudio_len:%d",
 				delay, speed_compensation, audio_length());
 
 		/* Only run delay logic if required. */
@@ -551,7 +554,8 @@ int main(int argc, char **argv)
 			after_delay_ticks = SDL_GetTicks();
 			speed_compensation += (double)delay -
 				(int)(after_delay_ticks - delay_ticks);
-			printf("\t\tspeed_compensation: %f\n", speed_compensation);
+			debugprintf("\t\tspeed_compensation: %f\n",
+					speed_compensation);
 		}
 	}
 

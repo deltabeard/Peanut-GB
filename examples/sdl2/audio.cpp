@@ -27,7 +27,7 @@ int audio_init(void)
 	want.callback = fill_audio;
 	want.userdata = NULL;
 
-	printf("Audio driver: %s\n", SDL_GetAudioDeviceName(0, 0));
+	debugprintf("Audio driver: %s\n", SDL_GetAudioDeviceName(0, 0));
 
 	if((dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0)) == 0)
 	{
