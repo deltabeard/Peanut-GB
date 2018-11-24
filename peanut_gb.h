@@ -525,7 +525,13 @@ uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
 				return gb->hram[addr - HRAM_ADDR];
 
 			if((addr >= 0xFF10) && (addr <= 0xFF3F))
+			{
+#if ENABLE_SOUND
 				return audio_read(addr);
+#else
+				return 1;
+#endif
+			}
 
 			/* IO and Interrupts. */
 			switch (addr & 0xFF)
@@ -706,7 +712,12 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 			}
 
 			if((addr >= 0xFF10) && (addr <= 0xFF3F))
+			{
+#if ENABLE_SOUND
 				audio_write(addr, val);
+#endif
+				return;
+			}
 
 			/* IO and Interrupts. */
 			switch(addr & 0xFF)

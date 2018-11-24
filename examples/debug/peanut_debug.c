@@ -14,7 +14,7 @@
 
 #include <SDL2/SDL.h>
 
-#define ENABLE_SOUND 1
+#define ENABLE_SOUND 0
 
 #include "../../peanut_gb.h"
 

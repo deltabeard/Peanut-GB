@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-int audio_init(void);
+void audio_init(SDL_AudioDeviceID *dev);
 uint8_t audio_read( uint16_t address );
 void audio_write( uint16_t address, uint8_t data );
 void audio_cleanup(void);

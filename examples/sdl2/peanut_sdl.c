@@ -15,9 +15,12 @@
 
 #include <SDL2/SDL.h>
 
-#define ENABLE_SOUND 1
+#define ENABLE_SOUND 0
 
+#if ENABLE_SOUND
 #include "audio.h"
+#endif
+
 #include "../../peanut_gb.h"
 
 //#define debugprintf printf
@@ -205,6 +208,8 @@ int main(int argc, char **argv)
 	enum gb_init_error_e ret;
 	unsigned int fast_mode = 1;
 	unsigned int fast_mode_timer = 1;
+	/* Record save file every 60 seconds. */
+	int save_timer = 60;
 
 	/* Make sure a file name is given. */
 	if(argc < 2 || argc > 3)
@@ -301,7 +306,11 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	audio_init();
+#if ENABLE_SOUND
+	SDL_AudioDeviceID dev;
+	audio_init(&dev);
+#endif
+
 	/* Allow the joystick input even if game is in background. */
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
 
@@ -496,8 +505,10 @@ int main(int argc, char **argv)
 
 		fast_mode_timer = fast_mode;
 
+#if ENABLE_SOUND
 		/* Process audio. */
 		audio_frame();
+#endif
 
 		/* Copy frame buffer from emulator context, converting to colours
 		 * defined in the palette. */
@@ -529,8 +540,10 @@ int main(int argc, char **argv)
 		/* We then subtract the actual delay value by the requested
 		 * delay value. */
 		speed_compensation -= delay;
+#if ENABLE_SOUND
 		debugprintf("delay: %d\t\tspeed_compensation: %f\t\taudio_len:%d",
 				delay, speed_compensation, audio_length());
+#endif
 
 		/* Only run delay logic if required. */
 		if(delay > 0)
@@ -544,6 +557,29 @@ int main(int argc, char **argv)
 			{
 				rtc_timer -= 1000;
 				gb_tick_rtc(&gb);
+
+				/* If 60 seconds has passed, record save file.
+				 * We do this because the external audio library
+				 * used contains asserts that will abort the
+				 * program without save.
+				 * TODO: Remove use of assert in audio library
+				 * in release build. */
+				--save_timer;
+				if(!save_timer)
+				{
+#if ENABLE_SOUND
+					/* Locking the audio thread to reduce
+					 * possibility of abort during save. */
+					SDL_LockAudioDevice(dev);
+#endif
+					write_cart_ram_file(save_file_name,
+							&priv.cart_ram,
+							gb_get_save_size(&gb));
+#if ENABLE_SOUND
+					SDL_UnlockAudioDevice(dev);
+#endif
+					save_timer = 60;
+				}
 			}
 
 			/* This will delay for at least the number of
@@ -564,7 +600,9 @@ int main(int argc, char **argv)
 	SDL_DestroyTexture(texture);
 	SDL_JoystickClose(joystick);
 	SDL_Quit();
+#if ENABLE_SOUND
 	audio_cleanup();
+#endif
 
 	/* Record save file. */
 	write_cart_ram_file(save_file_name, &priv.cart_ram, gb_get_save_size(&gb));
