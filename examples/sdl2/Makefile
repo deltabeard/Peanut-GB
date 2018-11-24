@@ -1,13 +1,16 @@
 .POSIX:
 .SUFFIXES:
 OPTIMIZE_FLAG = -s -Os
-WARNINGS = -W -Wall -Wextra
 SDL2_CFLAGS = $(shell sdl2-config --cflags)
 SDL2_LIBS = $(shell sdl2-config --libs)
+CWARNINGS = -W -Wall -Wextra
+# Not interested in the many warnings in blarggs APU library, so not enabling
+# warnings for CXX targets.
+CXXWARNINGS = -W
 
 CC = cc
-CFLAGS = -std=c99 $(SDL2_CFLAGS) $(OPTIMIZE_FLAG) $(WARNINGS)
-CXXFLAGS = $(SDL2_CFLAGS) $(OPTIMIZE_FLAG) $(WARNINGS)
+CFLAGS = -std=c99 $(SDL2_CFLAGS) $(OPTIMIZE_FLAG) $(CWARNINGS)
+CXXFLAGS = $(SDL2_CFLAGS) $(OPTIMIZE_FLAG) $(CXXWARNINGS)
 LDLIBS = -lm $(SDL2_LIBS)
 
 all: peanut-sdl
