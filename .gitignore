@@ -3,4 +3,6 @@
 *.gcda
 *.a
 *.exe
-peanut_sdl
+peanut-sdl
+peanut-debug
+tags
