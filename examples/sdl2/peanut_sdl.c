@@ -266,10 +266,13 @@ int main(int argc, char **argv)
 	ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write,
 			&gb_error, &priv);
 
-	if(ret != GB_INIT_NO_ERROR)
+	switch(ret)
 	{
-		printf("Unable to initialise context. Returned %d.\n", ret);
+	case GB_INIT_CARTRIDGE_UNSUPPORTED:
+		puts("Unsupported cartridge.");
 		exit(EXIT_FAILURE);
+	default:
+		break;
 	}
 
 	/* Load Save File. */
