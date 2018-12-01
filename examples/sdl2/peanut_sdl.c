@@ -18,7 +18,7 @@
 #define ENABLE_SOUND 1
 
 #if ENABLE_SOUND
-#include "audio.h"
+#include "gb_apu/audio.h"
 #endif
 
 #include "../../peanut_gb.h"

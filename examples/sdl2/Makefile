@@ -14,19 +14,22 @@ CXXFLAGS = $(SDL2_CFLAGS) $(OPTIMIZE_FLAG) $(CXXWARNINGS)
 LDLIBS = -lm $(SDL2_LIBS)
 
 all: peanut-sdl
-peanut-sdl: peanut_sdl.o audio.o Basic_Gb_Apu.o gb_apu/Blip_Buffer.o \
-	gb_apu/Gb_Apu.o gb_apu/Gb_Oscs.o gb_apu/Multi_Buffer.o
+peanut-sdl: peanut_sdl.o gb_apu/audio.o gb_apu/Basic_Gb_Apu.o \
+	gb_apu/Blip_Buffer.o gb_apu/Gb_Apu.o gb_apu/Gb_Oscs.o \
+	gb_apu/Multi_Buffer.o
 	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) 
 peanut_sdl.o: peanut_sdl.c ../../peanut_gb.h
 
-audio.o: audio.cpp audio.h Basic_Gb_Apu.h gb_apu/Gb_Apu.h gb_apu/Gb_Oscs.h \
-	gb_apu/Blip_Buffer.h gb_apu/blargg_common.h gb_apu/boost/config.hpp \
+gb_apu/audio.o: gb_apu/audio.cpp gb_apu/audio.h gb_apu/Basic_Gb_Apu.h \
+	gb_apu/Gb_Apu.h gb_apu/Gb_Oscs.h gb_apu/Blip_Buffer.h \
+	gb_apu/blargg_common.h gb_apu/boost/config.hpp \
 	gb_apu/boost/cstdint.hpp gb_apu/boost/static_assert.hpp \
 	gb_apu/Blip_Synth.h gb_apu/Multi_Buffer.h
-Basic_Gb_Apu.o: Basic_Gb_Apu.cpp Basic_Gb_Apu.h gb_apu/Gb_Apu.h \
-	gb_apu/Gb_Oscs.h gb_apu/Blip_Buffer.h gb_apu/blargg_common.h \
-	gb_apu/boost/config.hpp gb_apu/boost/cstdint.hpp \
-	gb_apu/boost/static_assert.hpp gb_apu/Blip_Synth.h gb_apu/Multi_Buffer.h
+gb_apu/Basic_Gb_Apu.o: gb_apu/Basic_Gb_Apu.cpp gb_apu/Basic_Gb_Apu.h \
+	gb_apu/Gb_Apu.h gb_apu/Gb_Oscs.h gb_apu/Blip_Buffer.h \
+	gb_apu/blargg_common.h gb_apu/boost/config.hpp \
+	gb_apu/boost/cstdint.hpp gb_apu/boost/static_assert.hpp \
+	gb_apu/Blip_Synth.h gb_apu/Multi_Buffer.h
 gb_apu/Blip_Buffer.o: gb_apu/Blip_Buffer.cpp gb_apu/Blip_Buffer.h \
 	gb_apu/blargg_common.h gb_apu/boost/config.hpp \
 	gb_apu/boost/cstdint.hpp gb_apu/boost/static_assert.hpp \
@@ -46,7 +49,7 @@ gb_apu/Multi_Buffer.o: gb_apu/Multi_Buffer.cpp gb_apu/Multi_Buffer.h \
 	gb_apu/Blip_Synth.h gb_apu/blargg_source.h
 
 clean:
-	rm -f peanut-sdl peanut_sdl.o audio.o Basic_Gb_Apu.o \
+	rm -f peanut-sdl peanut_sdl.o gb_apu/audio.o gb_apu/Basic_Gb_Apu.o \
 		gb_apu/Blip_Buffer.o gb_apu/Gb_Apu.o gb_apu/Gb_Oscs.o \
 		gb_apu/Multi_Buffer.o
 
