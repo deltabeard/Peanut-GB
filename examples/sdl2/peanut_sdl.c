@@ -23,6 +23,8 @@
 
 #include "../../peanut_gb.h"
 
+#include "nativefiledialog/src/include/nfd.h"
+
 //#define debugprintf printf
 #define debugprintf(...)
 
@@ -204,23 +206,58 @@ int main(int argc, char **argv)
 	SDL_Joystick *joystick;
 	uint16_t fb[height][width];
 	uint32_t new_ticks, old_ticks;
-	char *save_file_name;
 	enum gb_init_error_e ret;
 	unsigned int fast_mode = 1;
 	unsigned int fast_mode_timer = 1;
 	/* Record save file every 60 seconds. */
 	int save_timer = 60;
+	/* Must be freed */
+	char *rom_file_name = NULL;
+	char *save_file_name = NULL;
 
-	/* Make sure a file name is given. */
-	if(argc < 2 || argc > 3)
+	switch(argc)
 	{
-		printf("Usage: %s FILE [SAVE]\n", argv[0]);
+	case 1:
+		{
+			/* Invoke file picker */
+			nfdresult_t result =
+				NFD_OpenDialog("gb,gbc", NULL, &rom_file_name);
+
+			if(result == NFD_CANCEL)
+			{
+				puts("User pressed cancel.");
+				exit(EXIT_FAILURE);
+			}
+			else if(result != NFD_OKAY)
+			{
+				printf("Error: %s\n", NFD_GetError());
+				exit(EXIT_FAILURE);
+			}
+		}
+		break;
+
+	case 2:
+		/* Apply file name to rom_file_name
+		 * Set save_file_name to NULL. */
+		rom_file_name = argv[1];
+		break;
+
+	case 3:
+		/* Apply file name to rom_file_name
+		 * Apply save name to save_file_name */
+		rom_file_name = argv[1];
+		save_file_name = argv[2];
+		break;
+
+	default:
+		printf("Usage: %s [ROM] [SAVE]\n", argv[0]);
+		puts("A file picker is presented if ROM is not given.");
 		puts("SAVE is set by default if not provided.");
 		return EXIT_FAILURE;
 	}
 
 	/* Copy input ROM file to allocated memory. */
-	if((priv.rom = read_rom_to_ram(argv[1])) == NULL)
+	if((priv.rom = read_rom_to_ram(rom_file_name)) == NULL)
 	{
 		printf("%d: %s\n", __LINE__, strerror(errno));
 		return EXIT_FAILURE;
@@ -228,14 +265,14 @@ int main(int argc, char **argv)
 
 	/* If no save file is specified, copy save file (with specific name) to
 	 * allocated memory. */
-	if(argc == 2)
+	if(save_file_name == NULL)
 	{
 		char *str_replace;
 		const char extension[] = ".sav";
 
-		/* Allocate enough space for the ROM file name, for the "sav" extension
-		 * and for the null terminator. */
-		save_file_name = malloc(strlen(argv[1]) + strlen(extension) + 1);
+		/* Allocate enough space for the ROM file name, for the "sav"
+		 * extension and for the null terminator. */
+		save_file_name = malloc(strlen(rom_file_name) + strlen(extension) + 1);
 
 		if(save_file_name == NULL)
 		{
@@ -244,11 +281,12 @@ int main(int argc, char **argv)
 		}
 
 		/* Copy the ROM file name to allocated space. */
-		strcpy(save_file_name, argv[1]);
+		strcpy(save_file_name, rom_file_name);
 
-		/* If the file name does not have a dot, or the only dot is at the start
-		 * of the file name, set the pointer to begin replacing the string to
-		 * the end of the file name, otherwise set it to the dot. */
+		/* If the file name does not have a dot, or the only dot is at
+		 * the start of the file name, set the pointer to begin
+		 * replacing the string to the end of the file name, otherwise
+		 * set it to the dot. */
 		if((str_replace = strrchr(save_file_name, '.')) == NULL ||
 				str_replace == save_file_name)
 			str_replace = save_file_name + strlen(save_file_name);
@@ -257,8 +295,6 @@ int main(int argc, char **argv)
 		for(unsigned int i = 0; i <= strlen(extension); i++)
 			*(str_replace++) = extension[i];
 	}
-	else
-		save_file_name = argv[2];
 
 	/* TODO: Sanity check input GB file. */
 
@@ -617,6 +653,9 @@ int main(int argc, char **argv)
 	 * allocated on the help), then free it here. */
 	if(argc == 2)
 		free(save_file_name);
+
+	if(argc == 1)
+		free(rom_file_name);
 
 	return EXIT_SUCCESS;
 }

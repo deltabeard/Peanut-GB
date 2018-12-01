@@ -1,6 +1,6 @@
 .POSIX:
 .SUFFIXES:
-OPTIMIZE_FLAG = -s -Os
+OPTIMIZE_FLAG = -s -Ofast
 SDL2_CFLAGS = $(shell sdl2-config --cflags)
 SDL2_LIBS = $(shell sdl2-config --libs)
 CWARNINGS = -W -Wall -Wextra
@@ -11,14 +11,21 @@ CXXWARNINGS = -W
 CC = cc
 CFLAGS = -std=c99 $(SDL2_CFLAGS) $(OPTIMIZE_FLAG) $(CWARNINGS)
 CXXFLAGS = $(SDL2_CFLAGS) $(OPTIMIZE_FLAG) $(CXXWARNINGS)
-LDLIBS = -lm $(SDL2_LIBS)
+LDLIBS = -lm $(SDL2_LIBS) $(FILE_DIALOG)
+
+ifeq ($(OS),Windows_NT)
+	LDLIBS += -lcomctl32.lib
+else
+	LDLIBS += $(shell pkg-config --cflags --libs gtk+-3.0)
+endif
 
 all: peanut-sdl
 peanut-sdl: peanut_sdl.o gb_apu/audio.o gb_apu/Basic_Gb_Apu.o \
 	gb_apu/Blip_Buffer.o gb_apu/Gb_Apu.o gb_apu/Gb_Oscs.o \
-	gb_apu/Multi_Buffer.o
+	gb_apu/Multi_Buffer.o nativefiledialog/build/lib/Release/x64/libnfd.a
 	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) 
-peanut_sdl.o: peanut_sdl.c ../../peanut_gb.h
+peanut_sdl.o: peanut_sdl.c ../../peanut_gb.h \
+	nativefiledialog/src/include/nfd.h
 
 gb_apu/audio.o: gb_apu/audio.cpp gb_apu/audio.h gb_apu/Basic_Gb_Apu.h \
 	gb_apu/Gb_Apu.h gb_apu/Gb_Oscs.h gb_apu/Blip_Buffer.h \
