@@ -277,7 +277,8 @@ enum gb_error_e
 enum gb_init_error_e
 {
 	GB_INIT_NO_ERROR,
-	GB_INIT_CARTRIDGE_UNSUPPORTED
+	GB_INIT_CARTRIDGE_UNSUPPORTED,
+	GB_INIT_INVALID_CHECKSUM
 };
 
 /**
@@ -2980,6 +2981,7 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 		void (*gb_error)(struct gb_t*, const enum gb_error_e, const uint16_t),
 		void *priv)
 {
+	const uint16_t header_checksum_location = 0x014D;
 	const uint16_t mbc_location = 0x0147;
 	const uint16_t bank_count_location = 0x0148;
 	const uint16_t ram_size_location = 0x0149;
@@ -3022,6 +3024,16 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 	 * automatically. */
 	gb->gb_serial_transfer = NULL;
 
+	/* Check valid ROM using checksum value. */
+	{
+		uint8_t x = 0;
+		for(uint16_t i = 0x0134; i <= 0x014C; i++)
+			x = x - gb->gb_rom_read(gb, i) - 1;
+
+		if(x != gb->gb_rom_read(gb, header_checksum_location))
+			return GB_INIT_INVALID_CHECKSUM;
+	}
+
 	/* Check if cartridge type is supported, and set MBC type. */
 	{
 		const uint8_t mbc_value = gb->gb_rom_read(gb, mbc_location);
@@ -3034,8 +3046,8 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 	gb->num_rom_banks = num_rom_banks[gb->gb_rom_read(gb, bank_count_location)];
 	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(gb, ram_size_location)];
 
-	/* Initialise the audio buffer to NULL in-case audio is not initialised when
-	 * the emulator starts stepping CPU. */
+	/* Initialise the audio buffer to NULL in-case audio is not initialised
+	 * when the emulator starts stepping CPU. */
 	gb->audio.buffer = NULL;
 
 	gb_reset(gb);

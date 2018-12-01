@@ -307,6 +307,9 @@ int main(int argc, char **argv)
 	case GB_INIT_CARTRIDGE_UNSUPPORTED:
 		puts("Unsupported cartridge.");
 		exit(EXIT_FAILURE);
+	case GB_INIT_INVALID_CHECKSUM:
+		puts("Invalid ROM: Checksum failure.");
+		exit(EXIT_FAILURE);
 	default:
 		break;
 	}
@@ -362,7 +365,7 @@ int main(int argc, char **argv)
 			SDL_WINDOWPOS_UNDEFINED,
 			SDL_WINDOWPOS_UNDEFINED,
 			width, height,
-			0);
+			SDL_WINDOW_RESIZABLE | SDL_WINDOW_INPUT_FOCUS);
 	if(window == NULL)
 	{
 		printf("Could not create window: %s\n", SDL_GetError());

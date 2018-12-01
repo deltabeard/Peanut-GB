@@ -47,11 +47,18 @@ int main(void)
 {
 	const unsigned short pc_end = 0x06F1; /* Test ends when PC is this value. */
 	struct gb_t gb;
+	int ret;
 
 	PROF_START();
 
-	gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write,
-			&gb_error, NULL);
+	ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read,
+			&gb_cart_ram_write, &gb_error, NULL);
+
+	if(ret != GB_INIT_NO_ERROR)
+	{
+		printf("Error: %d\n", ret);
+		exit(EXIT_FAILURE);
+	}
 
 	/* Step CPU until test is complete. */
 	while(gb.cpu_reg.pc != pc_end)

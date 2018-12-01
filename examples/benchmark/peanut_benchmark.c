@@ -5,6 +5,7 @@
 #include "../../peanut_gb.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 
 /**
@@ -58,10 +59,17 @@ int main(void)
 		unsigned long long bench_ticks;
 		unsigned long long bench_fps;
 		unsigned long long frames = 0;
+		int ret;
 
 		/* Initialise context. */
-		gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write,
-				&gb_error, NULL);
+		ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read,
+				&gb_cart_ram_write, &gb_error, NULL);
+
+		if(ret != GB_INIT_NO_ERROR)
+		{
+			printf("Error: %d\n", ret);
+			exit(EXIT_FAILURE);
+		}
 
 		/* Step CPU until test is complete. */
 		while(gb.cpu_reg.pc != pc_end)
