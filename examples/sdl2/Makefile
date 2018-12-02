@@ -3,10 +3,10 @@
 OPTIMIZE_FLAG = -s -Ofast
 SDL2_CFLAGS = $(shell sdl2-config --cflags)
 SDL2_LIBS = $(shell sdl2-config --libs)
-CWARNINGS = -W -Wall -Wextra
+CWARNINGS = -Wall -Wextra
 # Not interested in the many warnings in blarggs APU library, so not enabling
 # warnings for CXX targets.
-CXXWARNINGS = -W
+CXXWARNINGS = -w
 
 CC = cc
 CFLAGS = -std=c99 $(SDL2_CFLAGS) $(OPTIMIZE_FLAG) $(CWARNINGS)
