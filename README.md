@@ -7,10 +7,11 @@ platform that has a C99 compiler.
 
 Only the original Game Boy (DMG) is supported at this time.
 
-This emulator is *extremely* inaccurate and is very much a work in progress. As
-such, some games may run incorrectly or not run at all. High speed is important;
-changes that cause a loss of emulation speed but increase in accuracy, will be
-rejected. Please seek an alternative emulator if accuracy is important.
+This emulator is inaccurate and is very much a work in progress (although it
+does pass Blargg's CPU instructions test). As such, some games may run
+incorrectly or not run at all. High speed is important; changes that cause a
+significant loss of emulation speed but increase in accuracy, will be rejected.
+Please seek an alternative emulator if accuracy is important.
 
 ## Getting Started
 
