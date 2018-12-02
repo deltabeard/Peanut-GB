@@ -27,11 +27,12 @@ These are:
 ## SDL2 Example
 
 An example implementation is given in peanut_sdl.c, which uses SDL2 to draw the
-screen and take input. Run `make` in the example folder to compile.
+screen and take input. Run `make` in the ./examples/sdl2/ folder to compile it.
 
 Execute in command line with `peanut-sdl game.gb` which will automatically
 create the save file `game.sav` for the game if one isn't found. Or run with
-`peanut-sdl game.gb save.sav` to specify a save file.
+`peanut-sdl game.gb save.sav` to specify a save file. Or even `peanut-sdl` to
+use a file picker native to your running operating system to select the ROM.
 
 ### Screenshot
 
