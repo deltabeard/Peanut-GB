@@ -495,10 +495,6 @@ int main(int argc, char **argv)
 						case SDLK_3: fast_mode = 3; break;
 						case SDLK_4: fast_mode = 4; break;
 						case SDLK_r: gb_reset(&gb); break;
-						case SDLK_p:
-									 if(++selected_palette == MAX_PALETTE)
-										 selected_palette = 0;
-									 break;
 						default: break;
 					}
 					break;
@@ -515,6 +511,27 @@ int main(int argc, char **argv)
 						case SDLK_DOWN: gb.joypad_bits.down = 1; break;
 						case SDLK_LEFT: gb.joypad_bits.left = 1; break;
 						case SDLK_SPACE: fast_mode = 1; break;
+						case SDLK_F11:
+						{
+							static int fullscreen = 0;
+							if(fullscreen)
+							{
+								SDL_SetWindowFullscreen(window, 0);
+								fullscreen = 0;
+							}
+							else
+							{
+								SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
+								fullscreen = SDL_WINDOW_FULLSCREEN;
+							}
+						}
+						break;
+
+						case SDLK_p:
+							if(++selected_palette == MAX_PALETTE)
+								selected_palette = 0;
+							break;
+
 						default: break;
 					}
 					break;
