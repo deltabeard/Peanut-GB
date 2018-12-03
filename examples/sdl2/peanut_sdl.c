@@ -361,7 +361,7 @@ int main(int argc, char **argv)
 	if(joystick)
 		printf("Joystick %s connected.\n", SDL_JoystickNameForIndex(0));
 
-	window = SDL_CreateWindow("DMG Emulator",
+	window = SDL_CreateWindow("Peanut-sdl",
 			SDL_WINDOWPOS_UNDEFINED,
 			SDL_WINDOWPOS_UNDEFINED,
 			width, height,
