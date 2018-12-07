@@ -2,6 +2,12 @@
 .SUFFIXES:
 OPTIMIZE_FLAG = -s -Ofast
 SDL2_CFLAGS = $(shell sdl2-config --cflags)
+SDL2_LDLIBS =
+
+# A check is performed later on as some Linux systems only install shared-lib
+# variant of SDL2, so a static build isn't possible. This check is to stop
+# building as soon as possible, instead of failing a build on the last step.
+SDL2_ERRCHECK = 0
 FILE_GUI_LIB = nativefiledialog/build/lib/Release/x64/libnfd.a
 CWARNINGS = -Wall -Wextra
 # Not interested in the many warnings in blarggs APU library, so not enabling
@@ -28,18 +34,21 @@ else
 endif
 
 ifeq ($(STATIC),yes)
-	LDLIBS += $(shell sdl2-config --libs --static-libs)
+	SDL2_LDLIBS = $(shell sdl2-config --libs --static-libs)
+	SDL2_ERRCHECK = $(.SHELLSTATUS)
 	CFLAGS += -static
 else
-	LDLIBS += $(shell sdl2-config --libs)
+	SDL2_LDLIBS = $(shell sdl2-config --libs)
 endif
+
+LDLIBS += $(SDL2_LDLIBS)
 
 all: peanut-sdl
 peanut-sdl: peanut_sdl.o gb_apu/audio.o gb_apu/Basic_Gb_Apu.o \
 	gb_apu/Blip_Buffer.o gb_apu/Gb_Apu.o gb_apu/Gb_Oscs.o \
 	gb_apu/Multi_Buffer.o $(FILE_GUI_LIB)
 	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) 
-peanut_sdl.o: peanut_sdl.c ../../peanut_gb.h \
+peanut_sdl.o: sdl2_check peanut_sdl.c ../../peanut_gb.h \
 	nativefiledialog/src/include/nfd.h
 
 gb_apu/audio.o: gb_apu/audio.cpp gb_apu/audio.h gb_apu/Basic_Gb_Apu.h \
@@ -71,6 +80,11 @@ gb_apu/Multi_Buffer.o: gb_apu/Multi_Buffer.cpp gb_apu/Multi_Buffer.h \
 	gb_apu/Blip_Synth.h gb_apu/blargg_source.h
 $(FILE_GUI_LIB): nativefiledialog/src/include/nfd.h
 	$(MAKE) nfd -C $(NFD_MAKEFILE)
+
+sdl2_check:
+ifneq (0,$(SDL2_ERRCHECK))
+	$(error Error calling sdl2-config. Maybe --static-libs was not accepted)
+endif
 
 clean:
 	rm -f peanut-sdl peanut_sdl.o gb_apu/audio.o gb_apu/Basic_Gb_Apu.o \
