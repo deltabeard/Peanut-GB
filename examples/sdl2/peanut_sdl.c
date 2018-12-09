@@ -454,7 +454,6 @@ int main(int argc, char **argv)
 						case SDL_HAT_RIGHT: gb.joypad_bits.right = 0; break;
 						case SDL_HAT_DOWN: gb.joypad_bits.down = 0; break;
 						case SDL_HAT_LEFT: gb.joypad_bits.left = 0; break;
-						default: break;
 					}
 					break;
 
@@ -466,7 +465,6 @@ int main(int argc, char **argv)
 						case 1: gb.joypad_bits.b = 0; break;
 						case 6: gb.joypad_bits.select = 0; break;
 						case 7: gb.joypad_bits.start = 0; break;
-						default: break;
 					}
 					break;
 
@@ -477,7 +475,6 @@ int main(int argc, char **argv)
 						case 1: gb.joypad_bits.b = 1; break;
 						case 6: gb.joypad_bits.select = 1; break;
 						case 7: gb.joypad_bits.start = 1; break;
-						default: break;
 					}
 					break;
 
