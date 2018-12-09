@@ -431,6 +431,9 @@ int main(int argc, char **argv)
 		/* Get joypad input. */
 		while(SDL_PollEvent(&event))
 		{
+			if(event.key.repeat)
+				break;
+
 			switch(event.type)
 			{
 				case SDL_QUIT:
@@ -495,7 +498,10 @@ int main(int argc, char **argv)
 						case SDLK_3: fast_mode = 3; break;
 						case SDLK_4: fast_mode = 4; break;
 						case SDLK_r: gb_reset(&gb); break;
-						default: break;
+						case SDLK_p:
+							if(++selected_palette == MAX_PALETTE)
+								selected_palette = 0;
+							break;
 					}
 					break;
 
@@ -526,13 +532,6 @@ int main(int argc, char **argv)
 							}
 						}
 						break;
-
-						case SDLK_p:
-							if(++selected_palette == MAX_PALETTE)
-								selected_palette = 0;
-							break;
-
-						default: break;
 					}
 					break;
 			}
