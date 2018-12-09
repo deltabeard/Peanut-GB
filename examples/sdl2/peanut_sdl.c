@@ -304,6 +304,8 @@ int main(int argc, char **argv)
 
 	switch(ret)
 	{
+	case GB_INIT_NO_ERROR:
+		break;
 	case GB_INIT_CARTRIDGE_UNSUPPORTED:
 		puts("Unsupported cartridge.");
 		exit(EXIT_FAILURE);
@@ -311,7 +313,8 @@ int main(int argc, char **argv)
 		puts("Invalid ROM: Checksum failure.");
 		exit(EXIT_FAILURE);
 	default:
-		break;
+		printf("Unknown error: %d\n", ret);
+		exit(EXIT_FAILURE);
 	}
 
 	/* Load Save File. */
