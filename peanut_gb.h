@@ -519,7 +519,7 @@ uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
 
 			/* Unusable memory area. Reading from this area returns 0.*/
 			if(addr < IO_ADDR)
-				return 0;
+				return 0xFF;
 
 			/* HRAM */
 			if(HRAM_ADDR <= addr && addr < INTR_EN_ADDR)
@@ -582,7 +582,7 @@ uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
 	}
 
 	(gb->gb_error)(gb, GB_INVALID_READ, addr);
-	return 1;
+	return 0xFF;
 }
 
 /**
