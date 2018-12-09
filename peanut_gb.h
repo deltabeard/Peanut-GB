@@ -749,7 +749,9 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 				case 0x07: gb->gb_reg.TAC = val;	return;
 
 						   /* Interrupt Flag Register */
-				case 0x0F: gb->gb_reg.IF = val;	   return;
+				case 0x0F:
+					   gb->gb_reg.IF = (val | 0b11100000);
+					   return;
 
 						   /* LCD Registers */
 				case 0x40:
@@ -863,7 +865,10 @@ void gb_reset(struct gb_t *gb)
 
 	gb->gb_reg.TIMA      = 0x00;
 	gb->gb_reg.TMA       = 0x00;
-	gb->gb_reg.TAC       = 0x00;
+	gb->gb_reg.TAC       = 0xF8;
+	gb->gb_reg.DIV       = 0xAC;
+
+	gb->gb_reg.IF        = 0xE1;
 
 	gb->gb_reg.LCDC      = 0x91;
 	gb->gb_reg.SCY       = 0x00;
@@ -871,7 +876,7 @@ void gb_reset(struct gb_t *gb)
 	gb->gb_reg.LYC       = 0x00;
 
 	/* Appease valgrind for invalid reads and unconditional jumps. */
-	gb->gb_reg.SC = 0xFF;
+	gb->gb_reg.SC = 0x7E;
 	gb->gb_reg.STAT = 0;
 	gb->gb_reg.LY = 0;
 
@@ -883,6 +888,7 @@ void gb_reset(struct gb_t *gb)
 	gb->gb_reg.IE        = 0x00;
 
 	gb->joypad = 0xFF;
+	gb->gb_reg.P1 = 0xCF;
 }
 
 void __gb_execute_cb(struct gb_t *gb)
