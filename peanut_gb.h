@@ -23,8 +23,9 @@
  */
 
 #include <stdint.h>	/* Required for int types */
-#include <string.h>	/* Required for memset() */
 #include <time.h>	/* Required for tm struct */
+
+#include <assert.h>
 
 /* Enable sound support, including sound registers. Off by default due to no
  * implementation. */
@@ -36,6 +37,8 @@
 #ifndef ENABLE_LCD
 #define ENABLE_LCD 1
 #endif
+
+#define LCD_NEW_DRAW_LINE 1
 
 /* Interrupt masks */
 #define VBLANK_INTR		0x01
@@ -1015,19 +1018,95 @@ void __gb_execute_cb(struct gb_t *gb)
 	}
 }
 
-/* TODO: Completely rewrite this */
 #if ENABLE_LCD
+#if LCD_NEW_DRAW_LINE
+void __gb_draw_line2(struct gb_t *gb)
+{
+	/* If background is enabled, draw it. */
+	if(gb->gb_reg.LCDC & LCDC_BG_ENABLE)
+	{
+		/* Calculate current background line to draw. Constant because
+		 * this function draws only this one line each time it is
+		 * called. */
+		const uint8_t bg_y = gb->gb_reg.LY + gb->gb_reg.SCY;
+
+		/* Get selected background map address for first tile
+		 * corresponding to current line.
+		 * 0x20 (32) is the width of a background tile, and the bit
+		 * shift is to calculate the address. */
+		const uint16_t bg_map =
+			((gb->gb_reg.LCDC & LCDC_BG_MAP) ?
+				VRAM_BMAP_2 : VRAM_BMAP_1)
+			+ (bg_y >> 3) * 0x20;
+
+		/* The displays (what the player sees) X coordinate, drawn right
+		 * to left. */
+		uint8_t disp_x = LCD_WIDTH - 1;
+
+		/* The X coordinate to begin drawing the background at. */
+		uint8_t bg_x = disp_x + gb->gb_reg.SCX;
+
+		/* FIXME: Get tile index for current background tile? */
+		uint8_t idx = gb->vram[bg_map + (bg_x >> 3)];
+		/* FIXME: Y coordinate of tile pixel to draw? */
+		const uint8_t py = (bg_y & 0x07);
+		/* FIXME: X coordinate of tile pixel to draw? */
+		uint8_t px = 7 - (bg_x & 0x07);
+
+		uint16_t tile;
+
+		/* Select addressing mode. */
+		if (gb->gb_reg.LCDC & LCDC_TILE_SELECT)
+			tile = VRAM_TILES_1 + idx * 0x10;
+		else
+			tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
+
+		tile += 2*py;
+
+		/* fetch first tile */
+		uint8_t t1, t2;
+		t1 = gb->vram[tile] >> px;
+		t2 = gb->vram[tile+1] >> px;
+
+		for (; disp_x != 0xFF; disp_x--)
+		{
+			if (px == 8)
+			{
+				/* fetch next tile */
+				px = 0;
+				bg_x = disp_x + gb->gb_reg.SCX;
+				idx = gb->vram[bg_map + (bg_x >> 3)];
+				if (gb->gb_reg.LCDC & LCDC_TILE_SELECT)
+					tile = VRAM_TILES_1 + idx * 0x10;
+				else
+					tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
+				tile += 2*py;
+				t1 = gb->vram[tile];
+				t2 = gb->vram[tile+1];
+			}
+			/* copy background */
+			uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
+			gb->gb_fb[gb->gb_reg.LY][disp_x] = gb->BGP[c];
+			t1 = t1 >> 1;
+			t2 = t2 >> 1;
+			px++;
+		}
+	}
+}
+#else
+/* TODO: Completely rewrite this */
 void __gb_draw_line(struct gb_t *gb)
 {
-	uint8_t BX, BY;
+	uint8_t BY;
 	uint8_t WX;
-	uint8_t SX[LCD_WIDTH];
 	uint16_t bg_line = 0, win_line, tile;
 	uint8_t t1, t2, c;
 	uint8_t count = 0;
 
+	/* If background is enabled. */
 	if(gb->gb_reg.LCDC & LCDC_BG_ENABLE)
 	{
+		/* Calculate current background line to draw */
 		BY = gb->gb_reg.LY + gb->gb_reg.SCY;
 		bg_line = (gb->gb_reg.LCDC & LCDC_BG_MAP) ? VRAM_BMAP_2 : VRAM_BMAP_1;
 		bg_line += (BY >> 3) * 0x20;
@@ -1045,13 +1124,11 @@ void __gb_draw_line(struct gb_t *gb)
 	else
 		win_line = 0;
 
-	memset(SX, 0xFF, LCD_WIDTH);
-
 	/* draw background */
 	if(bg_line)
 	{
 		uint8_t X = LCD_WIDTH - 1;
-		BX = X + gb->gb_reg.SCX;
+		uint8_t BX = X + gb->gb_reg.SCX;
 
 		/* TODO: Move declarations to the top. */
 		/* lookup tile index */
@@ -1072,7 +1149,6 @@ void __gb_draw_line(struct gb_t *gb)
 
 		for (; X != 0xFF; X--)
 		{
-			SX[X] = 0xFE;
 			if (px == 8)
 			{
 				/* fetch next tile */
@@ -1089,13 +1165,14 @@ void __gb_draw_line(struct gb_t *gb)
 			}
 			/* copy background */
 			c = (t1 & 0x1) | ((t2 & 0x1) << 1);
-			gb->gb_fb[gb->gb_reg.LY][X] = c;// BGP[c];
+			gb->gb_fb[gb->gb_reg.LY][X] = gb->BGP[c];
 			t1 = t1 >> 1;
 			t2 = t2 >> 1;
 			px++;
 		}
 	}
 
+#if 0
 	/* draw window */
 	if(win_line)
 	{
@@ -1123,7 +1200,6 @@ void __gb_draw_line(struct gb_t *gb)
 
 		for (; X != end; X--)
 		{
-			SX[X] = 0xFE;
 			if (px == 8)
 			{
 				// fetch next tile
@@ -1213,14 +1289,13 @@ void __gb_draw_line(struct gb_t *gb)
 			}
 		}
 	}
+#endif
 
 	/* Convert shade to color number. */
-	for(uint8_t X = 0; X < LCD_WIDTH; X++)
-	{
-		if(SX[X] == 0xFE)
-			gb->gb_fb[gb->gb_reg.LY][X] = gb->BGP[gb->gb_fb[gb->gb_reg.LY][X]];
-	}
+//	for(uint8_t X = 0; X < LCD_WIDTH; X++)
+//		gb->gb_fb[gb->gb_reg.LY][X] = gb->BGP[gb->gb_fb[gb->gb_reg.LY][X]];
 }
+#endif
 #endif
 
 /**
@@ -2918,7 +2993,6 @@ void __gb_step_cpu(struct gb_t *gb)
 				/* Clear Screen */
 				gb->WY = gb->gb_reg.WY;
 				gb->WYC = 0;
-				memset(gb->gb_fb, 0x00, LCD_WIDTH * LCD_HEIGHT);
 			}
 
 			gb->lcd_mode = LCD_HBLANK;
@@ -2939,7 +3013,11 @@ void __gb_step_cpu(struct gb_t *gb)
 		gb->lcd_mode = LCD_TRANSFER;
 		/* TODO: LCD_DRAW_LINE(); */
 #if ENABLE_LCD
+#if LCD_NEW_DRAW_LINE
+		__gb_draw_line2(gb);
+#else
 		__gb_draw_line(gb);
+#endif
 #endif
 	}
 }
