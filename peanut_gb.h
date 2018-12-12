@@ -41,9 +41,6 @@
 /* Disable incomplete audio implementation. */
 #define INTERNAL_AUDIO 0
 
-/* Use new WIP display drawing. */
-#define LCD_NEW_DRAW_LINE 1
-
 /* Interrupt masks */
 #define VBLANK_INTR		0x01
 #define LCDC_INTR		0x02
@@ -428,6 +425,9 @@ struct gb_t
 		/* Palettes */
 		uint8_t bg_palette[4];
 		uint8_t sp_palette[8];
+
+		uint8_t window_clear;
+		uint8_t WY; // FIXME: Check requirement
 	} display;
 
 #if INTERNAL_AUDIO
@@ -1042,10 +1042,10 @@ void __gb_execute_cb(struct gb_t *gb)
 }
 
 #if ENABLE_LCD
-#if LCD_NEW_DRAW_LINE
-void __gb_draw_line2(struct gb_t *gb)
+void __gb_draw_line(struct gb_t *gb)
 {
 	uint8_t pixels[160] = {0};
+	uint8_t fx[160] = {0xFF};
 
 	/* If LCD not initialised by front-end, don't render anything. */
 	if(gb->display.lcd_draw_line == NULL)
@@ -1098,6 +1098,7 @@ void __gb_draw_line2(struct gb_t *gb)
 
 		for (; disp_x != 0xFF; disp_x--)
 		{
+			fx[disp_x] = 0xFE;
 			if (px == 8)
 			{
 				/* fetch next tile */
@@ -1121,98 +1122,25 @@ void __gb_draw_line2(struct gb_t *gb)
 		}
 	}
 
-	gb->display.lcd_draw_line(gb, pixels, gb->gb_reg.LY);
-}
-#else
-/* TODO: Completely rewrite this */
-void __gb_draw_line(struct gb_t *gb)
-{
-	uint8_t BY;
-	uint8_t WX;
-	uint16_t bg_line = 0, win_line, tile;
-	uint8_t t1, t2, c;
-	uint8_t count = 0;
-
-	/* If background is enabled. */
-	if(gb->gb_reg.LCDC & LCDC_BG_ENABLE)
-	{
-		/* Calculate current background line to draw */
-		BY = gb->gb_reg.LY + gb->gb_reg.SCY;
-		bg_line = (gb->gb_reg.LCDC & LCDC_BG_MAP) ? VRAM_BMAP_2 : VRAM_BMAP_1;
-		bg_line += (BY >> 3) * 0x20;
-	}
-	else
-		bg_line = 0;
-
-	if(gb->gb_reg.LCDC & LCDC_WINDOW_ENABLE
-			&& gb->gb_reg.LY >= gb->WY && gb->gb_reg.WX <= 166)
-	{
-		win_line = (gb->gb_reg.LCDC & LCDC_WINDOW_MAP) ? VRAM_BMAP_2 : VRAM_BMAP_1;
-		/* TODO: Check this. */
-		win_line += (gb->WYC >> 3) * 0x20;
-	}
-	else
-		win_line = 0;
-
-	/* draw background */
-	if(bg_line)
-	{
-		uint8_t X = LCD_WIDTH - 1;
-		uint8_t BX = X + gb->gb_reg.SCX;
-
-		/* TODO: Move declarations to the top. */
-		/* lookup tile index */
-		uint8_t py = (BY & 0x07);
-		uint8_t px = 7 - (BX & 0x07);
-		uint8_t idx = gb->vram[bg_line + (BX >> 3)];
-
-		if (gb->gb_reg.LCDC & LCDC_TILE_SELECT)
-			tile = VRAM_TILES_1 + idx * 0x10;
-		else
-			tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
-
-		tile += 2*py;
-
-		/* fetch first tile */
-		t1 = gb->vram[tile] >> px;
-		t2 = gb->vram[tile+1] >> px;
-
-		for (; X != 0xFF; X--)
-		{
-			if (px == 8)
-			{
-				/* fetch next tile */
-				px = 0;
-				BX = X + gb->gb_reg.SCX;
-				idx = gb->vram[bg_line + (BX >> 3)];
-				if (gb->gb_reg.LCDC & LCDC_TILE_SELECT)
-					tile = VRAM_TILES_1 + idx * 0x10;
-				else
-					tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
-				tile += 2*py;
-				t1 = gb->vram[tile];
-				t2 = gb->vram[tile+1];
-			}
-			/* copy background */
-			c = (t1 & 0x1) | ((t2 & 0x1) << 1);
-			gb->gb_fb[gb->gb_reg.LY][X] = gb->display.bg_palette[c];
-			t1 = t1 >> 1;
-			t2 = t2 >> 1;
-			px++;
-		}
-	}
-
-#if 0
 	/* draw window */
-	if(win_line)
+	if(gb->gb_reg.LCDC & LCDC_WINDOW_ENABLE
+			&& gb->gb_reg.LY >= gb->display.WY
+			&& gb->gb_reg.WX <= 166)
 	{
-		uint8_t X = LCD_WIDTH - 1;
-		WX = X - gb->gb_reg.WX + 7;
+		/* Calculate Window Map Address. */
+		uint16_t win_line = (gb->gb_reg.LCDC & LCDC_WINDOW_MAP) ?
+			VRAM_BMAP_2 : VRAM_BMAP_1;
+		win_line += (gb->display.window_clear >> 3) * 0x20;
+
+		uint8_t disp_x = LCD_WIDTH - 1;
+		uint8_t win_x = disp_x - gb->gb_reg.WX + 7;
 
 		// look up tile
-		uint8_t py = gb->WYC & 0x07;
-		uint8_t px = 7 - (WX & 0x07);
-		uint8_t idx = gb->vram[win_line + (WX >> 3)];
+		uint8_t py = gb->display.window_clear & 0x07;
+		uint8_t px = 7 - (win_x & 0x07);
+		uint8_t idx = gb->vram[win_line + (win_x >> 3)];
+
+		uint16_t tile;
 
 		if (gb->gb_reg.LCDC & LCDC_TILE_SELECT)
 			tile = VRAM_TILES_1 + idx * 0x10;
@@ -1222,20 +1150,21 @@ void __gb_draw_line(struct gb_t *gb)
 		tile += 2*py;
 
 		// fetch first tile
-		t1 = gb->vram[tile] >> px;
-		t2 = gb->vram[tile+1] >> px;
+		uint8_t t1 = gb->vram[tile] >> px;
+		uint8_t t2 = gb->vram[tile+1] >> px;
 
 		// loop & copy window
 		uint8_t end = (gb->gb_reg.WX < 7 ? 0 : gb->gb_reg.WX - 7) - 1;
 
-		for (; X != end; X--)
+		for (; disp_x != end; disp_x--)
 		{
+			fx[disp_x] = 0xFE;
 			if (px == 8)
 			{
 				// fetch next tile
 				px = 0;
-				WX = X - gb->gb_reg.WX + 7;
-				idx = gb->vram[win_line + (WX >> 3)];
+				win_x = disp_x - gb->gb_reg.WX + 7;
+				idx = gb->vram[win_line + (win_x >> 3)];
 				if (gb->gb_reg.LCDC & LCDC_TILE_SELECT)
 					tile = VRAM_TILES_1 + idx * 0x10;
 				else
@@ -1246,86 +1175,102 @@ void __gb_draw_line(struct gb_t *gb)
 				t2 = gb->vram[tile+1];
 			}
 			// copy window
-			c = (t1 & 0x1) | ((t2 & 0x1) << 1);
-			gb->gb_fb[gb->gb_reg.LY][X] = c; //BGP[c];
+			uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
+			pixels[disp_x] = gb->display.bg_palette[c];
 			t1 = t1 >> 1;
 			t2 = t2 >> 1;
 			px++;
 		}
-		gb->WYC++; // advance window line
+
+		gb->display.window_clear++; // advance window line
 	}
 
 	// draw sprites
 	if (gb->gb_reg.LCDC & LCDC_OBJ_ENABLE)
 	{
-		for(uint8_t s = NUM_SPRITES - 1; s != 0xFF; s--)
-			//for (u8 s = 0; s < NUM_SPRITES && count < MAX_SPRITES_LINE; s++)
+		uint8_t count = 0;
+		//for(uint8_t s = NUM_SPRITES - 1; s != 0xFF; s--)
+		for (uint8_t s = 0; s < NUM_SPRITES && count < MAX_SPRITES_LINE; s++)
 		{
+			/* Sprite Y position. */
 			uint8_t OY = gb->oam[4*s + 0];
+			/* Sprite X position. */
 			uint8_t OX = gb->oam[4*s + 1];
-			uint8_t OT = gb->oam[4*s + 2] & (gb->gb_reg.LCDC & LCDC_OBJ_SIZE ? 0xFE : 0xFF);
+			/* Sprite Tile/Pattern Number. */
+			uint8_t OT = gb->oam[4*s + 2]
+				& (gb->gb_reg.LCDC & LCDC_OBJ_SIZE ? 0xFE : 0xFF);
+			/* Additional attributes. */
 			uint8_t OF = gb->oam[4*s + 3];
 
-			// sprite is on this line
-			if (gb->gb_reg.LY + (gb->gb_reg.LCDC & LCDC_OBJ_SIZE ? 0 : 8) < OY && gb->gb_reg.LY + 16 >= OY)
+			/* If sprite isn't on this line, continue. */
+			if (gb->gb_reg.LY +
+					(gb->gb_reg.LCDC & LCDC_OBJ_SIZE ?
+					0 : 8) >= OY
+				|| gb->gb_reg.LY + 16 < OY)
 			{
-				count++;
-				if (OX == 0 || OX >= 168)
-					continue;   // but not visible
+				continue;
+			}
 
-				// y flip
-				uint8_t py = gb->gb_reg.LY - OY + 16;
-				if (OF & OBJ_FLIP_Y)
-					py = (gb->gb_reg.LCDC & LCDC_OBJ_SIZE ? 15 : 7) - py;
+			count++;
+			/* Continue if sprite not visible. */
+			if (OX == 0 || OX >= 168)
+				continue;
 
-				// fetch the tile
-				t1 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2*py];
-				t2 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2*py + 1];
+			// y flip
+			uint8_t py = gb->gb_reg.LY - OY + 16;
+			if (OF & OBJ_FLIP_Y)
+				py = (gb->gb_reg.LCDC & LCDC_OBJ_SIZE ? 15 : 7) - py;
 
-				// handle x flip
-				uint8_t dir, start, end, shift;
-				if (OF & OBJ_FLIP_X)
+			// fetch the tile
+			uint8_t t1 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2*py];
+			uint8_t t2 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2*py + 1];
+
+			// handle x flip
+			uint8_t dir, start, end, shift;
+			if (OF & OBJ_FLIP_X)
+			{
+				dir = 1;
+				start = (OX < 8 ? 0 : OX - 8);
+				end = MIN(OX, LCD_WIDTH);
+				shift = 8 - OX + start;
+			}
+			else
+			{
+				dir = -1;
+				start = MIN(OX, LCD_WIDTH) - 1;
+				end = (OX < 8 ? 0 : OX - 8) - 1;
+				shift = OX - (start + 1);
+			}
+
+			// copy tile
+			t1 >>= shift;
+			t2 >>= shift;
+			for(uint8_t disp_x = start; disp_x != end; disp_x += dir)
+			{
+				uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
+				// check transparency / sprite overlap / background overlap
+#if 0
+				if (c && OX <= fx[disp_x]
+						&& !((OF & OBJ_PRIORITY)
+						&& ((pixels[disp_x] & 0x3)
+						&& fx[disp_x] == 0xFE)))
+#else
+				if (c && OX <= fx[disp_x]
+						&& !(OF & OBJ_PRIORITY
+						&& fx[disp_x] & 0x3))
+#endif
 				{
-					dir = 1;
-					start = (OX < 8 ? 0 : OX - 8);
-					end = MIN(OX, LCD_WIDTH);
-					shift = 8 - OX + start;
+					fx[disp_x] = OX;
+					pixels[disp_x] = (OF & OBJ_PALETTE) ? gb->display.sp_palette[c + 4] : gb->display.sp_palette[c];
 				}
-				else
-				{
-					dir = -1;
-					start = MIN(OX, LCD_WIDTH) - 1;
-					end = (OX < 8 ? 0 : OX - 8) - 1;
-					shift = OX - (start + 1);
-				}
-
-				// copy tile
-				t1 >>= shift;
-				t2 >>= shift;
-				for(uint8_t X = start; X != end; X += dir)
-				{
-					c = (t1 & 0x1) | ((t2 & 0x1) << 1);
-					// check transparency / sprite overlap / background overlap
-					if (c && OX <= SX[X] &&
-							!((OF & OBJ_PRIORITY) && ((gb->gb_fb[gb->gb_reg.LY][X] & 0x3) && SX[X] == 0xFE)))
-						//                    if (c && OX <= SX[X] && !(OF & OBJ_PRIORITY && gb_fb[gb->gb_reg.LY][X] & 0x3))
-					{
-						SX[X] = OX;
-						gb->gb_fb[gb->gb_reg.LY][X] = (OF & OBJ_PALETTE) ? gb->display.sp_palette[c + 4] : gb->display.sp_palette[c];
-					}
-					t1 = t1 >> 1;
-					t2 = t2 >> 1;
-				}
+				t1 = t1 >> 1;
+				t2 = t2 >> 1;
 			}
 		}
 	}
-#endif
 
-	/* Convert shade to color number. */
-//	for(uint8_t X = 0; X < LCD_WIDTH; X++)
-//		gb->gb_fb[gb->gb_reg.LY][X] = gb->display.bg_palette[gb->gb_fb[gb->gb_reg.LY][X]];
+	gb->display.lcd_draw_line(gb, pixels, gb->gb_reg.LY);
 }
-#endif
 #endif
 
 /**
@@ -3022,8 +2967,8 @@ void __gb_step_cpu(struct gb_t *gb)
 			{
 				/* Clear Screen */
 				// FIXME
-				//gb->WY = gb->gb_reg.WY;
-				//gb->WYC = 0;
+				gb->display.WY = gb->gb_reg.WY;
+				gb->display.window_clear = 0;
 			}
 
 			gb->lcd_mode = LCD_HBLANK;
@@ -3044,11 +2989,7 @@ void __gb_step_cpu(struct gb_t *gb)
 		gb->lcd_mode = LCD_TRANSFER;
 		/* TODO: LCD_DRAW_LINE(); */
 #if ENABLE_LCD
-#if LCD_NEW_DRAW_LINE
-		__gb_draw_line2(gb);
-#else
 		__gb_draw_line(gb);
-#endif
 #endif
 	}
 }
@@ -3204,6 +3145,7 @@ void gb_init_audio(struct gb_t *gb, uint8_t *buffer, unsigned int len,
 }
 #endif
 
+#if ENABLE_LCD
 void gb_init_lcd(struct gb_t *gb,
 		void (*lcd_draw_line)(struct gb_t*, const uint8_t pixels[160],
 				const uint_least8_t line))
@@ -3212,3 +3154,4 @@ void gb_init_lcd(struct gb_t *gb,
 
 	return;
 }
+#endif
