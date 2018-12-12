@@ -15,8 +15,6 @@
 
 #include <SDL2/SDL.h>
 
-#define ENABLE_SOUND 1
-
 #if ENABLE_SOUND
 #include "gb_apu/audio.h"
 #endif
