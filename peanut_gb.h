@@ -38,6 +38,10 @@
 #define ENABLE_LCD 1
 #endif
 
+/* Disable incomplete audio implementation. */
+#define INTERNAL_AUDIO 0
+
+/* Use new WIP display drawing. */
 #define LCD_NEW_DRAW_LINE 1
 
 /* Interrupt masks */
@@ -207,6 +211,7 @@ struct count_t
 	uint16_t tima_count;	/* Timer Counter */
 	uint16_t serial_count;
 
+#if INTERNAL_AUDIO
 	uint16_t apu_len_count;	/* Length counter */
 	uint16_t apu_swp_count;	/* Sweep counter */
 	uint32_t apu_env_count;	/* Volume envelope counter */
@@ -220,6 +225,7 @@ struct count_t
 	/* Counts the number of samples in audio buffer. Audio is queued to the
 	 * front-end when the buffer is filled. */
 	uint16_t apu_buffer_count;
+#endif
 };
 
 struct gb_registers_t
@@ -254,6 +260,7 @@ struct gb_registers_t
 	uint8_t IE;
 };
 
+#if INTERNAL_AUDIO
 struct audio_t
 {
 	uint8_t *buffer;
@@ -262,6 +269,7 @@ struct audio_t
 	void (*queue_audio)(void *priv, const uint8_t * const buffer,
 			const unsigned int len);
 };
+#endif
 
 /**
  * Errors that may occur during emulation.
@@ -402,18 +410,30 @@ struct gb_t
 	uint8_t hram[HRAM_SIZE];
 	uint8_t oam[OAM_SIZE];
 
-	/* Palettes */
-	uint8_t BGP[4];
-	uint8_t OBJP[8];
+	struct
+	{
+		/**
+		 * Draw line on screen.
+		 *
+		 * \param gb_t		emulator context
+		 * \param pixels	pixels to draw. Values are guaranteed to
+		 * be between 0-3 inclusive, and they denote the four different
+		 * shades of colour on the Game Boy.
+		 * \param line		Line to draw pixels on. This is
+		 * guaranteed to be between 0-144 inclusive.
+		 */
+		void (*lcd_draw_line)(struct gb_t*, const uint8_t pixels[160],
+				const uint_least8_t line);
 
-	/* screen */
-	uint8_t gb_fb[LCD_HEIGHT][LCD_WIDTH];
-	/* TODO: Move this */
-	uint8_t WY;
-	uint8_t WYC;
+		/* Palettes */
+		uint8_t bg_palette[4];
+		uint8_t sp_palette[8];
+	} display;
 
+#if INTERNAL_AUDIO
 	/* Audio */
 	struct audio_t audio;
+#endif
 };
 
 /**
@@ -796,26 +816,26 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 						   /* DMG Palette Registers */
 				case 0x47:
 						   gb->gb_reg.BGP = val;
-						   gb->BGP[0] = (gb->gb_reg.BGP & 0x03);
-						   gb->BGP[1] = (gb->gb_reg.BGP >> 2) & 0x03;
-						   gb->BGP[2] = (gb->gb_reg.BGP >> 4) & 0x03;
-						   gb->BGP[3] = (gb->gb_reg.BGP >> 6) & 0x03;
+						   gb->display.bg_palette[0] = (gb->gb_reg.BGP & 0x03);
+						   gb->display.bg_palette[1] = (gb->gb_reg.BGP >> 2) & 0x03;
+						   gb->display.bg_palette[2] = (gb->gb_reg.BGP >> 4) & 0x03;
+						   gb->display.bg_palette[3] = (gb->gb_reg.BGP >> 6) & 0x03;
 						   return;
 
 				case 0x48:
 						   gb->gb_reg.OBP0 = val;
-						   gb->OBJP[0] = (gb->gb_reg.OBP0 & 0x03);
-						   gb->OBJP[1] = (gb->gb_reg.OBP0 >> 2) & 0x03;
-						   gb->OBJP[2] = (gb->gb_reg.OBP0 >> 4) & 0x03;
-						   gb->OBJP[3] = (gb->gb_reg.OBP0 >> 6) & 0x03;
+						   gb->display.sp_palette[0] = (gb->gb_reg.OBP0 & 0x03);
+						   gb->display.sp_palette[1] = (gb->gb_reg.OBP0 >> 2) & 0x03;
+						   gb->display.sp_palette[2] = (gb->gb_reg.OBP0 >> 4) & 0x03;
+						   gb->display.sp_palette[3] = (gb->gb_reg.OBP0 >> 6) & 0x03;
 						   return;
 
 				case 0x49:
 						   gb->gb_reg.OBP1 = val;
-						   gb->OBJP[4] = (gb->gb_reg.OBP1 & 0x03);
-						   gb->OBJP[5] = (gb->gb_reg.OBP1 >> 2) & 0x03;
-						   gb->OBJP[6] = (gb->gb_reg.OBP1 >> 4) & 0x03;
-						   gb->OBJP[7] = (gb->gb_reg.OBP1 >> 6) & 0x03;
+						   gb->display.sp_palette[4] = (gb->gb_reg.OBP1 & 0x03);
+						   gb->display.sp_palette[5] = (gb->gb_reg.OBP1 >> 2) & 0x03;
+						   gb->display.sp_palette[6] = (gb->gb_reg.OBP1 >> 4) & 0x03;
+						   gb->display.sp_palette[7] = (gb->gb_reg.OBP1 >> 6) & 0x03;
 						   return;
 
 						   /* Window Position Registers */
@@ -862,9 +882,12 @@ void gb_reset(struct gb_t *gb)
 	gb->counter.div_count = 0;
 	gb->counter.tima_count = 0;
 	gb->counter.serial_count = 0;
+	
+#if INTERNAL_AUDIO
 	gb->counter.apu_len_count = 0;
 	gb->counter.apu_swp_count = 0;
 	gb->counter.apu_env_count = 0;
+#endif
 
 	gb->gb_reg.TIMA      = 0x00;
 	gb->gb_reg.TMA       = 0x00;
@@ -1022,6 +1045,12 @@ void __gb_execute_cb(struct gb_t *gb)
 #if LCD_NEW_DRAW_LINE
 void __gb_draw_line2(struct gb_t *gb)
 {
+	uint8_t pixels[160] = {0};
+
+	/* If LCD not initialised by front-end, don't render anything. */
+	if(gb->display.lcd_draw_line == NULL)
+		return;
+
 	/* If background is enabled, draw it. */
 	if(gb->gb_reg.LCDC & LCDC_BG_ENABLE)
 	{
@@ -1064,9 +1093,8 @@ void __gb_draw_line2(struct gb_t *gb)
 		tile += 2*py;
 
 		/* fetch first tile */
-		uint8_t t1, t2;
-		t1 = gb->vram[tile] >> px;
-		t2 = gb->vram[tile+1] >> px;
+		uint8_t t1 = gb->vram[tile] >> px;
+		uint8_t t2 = gb->vram[tile+1] >> px;
 
 		for (; disp_x != 0xFF; disp_x--)
 		{
@@ -1086,12 +1114,14 @@ void __gb_draw_line2(struct gb_t *gb)
 			}
 			/* copy background */
 			uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
-			gb->gb_fb[gb->gb_reg.LY][disp_x] = gb->BGP[c];
+			pixels[disp_x] = gb->display.bg_palette[c];
 			t1 = t1 >> 1;
 			t2 = t2 >> 1;
 			px++;
 		}
 	}
+
+	gb->display.lcd_draw_line(gb, pixels, gb->gb_reg.LY);
 }
 #else
 /* TODO: Completely rewrite this */
@@ -1165,7 +1195,7 @@ void __gb_draw_line(struct gb_t *gb)
 			}
 			/* copy background */
 			c = (t1 & 0x1) | ((t2 & 0x1) << 1);
-			gb->gb_fb[gb->gb_reg.LY][X] = gb->BGP[c];
+			gb->gb_fb[gb->gb_reg.LY][X] = gb->display.bg_palette[c];
 			t1 = t1 >> 1;
 			t2 = t2 >> 1;
 			px++;
@@ -1281,7 +1311,7 @@ void __gb_draw_line(struct gb_t *gb)
 						//                    if (c && OX <= SX[X] && !(OF & OBJ_PRIORITY && gb_fb[gb->gb_reg.LY][X] & 0x3))
 					{
 						SX[X] = OX;
-						gb->gb_fb[gb->gb_reg.LY][X] = (OF & OBJ_PALETTE) ? gb->OBJP[c + 4] : gb->OBJP[c];
+						gb->gb_fb[gb->gb_reg.LY][X] = (OF & OBJ_PALETTE) ? gb->display.sp_palette[c + 4] : gb->display.sp_palette[c];
 					}
 					t1 = t1 >> 1;
 					t2 = t2 >> 1;
@@ -1293,7 +1323,7 @@ void __gb_draw_line(struct gb_t *gb)
 
 	/* Convert shade to color number. */
 //	for(uint8_t X = 0; X < LCD_WIDTH; X++)
-//		gb->gb_fb[gb->gb_reg.LY][X] = gb->BGP[gb->gb_fb[gb->gb_reg.LY][X]];
+//		gb->gb_fb[gb->gb_reg.LY][X] = gb->display.bg_palette[gb->gb_fb[gb->gb_reg.LY][X]];
 }
 #endif
 #endif
@@ -2991,8 +3021,9 @@ void __gb_step_cpu(struct gb_t *gb)
 			if(gb->gb_reg.LY == 0)
 			{
 				/* Clear Screen */
-				gb->WY = gb->gb_reg.WY;
-				gb->WYC = 0;
+				// FIXME
+				//gb->WY = gb->gb_reg.WY;
+				//gb->WYC = 0;
 			}
 
 			gb->lcd_mode = LCD_HBLANK;
@@ -3130,15 +3161,20 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 	gb->num_rom_banks = num_rom_banks[gb->gb_rom_read(gb, bank_count_location)];
 	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(gb, ram_size_location)];
 
+#if INTERNAL_AUDIO
 	/* Initialise the audio buffer to NULL in-case audio is not initialised
 	 * when the emulator starts stepping CPU. */
 	gb->audio.buffer = NULL;
+#endif
+
+	gb->display.lcd_draw_line = NULL;
 
 	gb_reset(gb);
 
 	return GB_INIT_NO_ERROR;
 }
 
+#if INTERNAL_AUDIO
 /**
  * Used to initialise audio. Must be called after gb_init().
  * TODO: Make gb_init_audio() optional.
@@ -3163,6 +3199,16 @@ void gb_init_audio(struct gb_t *gb, uint8_t *buffer, unsigned int len,
 	gb->counter.apu_sample_count = 0;
 	gb->counter.apu_buffer_count = 0;
 	gb->counter.apu_sample_cycles = DMG_CPU_CLOCK / rate;
+
+	return;
+}
+#endif
+
+void gb_init_lcd(struct gb_t *gb,
+		void (*lcd_draw_line)(struct gb_t*, const uint8_t pixels[160],
+				const uint_least8_t line))
+{
+	gb->display.lcd_draw_line = lcd_draw_line;
 
 	return;
 }

@@ -1,6 +1,6 @@
 .POSIX:
 .SUFFIXES:
-OPTIMIZE_FLAG = -s -Ofast
+OPTIMIZE_FLAG = -g -Og
 SDL2_CFLAGS = $(shell sdl2-config --cflags)
 SDL2_LDLIBS =
 

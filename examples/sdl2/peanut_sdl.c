@@ -34,6 +34,9 @@ struct priv_t
 	uint8_t *rom;
 	/* Pointer to allocated memory holding save file. */
 	uint8_t *cart_ram;
+
+	uint8_t selected_palette;
+	uint16_t fb[LCD_HEIGHT][LCD_WIDTH];
 };
 
 /**
@@ -190,12 +193,35 @@ void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 	return;
 }
 
+/**
+ * Draws scanline into framebuffer.
+ */
+void lcd_draw_line(struct gb_t *gb, const uint8_t pixels[160],
+		const uint_least8_t line)
+{
+	struct priv_t *priv = gb->priv;
+#define MAX_PALETTE 6
+	const uint16_t palette[MAX_PALETTE][4] =
+	{					/* CGB Palette Entry (Notes) */
+		{ 0xFFFF, 0x57E0, 0xFA00, 0x0000 }, /* 0x05 */
+		{ 0xFFFF, 0xFFE0, 0xF800, 0x0000 }, /* 0x07 */
+		{ 0xFFFF, 0xFD6C, 0x8180, 0x0000 }, /* 0x12 */
+		{ 0x0000, 0x0430, 0xFEE0, 0xFFFF }, /* 0x13 */
+		{ 0xFFFF, 0xA534, 0x528A, 0x0000 }, /* 0x16 (DMG, Default) */
+		{ 0xFFF4, 0xFCB2, 0x94BF, 0x0000 }  /* 0x17 */
+		/* Entries with different palettes for BG, OBJ0 & OBJ1 are not
+		 * yet supported. */
+	};
+
+	// TODO: Remove "& 3"
+	for (unsigned int x = 0; x < LCD_WIDTH; x++)
+		priv->fb[line][x] = palette[priv->selected_palette][pixels[x] & 3];
+}
+
 int main(int argc, char **argv)
 {
 	struct gb_t gb;
-	struct priv_t priv;
-	const unsigned int height = 144;
-	const unsigned int width = 160;
+	struct priv_t priv = {.selected_palette = 4};
 	const double target_speed_ms = 1000.0/VERTICAL_SYNC;
 	double speed_compensation = 0.0;
 	unsigned int running = 1;
@@ -204,7 +230,6 @@ int main(int argc, char **argv)
 	SDL_Texture *texture;
 	SDL_Event event;
 	SDL_Joystick *joystick;
-	uint16_t fb[height][width];
 	uint32_t new_ticks, old_ticks;
 	enum gb_init_error_e ret;
 	unsigned int fast_mode = 1;
@@ -355,6 +380,7 @@ int main(int argc, char **argv)
 	SDL_AudioDeviceID dev;
 	audio_init(&dev);
 #endif
+	gb_init_lcd(&gb, &lcd_draw_line);
 
 	/* Allow the joystick input even if game is in background. */
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
@@ -367,7 +393,7 @@ int main(int argc, char **argv)
 	window = SDL_CreateWindow("Peanut-sdl",
 			SDL_WINDOWPOS_UNDEFINED,
 			SDL_WINDOWPOS_UNDEFINED,
-			width, height,
+			LCD_WIDTH, LCD_HEIGHT,
 			SDL_WINDOW_RESIZABLE | SDL_WINDOW_INPUT_FOCUS);
 	if(window == NULL)
 	{
@@ -396,13 +422,13 @@ int main(int argc, char **argv)
 	SDL_RenderPresent(renderer);
 
 	/* Use integer scale. */
-	SDL_RenderSetLogicalSize(renderer, width, height);
+	SDL_RenderSetLogicalSize(renderer, LCD_WIDTH, LCD_HEIGHT);
 	SDL_RenderSetIntegerScale(renderer, 1);
 
 	texture = SDL_CreateTexture(renderer,
 			SDL_PIXELFORMAT_RGB565,
 			SDL_TEXTUREACCESS_STREAMING,
-			width, height);
+			LCD_WIDTH, LCD_HEIGHT);
 	if(texture == NULL)
 	{
 		printf("Texture could not be created: %s\n", SDL_GetError());
@@ -413,19 +439,6 @@ int main(int argc, char **argv)
 	{
 		int delay;
 		static unsigned int rtc_timer = 0;
-		static uint8_t selected_palette = 4;
-#define MAX_PALETTE 6
-		const uint16_t palette[MAX_PALETTE][4] =
-		{										/* CGB Palette Entry (Notes) */
-			{ 0xFFFF, 0x57E0, 0xFA00, 0x0000 },	/* 0x05 */
-			{ 0xFFFF, 0xFFE0, 0xF800, 0x0000 },	/* 0x07 */
-			{ 0xFFFF, 0xFD6C, 0x8180, 0x0000 },	/* 0x12 */
-			{ 0x0000, 0x0430, 0xFEE0, 0xFFFF },	/* 0x13 */
-			{ 0xFFFF, 0xA534, 0x528A, 0x0000 },	/* 0x16 (DMG, Default) */
-			{ 0xFFF4, 0xFCB2, 0x94BF, 0x0000 }	/* 0x17 */
-			/* Entries with different palettes for BG, OBJ0 & OBJ1 are not
-			 * yet supported. */
-		};
 
 		/* Calculate the time taken to draw frame, then later add a
 		 * delay to cap at 60 fps. */
@@ -499,8 +512,8 @@ int main(int argc, char **argv)
 						case SDLK_4: fast_mode = 4; break;
 						case SDLK_r: gb_reset(&gb); break;
 						case SDLK_p:
-							if(++selected_palette == MAX_PALETTE)
-								selected_palette = 0;
+							if(++(priv.selected_palette) == MAX_PALETTE)
+								priv.selected_palette = 0;
 							break;
 					}
 					break;
@@ -568,16 +581,8 @@ int main(int argc, char **argv)
 		audio_frame();
 #endif
 
-		/* Copy frame buffer from emulator context, converting to colours
-		 * defined in the palette. */
-		for (unsigned int y = 0; y < height; y++)
-		{
-			for (unsigned int x = 0; x < width; x++)
-				fb[y][x] = palette[selected_palette][gb.gb_fb[y][x] & 3];
-		}
-
 		/* Copy frame buffer to SDL screen. */
-		SDL_UpdateTexture(texture, NULL, &fb, width * sizeof(uint16_t));
+		SDL_UpdateTexture(texture, NULL, &priv.fb, LCD_WIDTH * sizeof(uint16_t));
 		SDL_RenderClear(renderer);
 		SDL_RenderCopy(renderer, texture, NULL, NULL);
 		SDL_RenderPresent(renderer);
