@@ -1189,8 +1189,8 @@ void __gb_draw_line(struct gb_t *gb)
 	if (gb->gb_reg.LCDC & LCDC_OBJ_ENABLE)
 	{
 		uint8_t count = 0;
-		//for(uint8_t s = NUM_SPRITES - 1; s != 0xFF; s--)
-		for (uint8_t s = 0; s < NUM_SPRITES && count < MAX_SPRITES_LINE; s++)
+		for(uint8_t s = NUM_SPRITES - 1; s != 0xFF; s--)
+		//for (uint8_t s = 0; s < NUM_SPRITES && count < MAX_SPRITES_LINE; s++)
 		{
 			/* Sprite Y position. */
 			uint8_t OY = gb->oam[4*s + 0];
@@ -1249,7 +1249,7 @@ void __gb_draw_line(struct gb_t *gb)
 			{
 				uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
 				// check transparency / sprite overlap / background overlap
-#if 0
+#if 1
 				if (c && OX <= fx[disp_x]
 						&& !((OF & OBJ_PRIORITY)
 						&& ((pixels[disp_x] & 0x3)
