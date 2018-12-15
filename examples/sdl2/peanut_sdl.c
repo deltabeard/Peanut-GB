@@ -21,6 +21,14 @@
 #include "gb_apu/audio.h"
 #endif
 
+/**
+ * This uses palette configurations hard coded within the Game Boy Color.
+ * This will turn off the users ability to change palettes.
+ */
+#ifndef ENABLE_CGB_PALETTES
+#define ENABLE_CGB_PALETTES 1
+#endif
+
 #include "../../peanut_gb.h"
 
 #include "nativefiledialog/src/include/nfd.h"
@@ -35,9 +43,65 @@ struct priv_t
 	/* Pointer to allocated memory holding save file. */
 	uint8_t *cart_ram;
 
+#if ENABLE_CGB_PALETTES
+	/* Colour palette for each BG, OBJ0, and OBJ1. */
+	uint16_t selected_palette[3][4];
+#else
 	uint8_t selected_palette;
+#endif
 	uint16_t fb[LCD_HEIGHT][LCD_WIDTH];
 };
+
+#if ENABLE_CGB_PALETTES
+void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
+{
+	size_t palette_bytes = 3 * 4 * sizeof(uint16_t);
+
+	switch(game_checksum)
+	{
+	/* Donkey Kong */
+	case 0x19:
+	case 0x2D:
+	{
+		const uint16_t palette[3][4] = {
+			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }, /* OBJ0 */
+			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }, /* OBJ1 */
+			{ 0x7FFF, 0x7E60, 0x7C00, 0x0000 }  /* BG */
+		};
+		memcpy(priv->selected_palette, palette, palette_bytes);
+		break;
+	}
+	
+	/* Kirby */
+	case 0x27:
+	case 0x49:
+	case 0x5C:
+	case 0xB3:
+	case 0x93:
+	{
+		const uint16_t palette[3][4] = {
+			{ 0x7D8A, 0x6800, 0x3000, 0x0000 }, /* OBJ0 */
+			{ 0x001F, 0x7FFF, 0x7FEF, 0x021F }, /* OBJ1 */
+			{ 0x527F, 0x7FE0, 0x0180, 0x0000 }  /* BG */
+		};
+		memcpy(priv->selected_palette, palette, palette_bytes);
+		break;
+	}
+	
+	default:
+	{
+		const uint16_t palette[3][4] = {
+			{ 0x7FFF, 0x5294, 0x294A, 0x0000 },
+			{ 0x7FFF, 0x5294, 0x294A, 0x0000 },
+			{ 0x7FFF, 0x5294, 0x294A, 0x0000 }
+		};
+		memcpy(priv->selected_palette, palette, palette_bytes);
+	}
+	}
+
+	printf("No palette found for 0x%02X.\n", game_checksum);
+}
+#endif
 
 /**
  * Returns a byte from the ROM file at the given address.
@@ -200,28 +264,36 @@ void lcd_draw_line(struct gb_t *gb, const uint8_t pixels[160],
 		const uint_least8_t line)
 {
 	struct priv_t *priv = gb->priv;
+#if ENABLE_CGB_PALETTES
+	for (unsigned int x = 0; x < LCD_WIDTH; x++)
+	{
+		priv->fb[line][x] = priv->selected_palette
+				[(pixels[x] & LCD_PALETTE_ALL) >> 4]
+				[pixels[x] & 3];
+	}
+#else
 #define MAX_PALETTE 6
 	const uint16_t palette[MAX_PALETTE][4] =
 	{					/* CGB Palette Entry (Notes) */
-		{ 0xFFFF, 0x57E0, 0xFA00, 0x0000 }, /* 0x05 */
-		{ 0xFFFF, 0xFFE0, 0xF800, 0x0000 }, /* 0x07 */
-		{ 0xFFFF, 0xFD6C, 0x8180, 0x0000 }, /* 0x12 */
-		{ 0x0000, 0x0430, 0xFEE0, 0xFFFF }, /* 0x13 */
-		{ 0xFFFF, 0xA534, 0x528A, 0x0000 }, /* 0x16 (DMG, Default) */
-		{ 0xFFF4, 0xFCB2, 0x94BF, 0x0000 }  /* 0x17 */
+		{ 0x7FFF, 0x2BE0, 0x7D00, 0x0000 }, /* 0x05 */
+		{ 0x7FFF, 0x7FE0, 0x7C00, 0x0000 }, /* 0x07 */
+		{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 }, /* 0x12 */
+		{ 0x0000, 0x0210, 0x7F60, 0x7FFF }, /* 0x13 */
+		{ 0x7FFF, 0x5294, 0x294A, 0x0000 }, /* 0x16 (DMG, Default) */
+		{ 0x7FF4, 0x7E52, 0x4A5F, 0x0000 }  /* 0x17 */
 		/* Entries with different palettes for BG, OBJ0 & OBJ1 are not
 		 * yet supported. */
 	};
 
-	// TODO: Remove "& 3"
 	for (unsigned int x = 0; x < LCD_WIDTH; x++)
 		priv->fb[line][x] = palette[priv->selected_palette][pixels[x] & 3];
+#endif
 }
 
 int main(int argc, char **argv)
 {
 	struct gb_t gb;
-	struct priv_t priv = {.selected_palette = 4};
+	struct priv_t priv;
 	const double target_speed_ms = 1000.0/VERTICAL_SYNC;
 	double speed_compensation = 0.0;
 	unsigned int running = 1;
@@ -426,7 +498,7 @@ int main(int argc, char **argv)
 	SDL_RenderSetIntegerScale(renderer, 1);
 
 	texture = SDL_CreateTexture(renderer,
-			SDL_PIXELFORMAT_RGB565,
+			SDL_PIXELFORMAT_RGB555,
 			SDL_TEXTUREACCESS_STREAMING,
 			LCD_WIDTH, LCD_HEIGHT);
 	if(texture == NULL)
@@ -434,6 +506,16 @@ int main(int argc, char **argv)
 		printf("Texture could not be created: %s\n", SDL_GetError());
 		return EXIT_FAILURE;
 	}
+
+#if ENABLE_CGB_PALETTES
+	{
+		const uint8_t game_checksum =
+			gb_rom_read(&gb, ROM_HEADER_CHECKSUM_LOC);
+		auto_assign_palette(&priv, game_checksum);
+	}
+#else
+	priv.selected_palette = 4;
+#endif
 
 	while(running)
 	{
@@ -511,10 +593,12 @@ int main(int argc, char **argv)
 						case SDLK_3: fast_mode = 3; break;
 						case SDLK_4: fast_mode = 4; break;
 						case SDLK_r: gb_reset(&gb); break;
+#if !ENABLE_CGB_PALETTES
 						case SDLK_p:
 							if(++(priv.selected_palette) == MAX_PALETTE)
 								priv.selected_palette = 0;
 							break;
+#endif
 					}
 					break;
 

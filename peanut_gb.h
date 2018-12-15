@@ -148,6 +148,8 @@
 #define OBJ_FLIP_X          0x20
 #define OBJ_PALETTE         0x10
 
+#define ROM_HEADER_CHECKSUM_LOC	0x014D
+
 #ifndef MIN
 #define MIN(a, b)   ((a) < (b) ? (a) : (b))
 #endif
@@ -266,6 +268,13 @@ struct audio_t
 	void (*queue_audio)(void *priv, const uint8_t * const buffer,
 			const unsigned int len);
 };
+#endif
+
+#if ENABLE_LCD
+#define LCD_COLOUR	0x03
+#define LCD_PALETTE_OBJ	0x10
+#define LCD_PALETTE_BG	0x20
+#define LCD_PALETTE_ALL 0x30
 #endif
 
 /**
@@ -413,9 +422,18 @@ struct gb_t
 		 * Draw line on screen.
 		 *
 		 * \param gb_t		emulator context
-		 * \param pixels	pixels to draw. Values are guaranteed to
-		 * be between 0-3 inclusive, and they denote the four different
-		 * shades of colour on the Game Boy.
+		 * \param pixels	pixels to draw.
+		 * 			Bits 1-0 are the colour to draw.
+		 * 			Bits 5-4 are the palette, where:
+		 * 				OBJ0 = 0b00,
+		 * 				OBJ1 = 0b01,
+		 * 				BG = 0b10
+		 * 			Other bits are undefined.
+		 * 			Bits 5-4 are only required by front-ends
+		 * 			which want to use a different colour for
+		 * 			different object palettes. This is what
+		 * 			the Game Boy Color (CGB) does to DMG
+		 * 			games.
 		 * \param line		Line to draw pixels on. This is
 		 * guaranteed to be between 0-144 inclusive.
 		 */
@@ -1044,7 +1062,7 @@ void __gb_execute_cb(struct gb_t *gb)
 #if ENABLE_LCD
 void __gb_draw_line(struct gb_t *gb)
 {
-	uint8_t pixels[160] = {0};
+	uint8_t pixels[160];
 	uint8_t fx[160] = {0xFF};
 
 	/* If LCD not initialised by front-end, don't render anything. */
@@ -1116,6 +1134,7 @@ void __gb_draw_line(struct gb_t *gb)
 			/* copy background */
 			uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
 			pixels[disp_x] = gb->display.bg_palette[c];
+			pixels[disp_x] |= LCD_PALETTE_BG;
 			t1 = t1 >> 1;
 			t2 = t2 >> 1;
 			px++;
@@ -1177,6 +1196,7 @@ void __gb_draw_line(struct gb_t *gb)
 			// copy window
 			uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
 			pixels[disp_x] = gb->display.bg_palette[c];
+			pixels[disp_x] |= LCD_PALETTE_BG;
 			t1 = t1 >> 1;
 			t2 = t2 >> 1;
 			px++;
@@ -1261,7 +1281,10 @@ void __gb_draw_line(struct gb_t *gb)
 #endif
 				{
 					fx[disp_x] = OX;
-					pixels[disp_x] = (OF & OBJ_PALETTE) ? gb->display.sp_palette[c + 4] : gb->display.sp_palette[c];
+					pixels[disp_x] = (OF & OBJ_PALETTE)
+						? gb->display.sp_palette[c + 4]
+						: gb->display.sp_palette[c];
+					pixels[disp_x] |= (OF & OBJ_PALETTE);
 				}
 				t1 = t1 >> 1;
 				t2 = t2 >> 1;
@@ -3037,7 +3060,6 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 		void (*gb_error)(struct gb_t*, const enum gb_error_e, const uint16_t),
 		void *priv)
 {
-	const uint16_t header_checksum_location = 0x014D;
 	const uint16_t mbc_location = 0x0147;
 	const uint16_t bank_count_location = 0x0148;
 	const uint16_t ram_size_location = 0x0149;
@@ -3086,7 +3108,7 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 		for(uint16_t i = 0x0134; i <= 0x014C; i++)
 			x = x - gb->gb_rom_read(gb, i) - 1;
 
-		if(x != gb->gb_rom_read(gb, header_checksum_location))
+		if(x != gb->gb_rom_read(gb, ROM_HEADER_CHECKSUM_LOC))
 			return GB_INIT_INVALID_CHECKSUM;
 	}
 
