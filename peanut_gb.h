@@ -3049,6 +3049,18 @@ void gb_init_serial(struct gb_t *gb,
 	gb->gb_serial_transfer = gb_serial_transfer;
 }
 
+uint8_t gb_colour_hash(struct gb_t *gb)
+{
+#define ROM_TITLE_START_ADDR	0x0134
+#define ROM_TITLE_END_ADDR	0x0143 
+
+	uint8_t x = 0;
+	for(uint16_t i = ROM_TITLE_START_ADDR; i <= ROM_TITLE_END_ADDR; i++)
+		x += gb->gb_rom_read(gb, i);
+
+	return x;
+}
+
 /**
  * Initialise the emulator context. gb_reset() is also called to initialise
  * the CPU.
