@@ -271,9 +271,21 @@ struct audio_t
 #endif
 
 #if ENABLE_LCD
+/* Bit mask for the shade of pixel to display */
 #define LCD_COLOUR	0x03
+/**
+ * Bit mask for whether a pixel is OBJ0, OBJ1, or BG. Each may have a different
+ * palette when playing a DMG game on CGB.
+ */
 #define LCD_PALETTE_OBJ	0x10
 #define LCD_PALETTE_BG	0x20
+/**
+ * Bit mask for the two bits listed above.
+ * LCD_PALETTE_ALL == 0b00 --> OBJ0
+ * LCD_PALETTE_ALL == 0b01 --> OBJ1
+ * LCD_PALETTE_ALL == 0b10 --> BG
+ * LCD_PALETTE_ALL == 0b11 --> NOT POSSIBLE
+ */
 #define LCD_PALETTE_ALL 0x30
 #endif
 
@@ -1062,7 +1074,7 @@ void __gb_execute_cb(struct gb_t *gb)
 #if ENABLE_LCD
 void __gb_draw_line(struct gb_t *gb)
 {
-	uint8_t pixels[160];
+	uint8_t pixels[160] = {0};
 	uint8_t fx[160] = {0xFF};
 
 	/* If LCD not initialised by front-end, don't render anything. */
@@ -1281,10 +1293,14 @@ void __gb_draw_line(struct gb_t *gb)
 #endif
 				{
 					fx[disp_x] = OX;
+					/* Set pixel colour. */
 					pixels[disp_x] = (OF & OBJ_PALETTE)
 						? gb->display.sp_palette[c + 4]
 						: gb->display.sp_palette[c];
+					/* Set pixel palette (OBJ0 or OBJ1). */
 					pixels[disp_x] |= (OF & OBJ_PALETTE);
+					/* Deselect BG palette. */
+					pixels[disp_x] &= ~LCD_PALETTE_BG;
 				}
 				t1 = t1 >> 1;
 				t2 = t2 >> 1;

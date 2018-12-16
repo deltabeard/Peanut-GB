@@ -21,14 +21,6 @@
 #include "gb_apu/audio.h"
 #endif
 
-/**
- * This uses palette configurations hard coded within the Game Boy Color.
- * This will turn off the users ability to change palettes.
- */
-#ifndef ENABLE_CGB_PALETTES
-#define ENABLE_CGB_PALETTES 1
-#endif
-
 #include "../../peanut_gb.h"
 
 #include "nativefiledialog/src/include/nfd.h"
@@ -43,16 +35,170 @@ struct priv_t
 	/* Pointer to allocated memory holding save file. */
 	uint8_t *cart_ram;
 
-#if ENABLE_CGB_PALETTES
 	/* Colour palette for each BG, OBJ0, and OBJ1. */
 	uint16_t selected_palette[3][4];
-#else
-	uint8_t selected_palette;
-#endif
 	uint16_t fb[LCD_HEIGHT][LCD_WIDTH];
 };
 
-#if ENABLE_CGB_PALETTES
+/**
+ * Returns a byte from the ROM file at the given address.
+ */
+uint8_t gb_rom_read(struct gb_t *gb, const uint32_t addr)
+{
+	const struct priv_t * const p = gb->priv;
+	return p->rom[addr];
+}
+
+/**
+ * Returns a byte from the cartridge RAM at the given address.
+ */
+uint8_t gb_cart_ram_read(struct gb_t *gb, const uint32_t addr)
+{
+	const struct priv_t * const p = gb->priv;
+	return p->cart_ram[addr];
+}
+
+/**
+ * Writes a given byte to the cartridge RAM at the given address.
+ */
+void gb_cart_ram_write(struct gb_t *gb, const uint32_t addr,
+		const uint8_t val)
+{
+	const struct priv_t * const p = gb->priv;
+	p->cart_ram[addr] = val;
+}
+
+/**
+ * Returns a pointer to the allocated space containing the ROM. Must be freed.
+ */
+uint8_t *read_rom_to_ram(const char *file_name)
+{
+	FILE *rom_file = fopen(file_name, "rb");
+	size_t rom_size;
+	uint8_t *rom = NULL;
+
+	if(rom_file == NULL)
+		return NULL;
+
+	fseek(rom_file, 0, SEEK_END);
+	rom_size = ftell(rom_file);
+	rewind(rom_file);
+	rom = malloc(rom_size);
+
+	if(fread(rom, sizeof(uint8_t), rom_size, rom_file) != rom_size)
+	{
+		free(rom);
+		fclose(rom_file);
+		return NULL;
+	}
+
+	fclose(rom_file);
+	return rom;
+}
+
+void read_cart_ram_file(const char *save_file_name, uint8_t **dest,
+		const size_t len)
+{
+	FILE *f;
+
+	/* If save file not required. */
+	if(len == 0)
+	{
+		*dest = NULL;
+		return;
+	}
+
+	/* Allocate enough memory to hold save file. */
+	if((*dest = malloc(len)) == NULL)
+	{
+		printf("%d: %s\n", __LINE__, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	f = fopen(save_file_name, "rb");
+
+	/* It doesn't matter if the save file doesn't exist. We initialise the
+	 * save memory allocated above. The save file will be created on exit. */
+	if(f == NULL)
+	{
+		memset(*dest, 0xFF, len);
+		return;
+	}
+
+	/* Read save file to allocated memory. */
+	fread(*dest, sizeof(uint8_t), len, f);
+	fclose(f);
+}
+
+void write_cart_ram_file(const char *save_file_name, uint8_t **dest,
+		const size_t len)
+{
+	FILE *f;
+
+	if(len == 0 || *dest == NULL)
+		return;
+
+	if((f = fopen(save_file_name, "wb")) == NULL)
+	{
+		puts("Unable to open save file.");
+		printf("%d: %s\n", __LINE__, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	/* Record save file. */
+	fwrite(*dest, sizeof(uint8_t), len, f);
+	fclose(f);
+}
+
+/**
+ * Handles an error reported by the emulator. The emulator context may be used
+ * to better understand why the error given in gb_err was reported.
+ */
+void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
+{
+	struct priv_t *priv = gb->priv;
+
+	switch(gb_err)
+	{
+		case GB_INVALID_OPCODE:
+			/* We compensate for the post-increment in the __gb_step_cpu
+			 * function. */
+			fprintf(stdout, "Invalid opcode %#04x at PC: %#06x, SP: %#06x\n",
+					val,
+					gb->cpu_reg.pc - 1,
+					gb->cpu_reg.sp);
+			break;
+
+			/* Ignoring non fatal errors. */
+		case GB_INVALID_WRITE:
+		case GB_INVALID_READ:
+			return;
+
+		default:
+			printf("Unknown error");
+			break;
+	}
+
+	fprintf(stderr, "Error. Press q to exit, or any other key to continue.");
+	if(getchar() == 'q')
+	{
+		/* Record save file. */
+		write_cart_ram_file("recovery.sav", &priv->cart_ram,
+				gb_get_save_size(gb));
+
+		free(priv->rom);
+		free(priv->cart_ram);
+		exit(EXIT_FAILURE);
+	}
+
+	return;
+}
+
+/**
+ * Automatically assigns a colour palette to the game using a given game
+ * checksum.
+ * TODO: Not all checksums are programmed in yet because I'm lazy.
+ */
 void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 {
 	size_t palette_bytes = 3 * 4 * sizeof(uint16_t);
@@ -210,157 +356,154 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 	}
 	}
 }
-#endif
 
 /**
- * Returns a byte from the ROM file at the given address.
+ * Assigns a palette. This is used to allow the user to manually select a
+ * different colour palette if one was not found automatically, or if the user
+ * prefers a different colour palette.
+ * selection is the requestion colour palette. This should be a maximum of
+ * NUMBER_OF_PALETTES - 1. The default greyscale palette is selected otherwise.
  */
-uint8_t gb_rom_read(struct gb_t *gb, const uint32_t addr)
+void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 {
-	const struct priv_t * const p = gb->priv;
-	return p->rom[addr];
-}
+#define NUMBER_OF_PALETTES 12
+	size_t palette_bytes = 3 * 4 * sizeof(uint16_t);
 
-/**
- * Returns a byte from the cartridge RAM at the given address.
- */
-uint8_t gb_cart_ram_read(struct gb_t *gb, const uint32_t addr)
-{
-	const struct priv_t * const p = gb->priv;
-	return p->cart_ram[addr];
-}
-
-/**
- * Writes a given byte to the cartridge RAM at the given address.
- */
-void gb_cart_ram_write(struct gb_t *gb, const uint32_t addr,
-		const uint8_t val)
-{
-	const struct priv_t * const p = gb->priv;
-	p->cart_ram[addr] = val;
-}
-
-/**
- * Returns a pointer to the allocated space containing the ROM. Must be freed.
- */
-uint8_t *read_rom_to_ram(const char *file_name)
-{
-	FILE *rom_file = fopen(file_name, "rb");
-	size_t rom_size;
-	uint8_t *rom = NULL;
-
-	if(rom_file == NULL)
-		return NULL;
-
-	fseek(rom_file, 0, SEEK_END);
-	rom_size = ftell(rom_file);
-	rewind(rom_file);
-	rom = malloc(rom_size);
-
-	if(fread(rom, sizeof(uint8_t), rom_size, rom_file) != rom_size)
+	switch(selection)
 	{
-		free(rom);
-		fclose(rom_file);
-		return NULL;
+	/* 0x05 (Right) */
+	case 0:
+	{
+		const uint16_t palette[3][4] = {
+			{ 0x7FFF, 0x2BE0, 0x7D00, 0x0000 },
+			{ 0x7FFF, 0x2BE0, 0x7D00, 0x0000 },
+			{ 0x7FFF, 0x2BE0, 0x7D00, 0x0000 }
+		};
+		memcpy(priv->selected_palette, palette, palette_bytes);
+		break;
 	}
-
-	fclose(rom_file);
-	return rom;
-}
-
-void read_cart_ram_file(const char *save_file_name, uint8_t **dest,
-		const size_t len)
-{
-	FILE *f;
-
-	/* If save file not required. */
-	if(len == 0)
+	/* 0x07 (A + Down) */
+	case 1:
 	{
-		*dest = NULL;
-		return;
+		const uint16_t palette[3][4] = {
+			{ 0x7FFF, 0x7FE0, 0x7C00, 0x0000 },
+			{ 0x7FFF, 0x7FE0, 0x7C00, 0x0000 },
+			{ 0x7FFF, 0x7FE0, 0x7C00, 0x0000 }
+		};
+		memcpy(priv->selected_palette, palette, palette_bytes);
+		break;
 	}
-
-	/* Allocate enough memory to hold save file. */
-	if((*dest = malloc(len)) == NULL)
+	/* 0x12 (Up) */
+	case 2:
 	{
-		printf("%d: %s\n", __LINE__, strerror(errno));
-		exit(EXIT_FAILURE);
+		const uint16_t palette[3][4] = {
+			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 },
+			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 },
+			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 }
+		};
+		memcpy(priv->selected_palette, palette, palette_bytes);
+		break;
 	}
-
-	f = fopen(save_file_name, "rb");
-
-	/* It doesn't matter if the save file doesn't exist. We initialise the
-	 * save memory allocated above. The save file will be created on exit. */
-	if(f == NULL)
+	/* 0x13 (B + Right) */
+	case 3:
 	{
-		memset(*dest, 0xFF, len);
-		return;
+		const uint16_t palette[3][4] = {
+			{ 0x0000, 0x0210, 0x7F60, 0x7FFF },
+			{ 0x0000, 0x0210, 0x7F60, 0x7FFF },
+			{ 0x0000, 0x0210, 0x7F60, 0x7FFF }
+		};
+		memcpy(priv->selected_palette, palette, palette_bytes);
+		break;
 	}
-
-	/* Read save file to allocated memory. */
-	fread(*dest, sizeof(uint8_t), len, f);
-	fclose(f);
-}
-
-void write_cart_ram_file(const char *save_file_name, uint8_t **dest,
-		const size_t len)
-{
-	FILE *f;
-
-	if(len == 0 || *dest == NULL)
-		return;
-
-	if((f = fopen(save_file_name, "wb")) == NULL)
+	/* 0x16 (B + Left, DMG Palette) */
+	default:
+	case 4:
 	{
-		puts("Unable to open save file.");
-		printf("%d: %s\n", __LINE__, strerror(errno));
-		exit(EXIT_FAILURE);
+		const uint16_t palette[3][4] = {
+			{ 0x7FFF, 0x5294, 0x294A, 0x0000 },
+			{ 0x7FFF, 0x5294, 0x294A, 0x0000 },
+			{ 0x7FFF, 0x5294, 0x294A, 0x0000 }
+		};
+		memcpy(priv->selected_palette, palette, palette_bytes);
+		break;
 	}
-
-	/* Record save file. */
-	fwrite(*dest, sizeof(uint8_t), len, f);
-	fclose(f);
-}
-
-/**
- * Handles an error reported by the emulator. The emulator context may be used
- * to better understand why the error given in gb_err was reported.
- */
-void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
-{
-	struct priv_t *priv = gb->priv;
-
-	switch(gb_err)
+	/* 0x17 (Down) */
+	case 5:
 	{
-		case GB_INVALID_OPCODE:
-			/* We compensate for the post-increment in the __gb_step_cpu
-			 * function. */
-			fprintf(stdout, "Invalid opcode %#04x at PC: %#06x, SP: %#06x\n",
-					val,
-					gb->cpu_reg.pc - 1,
-					gb->cpu_reg.sp);
-			break;
-
-			/* Ignoring non fatal errors. */
-		case GB_INVALID_WRITE:
-		case GB_INVALID_READ:
-			return;
-
-		default:
-			printf("Unknown error");
-			break;
+		const uint16_t palette[3][4] = {
+			{ 0x7FF4, 0x7E52, 0x4A5F, 0x0000 },
+			{ 0x7FF4, 0x7E52, 0x4A5F, 0x0000 },
+			{ 0x7FF4, 0x7E52, 0x4A5F, 0x0000 }
+		};
+		memcpy(priv->selected_palette, palette, palette_bytes);
+		break;
 	}
-
-	fprintf(stderr, "Error. Press q to exit, or any other key to continue.");
-	if(getchar() == 'q')
+	/* 0x19 (B + Up) */
+	case 6:
 	{
-		/* Record save file. */
-		write_cart_ram_file("recovery.sav", &priv->cart_ram,
-				gb_get_save_size(gb));
-
-		free(priv->rom);
-		free(priv->cart_ram);
-		exit(EXIT_FAILURE);
+		const uint16_t palette[3][4] = {
+			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 },
+			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 },
+			{ 0x7F98, 0x6670, 0x41A5, 0x2CC1 }
+		};
+		memcpy(priv->selected_palette, palette, palette_bytes);
+		break;
+	}
+	/* 0x1C (A + Right) */
+	case 7:
+	{
+		const uint16_t palette[3][4] = {
+			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 },
+			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 },
+			{ 0x7FFF, 0x3FE6, 0x0198, 0x0000 }
+		};
+		memcpy(priv->selected_palette, palette, palette_bytes);
+		break;
+	}
+	/* 0x0D (A + Left) */
+	case 8:
+	{
+		const uint16_t palette[3][4] = {
+			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 },
+			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 },
+			{ 0x7FFF, 0x463B, 0x2951, 0x0000 }
+		};
+		memcpy(priv->selected_palette, palette, palette_bytes);
+		break;
+	}
+	/* 0x10 (A + Up) */
+	case 9:
+	{
+		const uint16_t palette[3][4] = {
+			{ 0x7FFF, 0x3FE6, 0x0200, 0x0000 },
+			{ 0x7FFF, 0x329F, 0x001F, 0x0000 },
+			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }
+		};
+		memcpy(priv->selected_palette, palette, palette_bytes);
+		break;
+	}
+	/* 0x18 (Left) */
+	case 10:
+	{
+		const uint16_t palette[3][4] = {
+			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 },
+			{ 0x7FFF, 0x3FE6, 0x0200, 0x0000 },
+			{ 0x7FFF, 0x329F, 0x001F, 0x0000 }
+		};
+		memcpy(priv->selected_palette, palette, palette_bytes);
+		break;
+	}
+	/* 0x1A (B + Down) */
+	case 11:
+	{
+		const uint16_t palette[3][4] = {
+			{ 0x7FFF, 0x329F, 0x001F, 0x0000 },
+			{ 0x7FFF, 0x3FE6, 0x0200, 0x0000 },
+			{ 0x7FFF, 0x7FE0, 0x3D20, 0x0000 }
+		};
+		memcpy(priv->selected_palette, palette, palette_bytes);
+		break;
+	}
 	}
 
 	return;
@@ -373,30 +516,13 @@ void lcd_draw_line(struct gb_t *gb, const uint8_t pixels[160],
 		const uint_least8_t line)
 {
 	struct priv_t *priv = gb->priv;
-#if ENABLE_CGB_PALETTES
+
 	for (unsigned int x = 0; x < LCD_WIDTH; x++)
 	{
 		priv->fb[line][x] = priv->selected_palette
 				[(pixels[x] & LCD_PALETTE_ALL) >> 4]
 				[pixels[x] & 3];
 	}
-#else
-#define MAX_PALETTE 6
-	const uint16_t palette[MAX_PALETTE][4] =
-	{					/* CGB Palette Entry (Notes) */
-		{ 0x7FFF, 0x2BE0, 0x7D00, 0x0000 }, /* 0x05 */
-		{ 0x7FFF, 0x7FE0, 0x7C00, 0x0000 }, /* 0x07 */
-		{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 }, /* 0x12 */
-		{ 0x0000, 0x0210, 0x7F60, 0x7FFF }, /* 0x13 */
-		{ 0x7FFF, 0x5294, 0x294A, 0x0000 }, /* 0x16 (DMG, Default) */
-		{ 0x7FF4, 0x7E52, 0x4A5F, 0x0000 }  /* 0x17 */
-		/* Entries with different palettes for BG, OBJ0 & OBJ1 are not
-		 * yet supported. */
-	};
-
-	for (unsigned int x = 0; x < LCD_WIDTH; x++)
-		priv->fb[line][x] = palette[priv->selected_palette][pixels[x] & 3];
-#endif
 }
 
 int main(int argc, char **argv)
@@ -616,16 +742,13 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-#if ENABLE_CGB_PALETTES
 	auto_assign_palette(&priv, gb_colour_hash(&gb));
-#else
-	priv.selected_palette = 4;
-#endif
 
 	while(running)
 	{
 		int delay;
 		static unsigned int rtc_timer = 0;
+		static unsigned int selected_palette = 4;
 
 		/* Calculate the time taken to draw frame, then later add a
 		 * delay to cap at 60 fps. */
@@ -698,12 +821,17 @@ int main(int argc, char **argv)
 						case SDLK_3: fast_mode = 3; break;
 						case SDLK_4: fast_mode = 4; break;
 						case SDLK_r: gb_reset(&gb); break;
-#if !ENABLE_CGB_PALETTES
 						case SDLK_p:
-							if(++(priv.selected_palette) == MAX_PALETTE)
-								priv.selected_palette = 0;
+							if(event.key.keysym.mod == KMOD_LSHIFT)
+							{
+							auto_assign_palette(&priv, gb_colour_hash(&gb));
 							break;
-#endif
+							}
+							if(++selected_palette == NUMBER_OF_PALETTES)
+								selected_palette = 0;
+
+							manual_assign_palette(&priv, selected_palette);
+							break;
 					}
 					break;
 
