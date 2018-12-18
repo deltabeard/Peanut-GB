@@ -54,6 +54,7 @@ use a file picker native to your running operating system to select the ROM.
 | Turbo X4 (Toggle) | 4          |
 | Reset             | r          |
 | Change Palette    | p          |
+| Reset Palette     | Shift + p  |
 | Fullscreen        | F11        |
 
 ## License
