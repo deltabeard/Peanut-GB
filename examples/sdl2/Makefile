@@ -40,17 +40,25 @@ ifeq ($(STATIC),yes)
 else
 	SDL2_LDLIBS = $(shell sdl2-config --libs)
 endif
-
 LDLIBS += $(SDL2_LDLIBS)
 
+# Enable sound by default
+SOUND ?= yes
+ifeq ($(SOUND),yes)
+	SOUND_OBJECTS = gb_apu/audio.o gb_apu/Basic_Gb_Apu.o \
+			gb_apu/Blip_Buffer.o gb_apu/Gb_Apu.o gb_apu/Gb_Oscs.o \
+			gb_apu/Multi_Buffer.o
+	# Enable sound support definitions within peanut_gb and peanut_sdl
+	CFLAGS += -D ENABLE_SOUND
+endif
+
 all: peanut-sdl
-peanut-sdl: peanut_sdl.o gb_apu/audio.o gb_apu/Basic_Gb_Apu.o \
-	gb_apu/Blip_Buffer.o gb_apu/Gb_Apu.o gb_apu/Gb_Oscs.o \
-	gb_apu/Multi_Buffer.o $(FILE_GUI_LIB)
+peanut-sdl: peanut_sdl.o $(SOUND_OBJECTS) $(FILE_GUI_LIB)
 	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) 
 peanut_sdl.o: sdl2_check peanut_sdl.c ../../peanut_gb.h \
 	nativefiledialog/src/include/nfd.h
 
+# Sound objects that are compiled when sound output is enabled.
 gb_apu/audio.o: gb_apu/audio.cpp gb_apu/audio.h gb_apu/Basic_Gb_Apu.h \
 	gb_apu/Gb_Apu.h gb_apu/Gb_Oscs.h gb_apu/Blip_Buffer.h \
 	gb_apu/blargg_common.h gb_apu/boost/config.hpp \
@@ -94,6 +102,7 @@ clean:
 help:
 	@echo Options:
 	@echo STATIC=yes	Enable static build. Default on Windows.
+	@echo SOUND=yes		Enable sound output using Gb_Snd_Emu. Default.
 
 .SUFFIXES: .c .cpp .o
 .c.o:

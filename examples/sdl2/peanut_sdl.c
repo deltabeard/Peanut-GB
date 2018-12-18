@@ -15,8 +15,6 @@
 
 #include <SDL2/SDL.h>
 
-#define ENABLE_SOUND 1
-
 #if ENABLE_SOUND
 #include "gb_apu/audio.h"
 #endif
@@ -536,7 +534,7 @@ int main(int argc, char **argv)
 	SDL_Renderer *renderer;
 	SDL_Texture *texture;
 	SDL_Event event;
-	SDL_Joystick *joystick;
+	SDL_GameController *controller = NULL;
 	uint32_t new_ticks, old_ticks;
 	enum gb_init_error_e ret;
 	unsigned int fast_mode = 1;
@@ -677,7 +675,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Initialise frontend implementation, in this case, SDL2. */
-	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK | SDL_INIT_AUDIO) < 0)
+	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO) < 0)
 	{
 		printf("Could not initialise SDL: %s\n", SDL_GetError());
 		return EXIT_FAILURE;
@@ -692,10 +690,30 @@ int main(int argc, char **argv)
 	/* Allow the joystick input even if game is in background. */
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
 
-	/* If joystick is connected, attempt to use it. */
-	joystick = SDL_JoystickOpen(0);
-	if(joystick)
-		printf("Joystick %s connected.\n", SDL_JoystickNameForIndex(0));
+	if(SDL_GameControllerAddMappingsFromFile("gamecontrollerdb.txt") < 0)
+	{
+		printf("Unable to assign joystick mappings: %s\n",
+				SDL_GetError());
+	}
+
+	/* Open the first available controller. */
+	for (int i = 0; i < SDL_NumJoysticks(); ++i)
+	{
+		if (SDL_IsGameController(i))
+		{
+			controller = SDL_GameControllerOpen(i);
+			if (controller)
+			{
+				printf("Game Controller %s connected.\n",
+						SDL_GameControllerName(controller));
+				break;
+			}
+			else
+			{
+				printf("Could not open gamecontroller %i: %s\n", i, SDL_GetError());
+			}
+		}
+	}
 
 	window = SDL_CreateWindow("Peanut-sdl",
 			SDL_WINDOWPOS_UNDEFINED,
@@ -757,50 +775,26 @@ int main(int argc, char **argv)
 		/* Get joypad input. */
 		while(SDL_PollEvent(&event))
 		{
-			if(event.key.repeat)
-				break;
-
 			switch(event.type)
 			{
 				case SDL_QUIT:
 					running = 0;
 					break;
 
-				case SDL_JOYHATMOTION:
-					/* Reset axis when joypad hat position changed. */
-					gb.joypad_bits.up = 1;
-					gb.joypad_bits.right = 1;
-					gb.joypad_bits.down = 1;
-					gb.joypad_bits.left = 1;
-
-					switch(event.jhat.value)
+				case SDL_CONTROLLERBUTTONDOWN:
+				case SDL_CONTROLLERBUTTONUP:
+					printf("Button %s\n",
+							SDL_GameControllerGetStringForButton(event.jbutton.button));
+					switch(event.cbutton.button)
 					{
-						/* TODO: Diagonal cases. */
-						case SDL_HAT_UP: gb.joypad_bits.up = 0; break;
-						case SDL_HAT_RIGHT: gb.joypad_bits.right = 0; break;
-						case SDL_HAT_DOWN: gb.joypad_bits.down = 0; break;
-						case SDL_HAT_LEFT: gb.joypad_bits.left = 0; break;
-					}
-					break;
-
-				case SDL_JOYBUTTONDOWN:
-					switch(event.jbutton.button)
-					{
-						/* Button mappings I use for X-Box 360 controller. */
-						case 0: gb.joypad_bits.a = 0; break;
-						case 1: gb.joypad_bits.b = 0; break;
-						case 6: gb.joypad_bits.select = 0; break;
-						case 7: gb.joypad_bits.start = 0; break;
-					}
-					break;
-
-				case SDL_JOYBUTTONUP:
-					switch(event.jbutton.button)
-					{
-						case 0: gb.joypad_bits.a = 1; break;
-						case 1: gb.joypad_bits.b = 1; break;
-						case 6: gb.joypad_bits.select = 1; break;
-						case 7: gb.joypad_bits.start = 1; break;
+						case SDL_CONTROLLER_BUTTON_A: gb.joypad_bits.a = !event.cbutton.state; break;
+						case SDL_CONTROLLER_BUTTON_B: gb.joypad_bits.b = !event.cbutton.state; break;
+						case SDL_CONTROLLER_BUTTON_BACK: gb.joypad_bits.select = !event.cbutton.state; break;
+						case SDL_CONTROLLER_BUTTON_START: gb.joypad_bits.start = !event.cbutton.state; break;
+						case SDL_CONTROLLER_BUTTON_DPAD_UP: gb.joypad_bits.up = !event.cbutton.state; break;
+						case SDL_CONTROLLER_BUTTON_DPAD_RIGHT: gb.joypad_bits.right = !event.cbutton.state; break;
+						case SDL_CONTROLLER_BUTTON_DPAD_DOWN: gb.joypad_bits.down = !event.cbutton.state; break;
+						case SDL_CONTROLLER_BUTTON_DPAD_LEFT: gb.joypad_bits.left = !event.cbutton.state; break;
 					}
 					break;
 
@@ -978,7 +972,7 @@ int main(int argc, char **argv)
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 	SDL_DestroyTexture(texture);
-	SDL_JoystickClose(joystick);
+	SDL_GameControllerClose(controller);
 	SDL_Quit();
 #if ENABLE_SOUND
 	audio_cleanup();
