@@ -783,8 +783,6 @@ int main(int argc, char **argv)
 
 				case SDL_CONTROLLERBUTTONDOWN:
 				case SDL_CONTROLLERBUTTONUP:
-					printf("Button %s\n",
-							SDL_GameControllerGetStringForButton(event.jbutton.button));
 					switch(event.cbutton.button)
 					{
 						case SDL_CONTROLLER_BUTTON_A: gb.joypad_bits.a = !event.cbutton.state; break;
