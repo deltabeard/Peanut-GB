@@ -1075,7 +1075,6 @@ void __gb_execute_cb(struct gb_t *gb)
 void __gb_draw_line(struct gb_t *gb)
 {
 	uint8_t pixels[160] = {0};
-	uint8_t fx[160] = {0xFF};
 
 	/* If LCD not initialised by front-end, don't render anything. */
 	if(gb->display.lcd_draw_line == NULL)
@@ -1128,7 +1127,6 @@ void __gb_draw_line(struct gb_t *gb)
 
 		for (; disp_x != 0xFF; disp_x--)
 		{
-			fx[disp_x] = 0xFE;
 			if (px == 8)
 			{
 				/* fetch next tile */
@@ -1189,7 +1187,6 @@ void __gb_draw_line(struct gb_t *gb)
 
 		for (; disp_x != end; disp_x--)
 		{
-			fx[disp_x] = 0xFE;
 			if (px == 8)
 			{
 				// fetch next tile
@@ -1221,8 +1218,9 @@ void __gb_draw_line(struct gb_t *gb)
 	if (gb->gb_reg.LCDC & LCDC_OBJ_ENABLE)
 	{
 		uint8_t count = 0;
-		for(uint8_t s = NUM_SPRITES - 1; s != 0xFF; s--)
-		//for (uint8_t s = 0; s < NUM_SPRITES && count < MAX_SPRITES_LINE; s++)
+		for(uint8_t s = NUM_SPRITES - 1;
+				s != 0xFF /* && count < MAX_SPRITES_LINE */ ;
+				s--)
 		{
 			/* Sprite Y position. */
 			uint8_t OY = gb->oam[4*s + 0];
@@ -1281,18 +1279,17 @@ void __gb_draw_line(struct gb_t *gb)
 			{
 				uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
 				// check transparency / sprite overlap / background overlap
-#if 1
-				if (c && OX <= fx[disp_x]
+#if 0
+				if (c
+					//	&& OX <= fx[disp_x]
 						&& !((OF & OBJ_PRIORITY)
 						&& ((pixels[disp_x] & 0x3)
 						&& fx[disp_x] == 0xFE)))
 #else
-				if (c && OX <= fx[disp_x]
-						&& !(OF & OBJ_PRIORITY
-						&& fx[disp_x] & 0x3))
+				if (c && !(OF & OBJ_PRIORITY
+						&& pixels[disp_x] & 0x3))
 #endif
 				{
-					fx[disp_x] = OX;
 					/* Set pixel colour. */
 					pixels[disp_x] = (OF & OBJ_PALETTE)
 						? gb->display.sp_palette[c + 4]
