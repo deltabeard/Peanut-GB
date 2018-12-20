@@ -310,6 +310,17 @@ enum gb_init_error_e
 	GB_INIT_INVALID_CHECKSUM
 };
 
+enum gb_lcd_interlace_e {
+	/* Turn off interlaced mode. */
+	GB_LCD_INTERLACE_OFF,
+	/* Draw every other line. */
+	GB_LCD_INTERLACE_2,
+	/* Draw every three lines. */
+	GB_LCD_INTERLACE_3,
+	/* Draw every four lines. */
+	GB_LCD_INTERLACE_4
+};
+
 /**
  * Emulator context.
  */
@@ -458,6 +469,9 @@ struct gb_t
 
 		uint8_t window_clear;
 		uint8_t WY; // FIXME: Check requirement
+
+		uint_least8_t interlace;
+		uint_least8_t interlace_count;
 	} display;
 
 #if INTERNAL_AUDIO
@@ -1079,6 +1093,23 @@ void __gb_draw_line(struct gb_t *gb)
 	/* If LCD not initialised by front-end, don't render anything. */
 	if(gb->display.lcd_draw_line == NULL)
 		return;
+
+	if(gb->display.interlace != GB_LCD_INTERLACE_OFF)
+	{
+		if((gb->display.interlace_count == 0
+					&& (gb->gb_reg.LY & 1) == 0)
+				|| (gb->display.interlace_count == 1
+					&& (gb->gb_reg.LY & 1) == 1))
+		{
+			/* Compensate for missing window draw if required. */
+			if(gb->gb_reg.LCDC & LCDC_WINDOW_ENABLE
+					&& gb->gb_reg.LY >= gb->display.WY
+					&& gb->gb_reg.WX <= 166)
+				gb->display.window_clear++; // advance window line
+
+			return;
+		}
+	}
 
 	/* If background is enabled, draw it. */
 	if(gb->gb_reg.LCDC & LCDC_BG_ENABLE)
@@ -2995,6 +3026,12 @@ void __gb_step_cpu(struct gb_t *gb)
 			gb->gb_reg.IF |= VBLANK_INTR;
 			if(gb->gb_reg.STAT & STAT_MODE_1_INTR)
 				gb->gb_reg.IF |= LCDC_INTR;
+
+#if ENABLE_LCD
+			/* Interlace code */
+			if(gb->display.interlace != GB_LCD_INTERLACE_OFF)
+				gb->display.interlace_count = !gb->display.interlace_count;
+#endif
 		}
 		/* Normal Line */
 		else if(gb->gb_reg.LY < LCD_HEIGHT)
@@ -3023,7 +3060,6 @@ void __gb_step_cpu(struct gb_t *gb)
 	else if(gb->lcd_mode == LCD_SEARCH_OAM && gb->counter.lcd_count >= LCD_MODE_3_CYCLES)
 	{
 		gb->lcd_mode = LCD_TRANSFER;
-		/* TODO: LCD_DRAW_LINE(); */
 #if ENABLE_LCD
 		__gb_draw_line(gb);
 #endif
@@ -3198,7 +3234,15 @@ void gb_init_lcd(struct gb_t *gb,
 				const uint_least8_t line))
 {
 	gb->display.lcd_draw_line = lcd_draw_line;
+	gb->display.interlace = GB_LCD_INTERLACE_OFF;
+	gb->display.interlace_count = 0;
 
+	return;
+}
+
+void gb_lcd_interlace(struct gb_t *gb, enum gb_lcd_interlace_e opt)
+{
+	gb->display.interlace = opt;
 	return;
 }
 #endif

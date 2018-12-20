@@ -726,7 +726,8 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
+	renderer = SDL_CreateRenderer(window, -1,
+			SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
 	if(renderer == NULL)
 	{
 		printf("Could not create renderer: %s\n", SDL_GetError());
@@ -752,7 +753,7 @@ int main(int argc, char **argv)
 
 	texture = SDL_CreateTexture(renderer,
 			SDL_PIXELFORMAT_RGB555,
-			SDL_TEXTUREACCESS_STREAMING,
+			SDL_TEXTUREACCESS_STATIC,
 			LCD_WIDTH, LCD_HEIGHT);
 	if(texture == NULL)
 	{
@@ -813,6 +814,9 @@ int main(int argc, char **argv)
 						case SDLK_3: fast_mode = 3; break;
 						case SDLK_4: fast_mode = 4; break;
 						case SDLK_r: gb_reset(&gb); break;
+						case SDLK_i:
+							     gb_lcd_interlace(&gb, GB_LCD_INTERLACE_2);
+							     break;
 						case SDLK_p:
 							if(event.key.keysym.mod == KMOD_LSHIFT)
 							{
