@@ -52,6 +52,14 @@ ifeq ($(SOUND),yes)
 	CFLAGS += -D ENABLE_SOUND
 endif
 
+# Enable LCD by default
+LCD ?= yes
+ifeq ($(LCD),yes)
+	CFLAGS += -D ENABLE_LCD=1
+else
+	CFLAGS += -D ENABLE_LCD=0
+endif
+
 all: peanut-sdl
 peanut-sdl: peanut_sdl.o $(SOUND_OBJECTS) $(FILE_GUI_LIB)
 	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) 

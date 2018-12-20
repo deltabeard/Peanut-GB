@@ -507,6 +507,7 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 	return;
 }
 
+#if ENABLE_LCD
 /**
  * Draws scanline into framebuffer.
  */
@@ -522,6 +523,7 @@ void lcd_draw_line(struct gb_t *gb, const uint8_t pixels[160],
 				[pixels[x] & 3];
 	}
 }
+#endif
 
 int main(int argc, char **argv)
 {
@@ -685,7 +687,9 @@ int main(int argc, char **argv)
 	SDL_AudioDeviceID dev;
 	audio_init(&dev);
 #endif
+#if ENABLE_LCD
 	gb_init_lcd(&gb, &lcd_draw_line);
+#endif
 
 	/* Allow the joystick input even if game is in background. */
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
@@ -814,9 +818,11 @@ int main(int argc, char **argv)
 						case SDLK_3: fast_mode = 3; break;
 						case SDLK_4: fast_mode = 4; break;
 						case SDLK_r: gb_reset(&gb); break;
+#if ENABLE_LCD
 						case SDLK_i:
 							     gb_lcd_interlace(&gb, GB_LCD_INTERLACE_2);
 							     break;
+#endif
 						case SDLK_p:
 							if(event.key.keysym.mod == KMOD_LSHIFT)
 							{
@@ -894,11 +900,13 @@ int main(int argc, char **argv)
 		audio_frame();
 #endif
 
+#if ENABLE_LCD
 		/* Copy frame buffer to SDL screen. */
 		SDL_UpdateTexture(texture, NULL, &priv.fb, LCD_WIDTH * sizeof(uint16_t));
 		SDL_RenderClear(renderer);
 		SDL_RenderCopy(renderer, texture, NULL, NULL);
 		SDL_RenderPresent(renderer);
+#endif
 
 		/* Use a delay that will draw the screen at a rate of 59.7275 Hz. */
 		new_ticks = SDL_GetTicks();
