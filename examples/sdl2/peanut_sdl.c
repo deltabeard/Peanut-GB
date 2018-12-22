@@ -817,7 +817,7 @@ int main(int argc, char **argv)
 						case SDLK_r: gb_reset(&gb); break;
 #if ENABLE_LCD
 						case SDLK_i:
-							     gb_lcd_interlace(&gb, GB_LCD_INTERLACE_2);
+							     gb.display.interlace = ~gb.display.interlace;
 							     break;
 #endif
 						case SDLK_p:

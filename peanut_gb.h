@@ -310,17 +310,6 @@ enum gb_init_error_e
 	GB_INIT_INVALID_CHECKSUM
 };
 
-enum gb_lcd_interlace_e {
-	/* Turn off interlaced mode. */
-	GB_LCD_INTERLACE_OFF,
-	/* Draw every other line. */
-	GB_LCD_INTERLACE_2,
-	/* Draw every three lines. */
-	GB_LCD_INTERLACE_3,
-	/* Draw every four lines. */
-	GB_LCD_INTERLACE_4
-};
-
 /**
  * Emulator context.
  */
@@ -1094,7 +1083,7 @@ void __gb_draw_line(struct gb_t *gb)
 	if(gb->display.lcd_draw_line == NULL)
 		return;
 
-	if(gb->display.interlace != GB_LCD_INTERLACE_OFF)
+	if(gb->display.interlace)
 	{
 		if((gb->display.interlace_count == 0
 					&& (gb->gb_reg.LY & 1) == 0)
@@ -1105,7 +1094,7 @@ void __gb_draw_line(struct gb_t *gb)
 			if(gb->gb_reg.LCDC & LCDC_WINDOW_ENABLE
 					&& gb->gb_reg.LY >= gb->display.WY
 					&& gb->gb_reg.WX <= 166)
-				gb->display.window_clear++; // advance window line
+				gb->display.window_clear++;
 
 			return;
 		}
@@ -3029,7 +3018,7 @@ void __gb_step_cpu(struct gb_t *gb)
 
 #if ENABLE_LCD
 			/* Interlace code */
-			if(gb->display.interlace != GB_LCD_INTERLACE_OFF)
+			if(gb->display.interlace)
 				gb->display.interlace_count = !gb->display.interlace_count;
 #endif
 		}
@@ -3234,15 +3223,9 @@ void gb_init_lcd(struct gb_t *gb,
 				const uint_least8_t line))
 {
 	gb->display.lcd_draw_line = lcd_draw_line;
-	gb->display.interlace = GB_LCD_INTERLACE_OFF;
+	gb->display.interlace = 0;
 	gb->display.interlace_count = 0;
 
-	return;
-}
-
-void gb_lcd_interlace(struct gb_t *gb, enum gb_lcd_interlace_e opt)
-{
-	gb->display.interlace = opt;
 	return;
 }
 #endif
