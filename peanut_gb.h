@@ -312,6 +312,9 @@ enum gb_init_error_e
 
 /**
  * Emulator context.
+ *
+ * Only values within the `direct` struct may be modified directly by the
+ * front-end implementation. Other variables must not be modified.
  */
 struct gb_t
 {
@@ -354,9 +357,6 @@ struct gb_t
 
 	/* Transmit one byte and return the received byte. */
 	uint8_t (*gb_serial_transfer)(struct gb_t*, const uint8_t);
-
-	/* Implementation defined data. Set to NULL if not required. */
-	void *priv;
 
 	struct
 	{
@@ -406,22 +406,6 @@ struct gb_t
 	struct gb_registers_t gb_reg;
 	struct count_t counter;
 
-	union
-	{
-		struct
-		{
-			unsigned int a		: 1;
-			unsigned int b		: 1;
-			unsigned int select	: 1;
-			unsigned int start	: 1;
-			unsigned int right	: 1;
-			unsigned int left	: 1;
-			unsigned int up		: 1;
-			unsigned int down	: 1;
-		} joypad_bits;
-		uint8_t joypad;
-	};
-
 	/* TODO: Allow implementation to allocate WRAM, VRAM and Frame Buffer. */
 	uint8_t wram[WRAM_SIZE];
 	uint8_t vram[VRAM_SIZE];
@@ -459,7 +443,6 @@ struct gb_t
 		uint8_t window_clear;
 		uint8_t WY; // FIXME: Check requirement
 
-		uint_least8_t interlace;
 		uint_least8_t interlace_count;
 	} display;
 
@@ -467,6 +450,40 @@ struct gb_t
 	/* Audio */
 	struct audio_t audio;
 #endif
+
+	/**
+	 * Variables that may be modified directly by the front-end.
+	 * This method seems to be easier and possibly less overhead than
+	 * calling a function to modify these variables each time.
+	 *
+	 * None of this is thread-safe.
+	 */
+	struct
+	{
+		/* Set to enable interlacing. Interlacing will start immediately
+		 * (at the next line drawing).
+		 */
+		unsigned int interlace : 1;
+
+		union
+		{
+			struct
+			{
+				unsigned int a		: 1;
+				unsigned int b		: 1;
+				unsigned int select	: 1;
+				unsigned int start	: 1;
+				unsigned int right	: 1;
+				unsigned int left	: 1;
+				unsigned int up		: 1;
+				unsigned int down	: 1;
+			} joypad_bits;
+			uint8_t joypad;
+		};
+
+		/* Implementation defined data. Set to NULL if not required. */
+		void *priv;
+	} direct;
 };
 
 /**
@@ -788,10 +805,10 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 
 					/* Direction keys selected */
 					if((gb->gb_reg.P1 & 0b010000) == 0)
-						gb->gb_reg.P1 |= (gb->joypad >> 4);
+						gb->gb_reg.P1 |= (gb->direct.joypad >> 4);
 					/* Button keys selected */
 					else
-						gb->gb_reg.P1 |= (gb->joypad & 0x0F);
+						gb->gb_reg.P1 |= (gb->direct.joypad & 0x0F);
 					return;
 
 							/* Serial */
@@ -946,7 +963,7 @@ void gb_reset(struct gb_t *gb)
 	gb->gb_reg.WX        = 0x00;
 	gb->gb_reg.IE        = 0x00;
 
-	gb->joypad = 0xFF;
+	gb->direct.joypad = 0xFF;
 	gb->gb_reg.P1 = 0xCF;
 }
 
@@ -1083,7 +1100,7 @@ void __gb_draw_line(struct gb_t *gb)
 	if(gb->display.lcd_draw_line == NULL)
 		return;
 
-	if(gb->display.interlace)
+	if(gb->direct.interlace)
 	{
 		if((gb->display.interlace_count == 0
 					&& (gb->gb_reg.LY & 1) == 0)
@@ -3018,7 +3035,7 @@ void __gb_step_cpu(struct gb_t *gb)
 
 #if ENABLE_LCD
 			/* Interlace code */
-			if(gb->display.interlace)
+			if(gb->direct.interlace)
 				gb->display.interlace_count = !gb->display.interlace_count;
 #endif
 		}
@@ -3145,7 +3162,7 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 	gb->gb_cart_ram_read = gb_cart_ram_read;
 	gb->gb_cart_ram_write = gb_cart_ram_write;
 	gb->gb_error = gb_error;
-	gb->priv = priv;
+	gb->direct.priv = priv;
 
 	/* Initialise serial transfer function to NULL. If the front-end does not
 	 * provide serial support, peanut-gb will emulate no cable connected
@@ -3223,7 +3240,7 @@ void gb_init_lcd(struct gb_t *gb,
 				const uint_least8_t line))
 {
 	gb->display.lcd_draw_line = lcd_draw_line;
-	gb->display.interlace = 0;
+	gb->direct.interlace = 0;
 	gb->display.interlace_count = 0;
 
 	return;

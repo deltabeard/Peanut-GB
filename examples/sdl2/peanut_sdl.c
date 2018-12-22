@@ -40,7 +40,7 @@ struct priv_t
  */
 uint8_t gb_rom_read(struct gb_t *gb, const uint32_t addr)
 {
-	const struct priv_t * const p = gb->priv;
+	const struct priv_t * const p = gb->direct.priv;
 	return p->rom[addr];
 }
 
@@ -49,7 +49,7 @@ uint8_t gb_rom_read(struct gb_t *gb, const uint32_t addr)
  */
 uint8_t gb_cart_ram_read(struct gb_t *gb, const uint32_t addr)
 {
-	const struct priv_t * const p = gb->priv;
+	const struct priv_t * const p = gb->direct.priv;
 	return p->cart_ram[addr];
 }
 
@@ -59,7 +59,7 @@ uint8_t gb_cart_ram_read(struct gb_t *gb, const uint32_t addr)
 void gb_cart_ram_write(struct gb_t *gb, const uint32_t addr,
 		const uint8_t val)
 {
-	const struct priv_t * const p = gb->priv;
+	const struct priv_t * const p = gb->direct.priv;
 	p->cart_ram[addr] = val;
 }
 
@@ -151,7 +151,7 @@ void write_cart_ram_file(const char *save_file_name, uint8_t **dest,
  */
 void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 {
-	struct priv_t *priv = gb->priv;
+	struct priv_t *priv = gb->direct.priv;
 
 	switch(gb_err)
 	{
@@ -511,7 +511,7 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 void lcd_draw_line(struct gb_t *gb, const uint8_t pixels[160],
 		const uint_least8_t line)
 {
-	struct priv_t *priv = gb->priv;
+	struct priv_t *priv = gb->direct.priv;
 
 	for (unsigned int x = 0; x < LCD_WIDTH; x++)
 	{
@@ -787,28 +787,28 @@ int main(int argc, char **argv)
 				case SDL_CONTROLLERBUTTONUP:
 					switch(event.cbutton.button)
 					{
-						case SDL_CONTROLLER_BUTTON_A: gb.joypad_bits.a = !event.cbutton.state; break;
-						case SDL_CONTROLLER_BUTTON_B: gb.joypad_bits.b = !event.cbutton.state; break;
-						case SDL_CONTROLLER_BUTTON_BACK: gb.joypad_bits.select = !event.cbutton.state; break;
-						case SDL_CONTROLLER_BUTTON_START: gb.joypad_bits.start = !event.cbutton.state; break;
-						case SDL_CONTROLLER_BUTTON_DPAD_UP: gb.joypad_bits.up = !event.cbutton.state; break;
-						case SDL_CONTROLLER_BUTTON_DPAD_RIGHT: gb.joypad_bits.right = !event.cbutton.state; break;
-						case SDL_CONTROLLER_BUTTON_DPAD_DOWN: gb.joypad_bits.down = !event.cbutton.state; break;
-						case SDL_CONTROLLER_BUTTON_DPAD_LEFT: gb.joypad_bits.left = !event.cbutton.state; break;
+						case SDL_CONTROLLER_BUTTON_A: gb.direct.joypad_bits.a = !event.cbutton.state; break;
+						case SDL_CONTROLLER_BUTTON_B: gb.direct.joypad_bits.b = !event.cbutton.state; break;
+						case SDL_CONTROLLER_BUTTON_BACK: gb.direct.joypad_bits.select = !event.cbutton.state; break;
+						case SDL_CONTROLLER_BUTTON_START: gb.direct.joypad_bits.start = !event.cbutton.state; break;
+						case SDL_CONTROLLER_BUTTON_DPAD_UP: gb.direct.joypad_bits.up = !event.cbutton.state; break;
+						case SDL_CONTROLLER_BUTTON_DPAD_RIGHT: gb.direct.joypad_bits.right = !event.cbutton.state; break;
+						case SDL_CONTROLLER_BUTTON_DPAD_DOWN: gb.direct.joypad_bits.down = !event.cbutton.state; break;
+						case SDL_CONTROLLER_BUTTON_DPAD_LEFT: gb.direct.joypad_bits.left = !event.cbutton.state; break;
 					}
 					break;
 
 				case SDL_KEYDOWN:
 					switch(event.key.keysym.sym)
 					{
-						case SDLK_RETURN: gb.joypad_bits.start = 0; break;
-						case SDLK_BACKSPACE: gb.joypad_bits.select = 0; break;
-						case SDLK_z: gb.joypad_bits.a = 0; break;
-						case SDLK_x: gb.joypad_bits.b = 0; break;
-						case SDLK_UP: gb.joypad_bits.up = 0; break;
-						case SDLK_RIGHT: gb.joypad_bits.right = 0; break;
-						case SDLK_DOWN: gb.joypad_bits.down = 0; break;
-						case SDLK_LEFT: gb.joypad_bits.left = 0; break;
+						case SDLK_RETURN: gb.direct.joypad_bits.start = 0; break;
+						case SDLK_BACKSPACE: gb.direct.joypad_bits.select = 0; break;
+						case SDLK_z: gb.direct.joypad_bits.a = 0; break;
+						case SDLK_x: gb.direct.joypad_bits.b = 0; break;
+						case SDLK_UP: gb.direct.joypad_bits.up = 0; break;
+						case SDLK_RIGHT: gb.direct.joypad_bits.right = 0; break;
+						case SDLK_DOWN: gb.direct.joypad_bits.down = 0; break;
+						case SDLK_LEFT: gb.direct.joypad_bits.left = 0; break;
 						case SDLK_SPACE: fast_mode = 2; break;
 						case SDLK_1: fast_mode = 1; break;
 						case SDLK_2: fast_mode = 2; break;
@@ -817,7 +817,7 @@ int main(int argc, char **argv)
 						case SDLK_r: gb_reset(&gb); break;
 #if ENABLE_LCD
 						case SDLK_i:
-							     gb.display.interlace = ~gb.display.interlace;
+							     gb.direct.interlace = ~gb.direct.interlace;
 							     break;
 #endif
 						case SDLK_p:
@@ -837,14 +837,14 @@ int main(int argc, char **argv)
 				case SDL_KEYUP:
 					switch(event.key.keysym.sym)
 					{
-						case SDLK_RETURN: gb.joypad_bits.start = 1; break;
-						case SDLK_BACKSPACE: gb.joypad_bits.select = 1; break;
-						case SDLK_z: gb.joypad_bits.a = 1; break;
-						case SDLK_x: gb.joypad_bits.b = 1; break;
-						case SDLK_UP: gb.joypad_bits.up = 1; break;
-						case SDLK_RIGHT: gb.joypad_bits.right = 1; break;
-						case SDLK_DOWN: gb.joypad_bits.down = 1; break;
-						case SDLK_LEFT: gb.joypad_bits.left = 1; break;
+						case SDLK_RETURN: gb.direct.joypad_bits.start = 1; break;
+						case SDLK_BACKSPACE: gb.direct.joypad_bits.select = 1; break;
+						case SDLK_z: gb.direct.joypad_bits.a = 1; break;
+						case SDLK_x: gb.direct.joypad_bits.b = 1; break;
+						case SDLK_UP: gb.direct.joypad_bits.up = 1; break;
+						case SDLK_RIGHT: gb.direct.joypad_bits.right = 1; break;
+						case SDLK_DOWN: gb.direct.joypad_bits.down = 1; break;
+						case SDLK_LEFT: gb.direct.joypad_bits.left = 1; break;
 						case SDLK_SPACE: fast_mode = 1; break;
 						case SDLK_F11:
 						{
