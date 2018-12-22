@@ -23,9 +23,6 @@
 
 #include "nativefiledialog/src/include/nfd.h"
 
-//#define debugprintf printf
-#define debugprintf(...)
-
 struct priv_t
 {
 	/* Pointer to allocated memory holding GB file. */
@@ -924,10 +921,6 @@ int main(int argc, char **argv)
 		/* We then subtract the actual delay value by the requested
 		 * delay value. */
 		speed_compensation -= delay;
-#if ENABLE_SOUND
-		debugprintf("delay: %d\t\tspeed_compensation: %f\t\taudio_len:%d",
-				delay, speed_compensation, audio_length());
-#endif
 
 		/* Only run delay logic if required. */
 		if(delay > 0)
@@ -974,8 +967,6 @@ int main(int argc, char **argv)
 			after_delay_ticks = SDL_GetTicks();
 			speed_compensation += (double)delay -
 				(int)(after_delay_ticks - delay_ticks);
-			debugprintf("\t\tspeed_compensation: %f\n",
-					speed_compensation);
 		}
 	}
 
