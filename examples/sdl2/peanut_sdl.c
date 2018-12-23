@@ -546,6 +546,7 @@ int main(int argc, char **argv)
 
 	switch(argc)
 	{
+#if ENABLE_FILE_GUI
 	case 1:
 		{
 			/* Invoke file picker */
@@ -564,6 +565,7 @@ int main(int argc, char **argv)
 			}
 		}
 		break;
+#endif
 
 	case 2:
 		/* Apply file name to rom_file_name
@@ -579,8 +581,12 @@ int main(int argc, char **argv)
 		break;
 
 	default:
+#if ENABLE_FILE_GUI
 		printf("Usage: %s [ROM] [SAVE]\n", argv[0]);
 		puts("A file picker is presented if ROM is not given.");
+#else
+		printf("Usage: %s ROM [SAVE]\n", argv[0]);
+#endif
 		puts("SAVE is set by default if not provided.");
 		return EXIT_FAILURE;
 	}
