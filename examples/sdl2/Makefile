@@ -1,6 +1,6 @@
 .POSIX:
 .SUFFIXES:
-OPTIMIZE_FLAG = -s -Ofast
+OPTIMIZE_FLAG = -g -Og
 SDL2_CFLAGS = $(shell sdl2-config --cflags)
 SDL2_LDLIBS =
 
@@ -52,6 +52,25 @@ ifeq ($(SOUND),yes)
 	CFLAGS += -D ENABLE_SOUND
 endif
 
+# Enable LCD by default
+LCD ?= yes
+ifeq ($(LCD),yes)
+	CFLAGS += -D ENABLE_LCD=1
+else
+	CFLAGS += -D ENABLE_LCD=0
+endif
+
+# Enable file picker GUI by default
+FILEGUI ?= yes
+ifeq ($(FILEGUI),yes)
+	# Object file defined above since it's platform independent.
+	CFLAGS += -D ENABLE_FILE_GUI
+else
+	# Reset lib path if we want to disable the file picker.
+	FILE_GUI_LIB =
+endif
+
+
 all: peanut-sdl
 peanut-sdl: peanut_sdl.o $(SOUND_OBJECTS) $(FILE_GUI_LIB)
 	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) 
@@ -101,8 +120,12 @@ clean:
 
 help:
 	@echo Options:
-	@echo STATIC=yes	Enable static build. Default on Windows.
-	@echo SOUND=yes		Enable sound output using Gb_Snd_Emu. Default.
+	@echo \ STATIC=yes\	Enable static build. Default on Windows.
+	@echo \ SOUND=yes\	Enable sound output using Gb_Snd_Emu. Default.
+	@echo \ FILEGUI=yes\	Enable graphical file picker. Default.
+	@echo
+	@echo Values other than \"yes\" will disable the option.
+	@echo
 
 .SUFFIXES: .c .cpp .o
 .c.o:

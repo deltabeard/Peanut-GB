@@ -23,8 +23,9 @@
  */
 
 #include <stdint.h>	/* Required for int types */
-#include <string.h>	/* Required for memset() */
 #include <time.h>	/* Required for tm struct */
+
+#include <assert.h>
 
 /* Enable sound support, including sound registers. Off by default due to no
  * implementation. */
@@ -36,6 +37,9 @@
 #ifndef ENABLE_LCD
 #define ENABLE_LCD 1
 #endif
+
+/* Disable incomplete audio implementation. */
+#define INTERNAL_AUDIO 0
 
 /* Interrupt masks */
 #define VBLANK_INTR		0x01
@@ -144,6 +148,8 @@
 #define OBJ_FLIP_X          0x20
 #define OBJ_PALETTE         0x10
 
+#define ROM_HEADER_CHECKSUM_LOC	0x014D
+
 #ifndef MIN
 #define MIN(a, b)   ((a) < (b) ? (a) : (b))
 #endif
@@ -204,6 +210,7 @@ struct count_t
 	uint16_t tima_count;	/* Timer Counter */
 	uint16_t serial_count;
 
+#if INTERNAL_AUDIO
 	uint16_t apu_len_count;	/* Length counter */
 	uint16_t apu_swp_count;	/* Sweep counter */
 	uint32_t apu_env_count;	/* Volume envelope counter */
@@ -217,6 +224,7 @@ struct count_t
 	/* Counts the number of samples in audio buffer. Audio is queued to the
 	 * front-end when the buffer is filled. */
 	uint16_t apu_buffer_count;
+#endif
 };
 
 struct gb_registers_t
@@ -251,6 +259,7 @@ struct gb_registers_t
 	uint8_t IE;
 };
 
+#if INTERNAL_AUDIO
 struct audio_t
 {
 	uint8_t *buffer;
@@ -259,6 +268,26 @@ struct audio_t
 	void (*queue_audio)(void *priv, const uint8_t * const buffer,
 			const unsigned int len);
 };
+#endif
+
+#if ENABLE_LCD
+/* Bit mask for the shade of pixel to display */
+#define LCD_COLOUR	0x03
+/**
+ * Bit mask for whether a pixel is OBJ0, OBJ1, or BG. Each may have a different
+ * palette when playing a DMG game on CGB.
+ */
+#define LCD_PALETTE_OBJ	0x10
+#define LCD_PALETTE_BG	0x20
+/**
+ * Bit mask for the two bits listed above.
+ * LCD_PALETTE_ALL == 0b00 --> OBJ0
+ * LCD_PALETTE_ALL == 0b01 --> OBJ1
+ * LCD_PALETTE_ALL == 0b10 --> BG
+ * LCD_PALETTE_ALL == 0b11 --> NOT POSSIBLE
+ */
+#define LCD_PALETTE_ALL 0x30
+#endif
 
 /**
  * Errors that may occur during emulation.
@@ -283,6 +312,9 @@ enum gb_init_error_e
 
 /**
  * Emulator context.
+ *
+ * Only values within the `direct` struct may be modified directly by the
+ * front-end implementation. Other variables must not be modified.
  */
 struct gb_t
 {
@@ -325,9 +357,6 @@ struct gb_t
 
 	/* Transmit one byte and return the received byte. */
 	uint8_t (*gb_serial_transfer)(struct gb_t*, const uint8_t);
-
-	/* Implementation defined data. Set to NULL if not required. */
-	void *priv;
 
 	struct
 	{
@@ -377,40 +406,84 @@ struct gb_t
 	struct gb_registers_t gb_reg;
 	struct count_t counter;
 
-	union
-	{
-		struct
-		{
-			unsigned int a		: 1;
-			unsigned int b		: 1;
-			unsigned int select	: 1;
-			unsigned int start	: 1;
-			unsigned int right	: 1;
-			unsigned int left	: 1;
-			unsigned int up		: 1;
-			unsigned int down	: 1;
-		} joypad_bits;
-		uint8_t joypad;
-	};
-
 	/* TODO: Allow implementation to allocate WRAM, VRAM and Frame Buffer. */
 	uint8_t wram[WRAM_SIZE];
 	uint8_t vram[VRAM_SIZE];
 	uint8_t hram[HRAM_SIZE];
 	uint8_t oam[OAM_SIZE];
 
-	/* Palettes */
-	uint8_t BGP[4];
-	uint8_t OBJP[8];
+	struct
+	{
+		/**
+		 * Draw line on screen.
+		 *
+		 * \param gb_t		emulator context
+		 * \param pixels	pixels to draw.
+		 * 			Bits 1-0 are the colour to draw.
+		 * 			Bits 5-4 are the palette, where:
+		 * 				OBJ0 = 0b00,
+		 * 				OBJ1 = 0b01,
+		 * 				BG = 0b10
+		 * 			Other bits are undefined.
+		 * 			Bits 5-4 are only required by front-ends
+		 * 			which want to use a different colour for
+		 * 			different object palettes. This is what
+		 * 			the Game Boy Color (CGB) does to DMG
+		 * 			games.
+		 * \param line		Line to draw pixels on. This is
+		 * guaranteed to be between 0-144 inclusive.
+		 */
+		void (*lcd_draw_line)(struct gb_t*, const uint8_t pixels[160],
+				const uint_least8_t line);
 
-	/* screen */
-	uint8_t gb_fb[LCD_HEIGHT][LCD_WIDTH];
-	/* TODO: Move this */
-	uint8_t WY;
-	uint8_t WYC;
+		/* Palettes */
+		uint8_t bg_palette[4];
+		uint8_t sp_palette[8];
 
+		uint8_t window_clear;
+		uint8_t WY; // FIXME: Check requirement
+
+		uint_least8_t interlace_count;
+	} display;
+
+#if INTERNAL_AUDIO
 	/* Audio */
 	struct audio_t audio;
+#endif
+
+	/**
+	 * Variables that may be modified directly by the front-end.
+	 * This method seems to be easier and possibly less overhead than
+	 * calling a function to modify these variables each time.
+	 *
+	 * None of this is thread-safe.
+	 */
+	struct
+	{
+		/* Set to enable interlacing. Interlacing will start immediately
+		 * (at the next line drawing).
+		 */
+		unsigned int interlace : 1;
+
+		union
+		{
+			struct
+			{
+				unsigned int a		: 1;
+				unsigned int b		: 1;
+				unsigned int select	: 1;
+				unsigned int start	: 1;
+				unsigned int right	: 1;
+				unsigned int left	: 1;
+				unsigned int up		: 1;
+				unsigned int down	: 1;
+			} joypad_bits;
+			uint8_t joypad;
+		};
+
+		/* Implementation defined data. Set to NULL if not required. */
+		void *priv;
+	} direct;
 };
 
 /**
@@ -732,10 +805,10 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 
 					/* Direction keys selected */
 					if((gb->gb_reg.P1 & 0b010000) == 0)
-						gb->gb_reg.P1 |= (gb->joypad >> 4);
+						gb->gb_reg.P1 |= (gb->direct.joypad >> 4);
 					/* Button keys selected */
 					else
-						gb->gb_reg.P1 |= (gb->joypad & 0x0F);
+						gb->gb_reg.P1 |= (gb->direct.joypad & 0x0F);
 					return;
 
 							/* Serial */
@@ -793,26 +866,26 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 						   /* DMG Palette Registers */
 				case 0x47:
 						   gb->gb_reg.BGP = val;
-						   gb->BGP[0] = (gb->gb_reg.BGP & 0x03);
-						   gb->BGP[1] = (gb->gb_reg.BGP >> 2) & 0x03;
-						   gb->BGP[2] = (gb->gb_reg.BGP >> 4) & 0x03;
-						   gb->BGP[3] = (gb->gb_reg.BGP >> 6) & 0x03;
+						   gb->display.bg_palette[0] = (gb->gb_reg.BGP & 0x03);
+						   gb->display.bg_palette[1] = (gb->gb_reg.BGP >> 2) & 0x03;
+						   gb->display.bg_palette[2] = (gb->gb_reg.BGP >> 4) & 0x03;
+						   gb->display.bg_palette[3] = (gb->gb_reg.BGP >> 6) & 0x03;
 						   return;
 
 				case 0x48:
 						   gb->gb_reg.OBP0 = val;
-						   gb->OBJP[0] = (gb->gb_reg.OBP0 & 0x03);
-						   gb->OBJP[1] = (gb->gb_reg.OBP0 >> 2) & 0x03;
-						   gb->OBJP[2] = (gb->gb_reg.OBP0 >> 4) & 0x03;
-						   gb->OBJP[3] = (gb->gb_reg.OBP0 >> 6) & 0x03;
+						   gb->display.sp_palette[0] = (gb->gb_reg.OBP0 & 0x03);
+						   gb->display.sp_palette[1] = (gb->gb_reg.OBP0 >> 2) & 0x03;
+						   gb->display.sp_palette[2] = (gb->gb_reg.OBP0 >> 4) & 0x03;
+						   gb->display.sp_palette[3] = (gb->gb_reg.OBP0 >> 6) & 0x03;
 						   return;
 
 				case 0x49:
 						   gb->gb_reg.OBP1 = val;
-						   gb->OBJP[4] = (gb->gb_reg.OBP1 & 0x03);
-						   gb->OBJP[5] = (gb->gb_reg.OBP1 >> 2) & 0x03;
-						   gb->OBJP[6] = (gb->gb_reg.OBP1 >> 4) & 0x03;
-						   gb->OBJP[7] = (gb->gb_reg.OBP1 >> 6) & 0x03;
+						   gb->display.sp_palette[4] = (gb->gb_reg.OBP1 & 0x03);
+						   gb->display.sp_palette[5] = (gb->gb_reg.OBP1 >> 2) & 0x03;
+						   gb->display.sp_palette[6] = (gb->gb_reg.OBP1 >> 4) & 0x03;
+						   gb->display.sp_palette[7] = (gb->gb_reg.OBP1 >> 6) & 0x03;
 						   return;
 
 						   /* Window Position Registers */
@@ -859,9 +932,12 @@ void gb_reset(struct gb_t *gb)
 	gb->counter.div_count = 0;
 	gb->counter.tima_count = 0;
 	gb->counter.serial_count = 0;
+	
+#if INTERNAL_AUDIO
 	gb->counter.apu_len_count = 0;
 	gb->counter.apu_swp_count = 0;
 	gb->counter.apu_env_count = 0;
+#endif
 
 	gb->gb_reg.TIMA      = 0x00;
 	gb->gb_reg.TMA       = 0x00;
@@ -887,7 +963,7 @@ void gb_reset(struct gb_t *gb)
 	gb->gb_reg.WX        = 0x00;
 	gb->gb_reg.IE        = 0x00;
 
-	gb->joypad = 0xFF;
+	gb->direct.joypad = 0xFF;
 	gb->gb_reg.P1 = 0xCF;
 }
 
@@ -1015,50 +1091,66 @@ void __gb_execute_cb(struct gb_t *gb)
 	}
 }
 
-/* TODO: Completely rewrite this */
 #if ENABLE_LCD
 void __gb_draw_line(struct gb_t *gb)
 {
-	uint8_t BX, BY;
-	uint8_t WX;
-	uint8_t SX[LCD_WIDTH];
-	uint16_t bg_line = 0, win_line, tile;
-	uint8_t t1, t2, c;
-	uint8_t count = 0;
+	uint8_t pixels[160] = {0};
 
+	/* If LCD not initialised by front-end, don't render anything. */
+	if(gb->display.lcd_draw_line == NULL)
+		return;
+
+	if(gb->direct.interlace)
+	{
+		if((gb->display.interlace_count == 0
+					&& (gb->gb_reg.LY & 1) == 0)
+				|| (gb->display.interlace_count == 1
+					&& (gb->gb_reg.LY & 1) == 1))
+		{
+			/* Compensate for missing window draw if required. */
+			if(gb->gb_reg.LCDC & LCDC_WINDOW_ENABLE
+					&& gb->gb_reg.LY >= gb->display.WY
+					&& gb->gb_reg.WX <= 166)
+				gb->display.window_clear++;
+
+			return;
+		}
+	}
+
+	/* If background is enabled, draw it. */
 	if(gb->gb_reg.LCDC & LCDC_BG_ENABLE)
 	{
-		BY = gb->gb_reg.LY + gb->gb_reg.SCY;
-		bg_line = (gb->gb_reg.LCDC & LCDC_BG_MAP) ? VRAM_BMAP_2 : VRAM_BMAP_1;
-		bg_line += (BY >> 3) * 0x20;
-	}
-	else
-		bg_line = 0;
+		/* Calculate current background line to draw. Constant because
+		 * this function draws only this one line each time it is
+		 * called. */
+		const uint8_t bg_y = gb->gb_reg.LY + gb->gb_reg.SCY;
 
-	if(gb->gb_reg.LCDC & LCDC_WINDOW_ENABLE
-			&& gb->gb_reg.LY >= gb->WY && gb->gb_reg.WX <= 166)
-	{
-		win_line = (gb->gb_reg.LCDC & LCDC_WINDOW_MAP) ? VRAM_BMAP_2 : VRAM_BMAP_1;
-		/* TODO: Check this. */
-		win_line += (gb->WYC >> 3) * 0x20;
-	}
-	else
-		win_line = 0;
+		/* Get selected background map address for first tile
+		 * corresponding to current line.
+		 * 0x20 (32) is the width of a background tile, and the bit
+		 * shift is to calculate the address. */
+		const uint16_t bg_map =
+			((gb->gb_reg.LCDC & LCDC_BG_MAP) ?
+				VRAM_BMAP_2 : VRAM_BMAP_1)
+			+ (bg_y >> 3) * 0x20;
 
-	memset(SX, 0xFF, LCD_WIDTH);
+		/* The displays (what the player sees) X coordinate, drawn right
+		 * to left. */
+		uint8_t disp_x = LCD_WIDTH - 1;
 
-	/* draw background */
-	if(bg_line)
-	{
-		uint8_t X = LCD_WIDTH - 1;
-		BX = X + gb->gb_reg.SCX;
+		/* The X coordinate to begin drawing the background at. */
+		uint8_t bg_x = disp_x + gb->gb_reg.SCX;
 
-		/* TODO: Move declarations to the top. */
-		/* lookup tile index */
-		uint8_t py = (BY & 0x07);
-		uint8_t px = 7 - (BX & 0x07);
-		uint8_t idx = gb->vram[bg_line + (BX >> 3)];
+		/* FIXME: Get tile index for current background tile? */
+		uint8_t idx = gb->vram[bg_map + (bg_x >> 3)];
+		/* FIXME: Y coordinate of tile pixel to draw? */
+		const uint8_t py = (bg_y & 0x07);
+		/* FIXME: X coordinate of tile pixel to draw? */
+		uint8_t px = 7 - (bg_x & 0x07);
 
+		uint16_t tile;
+
+		/* Select addressing mode. */
 		if (gb->gb_reg.LCDC & LCDC_TILE_SELECT)
 			tile = VRAM_TILES_1 + idx * 0x10;
 		else
@@ -1067,18 +1159,17 @@ void __gb_draw_line(struct gb_t *gb)
 		tile += 2*py;
 
 		/* fetch first tile */
-		t1 = gb->vram[tile] >> px;
-		t2 = gb->vram[tile+1] >> px;
+		uint8_t t1 = gb->vram[tile] >> px;
+		uint8_t t2 = gb->vram[tile+1] >> px;
 
-		for (; X != 0xFF; X--)
+		for (; disp_x != 0xFF; disp_x--)
 		{
-			SX[X] = 0xFE;
 			if (px == 8)
 			{
 				/* fetch next tile */
 				px = 0;
-				BX = X + gb->gb_reg.SCX;
-				idx = gb->vram[bg_line + (BX >> 3)];
+				bg_x = disp_x + gb->gb_reg.SCX;
+				idx = gb->vram[bg_map + (bg_x >> 3)];
 				if (gb->gb_reg.LCDC & LCDC_TILE_SELECT)
 					tile = VRAM_TILES_1 + idx * 0x10;
 				else
@@ -1088,8 +1179,9 @@ void __gb_draw_line(struct gb_t *gb)
 				t2 = gb->vram[tile+1];
 			}
 			/* copy background */
-			c = (t1 & 0x1) | ((t2 & 0x1) << 1);
-			gb->gb_fb[gb->gb_reg.LY][X] = c;// BGP[c];
+			uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
+			pixels[disp_x] = gb->display.bg_palette[c];
+			pixels[disp_x] |= LCD_PALETTE_BG;
 			t1 = t1 >> 1;
 			t2 = t2 >> 1;
 			px++;
@@ -1097,15 +1189,24 @@ void __gb_draw_line(struct gb_t *gb)
 	}
 
 	/* draw window */
-	if(win_line)
+	if(gb->gb_reg.LCDC & LCDC_WINDOW_ENABLE
+			&& gb->gb_reg.LY >= gb->display.WY
+			&& gb->gb_reg.WX <= 166)
 	{
-		uint8_t X = LCD_WIDTH - 1;
-		WX = X - gb->gb_reg.WX + 7;
+		/* Calculate Window Map Address. */
+		uint16_t win_line = (gb->gb_reg.LCDC & LCDC_WINDOW_MAP) ?
+			VRAM_BMAP_2 : VRAM_BMAP_1;
+		win_line += (gb->display.window_clear >> 3) * 0x20;
+
+		uint8_t disp_x = LCD_WIDTH - 1;
+		uint8_t win_x = disp_x - gb->gb_reg.WX + 7;
 
 		// look up tile
-		uint8_t py = gb->WYC & 0x07;
-		uint8_t px = 7 - (WX & 0x07);
-		uint8_t idx = gb->vram[win_line + (WX >> 3)];
+		uint8_t py = gb->display.window_clear & 0x07;
+		uint8_t px = 7 - (win_x & 0x07);
+		uint8_t idx = gb->vram[win_line + (win_x >> 3)];
+
+		uint16_t tile;
 
 		if (gb->gb_reg.LCDC & LCDC_TILE_SELECT)
 			tile = VRAM_TILES_1 + idx * 0x10;
@@ -1115,21 +1216,20 @@ void __gb_draw_line(struct gb_t *gb)
 		tile += 2*py;
 
 		// fetch first tile
-		t1 = gb->vram[tile] >> px;
-		t2 = gb->vram[tile+1] >> px;
+		uint8_t t1 = gb->vram[tile] >> px;
+		uint8_t t2 = gb->vram[tile+1] >> px;
 
 		// loop & copy window
 		uint8_t end = (gb->gb_reg.WX < 7 ? 0 : gb->gb_reg.WX - 7) - 1;
 
-		for (; X != end; X--)
+		for (; disp_x != end; disp_x--)
 		{
-			SX[X] = 0xFE;
 			if (px == 8)
 			{
 				// fetch next tile
 				px = 0;
-				WX = X - gb->gb_reg.WX + 7;
-				idx = gb->vram[win_line + (WX >> 3)];
+				win_x = disp_x - gb->gb_reg.WX + 7;
+				idx = gb->vram[win_line + (win_x >> 3)];
 				if (gb->gb_reg.LCDC & LCDC_TILE_SELECT)
 					tile = VRAM_TILES_1 + idx * 0x10;
 				else
@@ -1140,86 +1240,109 @@ void __gb_draw_line(struct gb_t *gb)
 				t2 = gb->vram[tile+1];
 			}
 			// copy window
-			c = (t1 & 0x1) | ((t2 & 0x1) << 1);
-			gb->gb_fb[gb->gb_reg.LY][X] = c; //BGP[c];
+			uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
+			pixels[disp_x] = gb->display.bg_palette[c];
+			pixels[disp_x] |= LCD_PALETTE_BG;
 			t1 = t1 >> 1;
 			t2 = t2 >> 1;
 			px++;
 		}
-		gb->WYC++; // advance window line
+
+		gb->display.window_clear++; // advance window line
 	}
 
 	// draw sprites
 	if (gb->gb_reg.LCDC & LCDC_OBJ_ENABLE)
 	{
-		for(uint8_t s = NUM_SPRITES - 1; s != 0xFF; s--)
-			//for (u8 s = 0; s < NUM_SPRITES && count < MAX_SPRITES_LINE; s++)
+		uint8_t count = 0;
+		for(uint8_t s = NUM_SPRITES - 1;
+				s != 0xFF /* && count < MAX_SPRITES_LINE */ ;
+				s--)
 		{
+			/* Sprite Y position. */
 			uint8_t OY = gb->oam[4*s + 0];
+			/* Sprite X position. */
 			uint8_t OX = gb->oam[4*s + 1];
-			uint8_t OT = gb->oam[4*s + 2] & (gb->gb_reg.LCDC & LCDC_OBJ_SIZE ? 0xFE : 0xFF);
+			/* Sprite Tile/Pattern Number. */
+			uint8_t OT = gb->oam[4*s + 2]
+				& (gb->gb_reg.LCDC & LCDC_OBJ_SIZE ? 0xFE : 0xFF);
+			/* Additional attributes. */
 			uint8_t OF = gb->oam[4*s + 3];
 
-			// sprite is on this line
-			if (gb->gb_reg.LY + (gb->gb_reg.LCDC & LCDC_OBJ_SIZE ? 0 : 8) < OY && gb->gb_reg.LY + 16 >= OY)
+			/* If sprite isn't on this line, continue. */
+			if (gb->gb_reg.LY +
+					(gb->gb_reg.LCDC & LCDC_OBJ_SIZE ?
+					0 : 8) >= OY
+				|| gb->gb_reg.LY + 16 < OY)
 			{
-				count++;
-				if (OX == 0 || OX >= 168)
-					continue;   // but not visible
+				continue;
+			}
 
-				// y flip
-				uint8_t py = gb->gb_reg.LY - OY + 16;
-				if (OF & OBJ_FLIP_Y)
-					py = (gb->gb_reg.LCDC & LCDC_OBJ_SIZE ? 15 : 7) - py;
+			count++;
+			/* Continue if sprite not visible. */
+			if (OX == 0 || OX >= 168)
+				continue;
 
-				// fetch the tile
-				t1 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2*py];
-				t2 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2*py + 1];
+			// y flip
+			uint8_t py = gb->gb_reg.LY - OY + 16;
+			if (OF & OBJ_FLIP_Y)
+				py = (gb->gb_reg.LCDC & LCDC_OBJ_SIZE ? 15 : 7) - py;
 
-				// handle x flip
-				uint8_t dir, start, end, shift;
-				if (OF & OBJ_FLIP_X)
+			// fetch the tile
+			uint8_t t1 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2*py];
+			uint8_t t2 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2*py + 1];
+
+			// handle x flip
+			uint8_t dir, start, end, shift;
+			if (OF & OBJ_FLIP_X)
+			{
+				dir = 1;
+				start = (OX < 8 ? 0 : OX - 8);
+				end = MIN(OX, LCD_WIDTH);
+				shift = 8 - OX + start;
+			}
+			else
+			{
+				dir = -1;
+				start = MIN(OX, LCD_WIDTH) - 1;
+				end = (OX < 8 ? 0 : OX - 8) - 1;
+				shift = OX - (start + 1);
+			}
+
+			// copy tile
+			t1 >>= shift;
+			t2 >>= shift;
+			for(uint8_t disp_x = start; disp_x != end; disp_x += dir)
+			{
+				uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
+				// check transparency / sprite overlap / background overlap
+#if 0
+				if (c
+					//	&& OX <= fx[disp_x]
+						&& !((OF & OBJ_PRIORITY)
+						&& ((pixels[disp_x] & 0x3)
+						&& fx[disp_x] == 0xFE)))
+#else
+				if (c && !(OF & OBJ_PRIORITY
+						&& pixels[disp_x] & 0x3))
+#endif
 				{
-					dir = 1;
-					start = (OX < 8 ? 0 : OX - 8);
-					end = MIN(OX, LCD_WIDTH);
-					shift = 8 - OX + start;
+					/* Set pixel colour. */
+					pixels[disp_x] = (OF & OBJ_PALETTE)
+						? gb->display.sp_palette[c + 4]
+						: gb->display.sp_palette[c];
+					/* Set pixel palette (OBJ0 or OBJ1). */
+					pixels[disp_x] |= (OF & OBJ_PALETTE);
+					/* Deselect BG palette. */
+					pixels[disp_x] &= ~LCD_PALETTE_BG;
 				}
-				else
-				{
-					dir = -1;
-					start = MIN(OX, LCD_WIDTH) - 1;
-					end = (OX < 8 ? 0 : OX - 8) - 1;
-					shift = OX - (start + 1);
-				}
-
-				// copy tile
-				t1 >>= shift;
-				t2 >>= shift;
-				for(uint8_t X = start; X != end; X += dir)
-				{
-					c = (t1 & 0x1) | ((t2 & 0x1) << 1);
-					// check transparency / sprite overlap / background overlap
-					if (c && OX <= SX[X] &&
-							!((OF & OBJ_PRIORITY) && ((gb->gb_fb[gb->gb_reg.LY][X] & 0x3) && SX[X] == 0xFE)))
-						//                    if (c && OX <= SX[X] && !(OF & OBJ_PRIORITY && gb_fb[gb->gb_reg.LY][X] & 0x3))
-					{
-						SX[X] = OX;
-						gb->gb_fb[gb->gb_reg.LY][X] = (OF & OBJ_PALETTE) ? gb->OBJP[c + 4] : gb->OBJP[c];
-					}
-					t1 = t1 >> 1;
-					t2 = t2 >> 1;
-				}
+				t1 = t1 >> 1;
+				t2 = t2 >> 1;
 			}
 		}
 	}
 
-	/* Convert shade to color number. */
-	for(uint8_t X = 0; X < LCD_WIDTH; X++)
-	{
-		if(SX[X] == 0xFE)
-			gb->gb_fb[gb->gb_reg.LY][X] = gb->BGP[gb->gb_fb[gb->gb_reg.LY][X]];
-	}
+	gb->display.lcd_draw_line(gb, pixels, gb->gb_reg.LY);
 }
 #endif
 
@@ -2909,6 +3032,12 @@ void __gb_step_cpu(struct gb_t *gb)
 			gb->gb_reg.IF |= VBLANK_INTR;
 			if(gb->gb_reg.STAT & STAT_MODE_1_INTR)
 				gb->gb_reg.IF |= LCDC_INTR;
+
+#if ENABLE_LCD
+			/* Interlace code */
+			if(gb->direct.interlace)
+				gb->display.interlace_count = !gb->display.interlace_count;
+#endif
 		}
 		/* Normal Line */
 		else if(gb->gb_reg.LY < LCD_HEIGHT)
@@ -2916,9 +3045,9 @@ void __gb_step_cpu(struct gb_t *gb)
 			if(gb->gb_reg.LY == 0)
 			{
 				/* Clear Screen */
-				gb->WY = gb->gb_reg.WY;
-				gb->WYC = 0;
-				memset(gb->gb_fb, 0x00, LCD_WIDTH * LCD_HEIGHT);
+				// FIXME
+				gb->display.WY = gb->gb_reg.WY;
+				gb->display.window_clear = 0;
 			}
 
 			gb->lcd_mode = LCD_HBLANK;
@@ -2937,7 +3066,6 @@ void __gb_step_cpu(struct gb_t *gb)
 	else if(gb->lcd_mode == LCD_SEARCH_OAM && gb->counter.lcd_count >= LCD_MODE_3_CYCLES)
 	{
 		gb->lcd_mode = LCD_TRANSFER;
-		/* TODO: LCD_DRAW_LINE(); */
 #if ENABLE_LCD
 		__gb_draw_line(gb);
 #endif
@@ -2976,6 +3104,18 @@ void gb_init_serial(struct gb_t *gb,
 	gb->gb_serial_transfer = gb_serial_transfer;
 }
 
+uint8_t gb_colour_hash(struct gb_t *gb)
+{
+#define ROM_TITLE_START_ADDR	0x0134
+#define ROM_TITLE_END_ADDR	0x0143 
+
+	uint8_t x = 0;
+	for(uint16_t i = ROM_TITLE_START_ADDR; i <= ROM_TITLE_END_ADDR; i++)
+		x += gb->gb_rom_read(gb, i);
+
+	return x;
+}
+
 /**
  * Initialise the emulator context. gb_reset() is also called to initialise
  * the CPU.
@@ -2987,7 +3127,6 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 		void (*gb_error)(struct gb_t*, const enum gb_error_e, const uint16_t),
 		void *priv)
 {
-	const uint16_t header_checksum_location = 0x014D;
 	const uint16_t mbc_location = 0x0147;
 	const uint16_t bank_count_location = 0x0148;
 	const uint16_t ram_size_location = 0x0149;
@@ -3023,7 +3162,7 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 	gb->gb_cart_ram_read = gb_cart_ram_read;
 	gb->gb_cart_ram_write = gb_cart_ram_write;
 	gb->gb_error = gb_error;
-	gb->priv = priv;
+	gb->direct.priv = priv;
 
 	/* Initialise serial transfer function to NULL. If the front-end does not
 	 * provide serial support, peanut-gb will emulate no cable connected
@@ -3036,7 +3175,7 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 		for(uint16_t i = 0x0134; i <= 0x014C; i++)
 			x = x - gb->gb_rom_read(gb, i) - 1;
 
-		if(x != gb->gb_rom_read(gb, header_checksum_location))
+		if(x != gb->gb_rom_read(gb, ROM_HEADER_CHECKSUM_LOC))
 			return GB_INIT_INVALID_CHECKSUM;
 	}
 
@@ -3052,15 +3191,20 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 	gb->num_rom_banks = num_rom_banks[gb->gb_rom_read(gb, bank_count_location)];
 	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(gb, ram_size_location)];
 
+#if INTERNAL_AUDIO
 	/* Initialise the audio buffer to NULL in-case audio is not initialised
 	 * when the emulator starts stepping CPU. */
 	gb->audio.buffer = NULL;
+#endif
+
+	gb->display.lcd_draw_line = NULL;
 
 	gb_reset(gb);
 
 	return GB_INIT_NO_ERROR;
 }
 
+#if INTERNAL_AUDIO
 /**
  * Used to initialise audio. Must be called after gb_init().
  * TODO: Make gb_init_audio() optional.
@@ -3088,3 +3232,17 @@ void gb_init_audio(struct gb_t *gb, uint8_t *buffer, unsigned int len,
 
 	return;
 }
+#endif
+
+#if ENABLE_LCD
+void gb_init_lcd(struct gb_t *gb,
+		void (*lcd_draw_line)(struct gb_t*, const uint8_t pixels[160],
+				const uint_least8_t line))
+{
+	gb->display.lcd_draw_line = lcd_draw_line;
+	gb->direct.interlace = 0;
+	gb->display.interlace_count = 0;
+
+	return;
+}
+#endif
