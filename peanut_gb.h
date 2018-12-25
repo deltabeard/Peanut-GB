@@ -1353,6 +1353,7 @@ void __gb_step_cpu(struct gb_t *gb)
 {
 	uint8_t opcode, inst_cycles;
 	static const uint8_t op_cycles[0x100] = {
+		/* *INDENT-OFF* */
 		/*  0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F		*/
 		4,12, 8, 8, 4, 4, 8, 4,20, 8, 8, 8, 4, 4, 8, 4,		/* 0x00 */
 		4,12, 8, 8, 4, 4, 8, 4, 8, 8, 8, 8, 4, 4, 8, 4,		/* 0x10 */
@@ -1370,6 +1371,7 @@ void __gb_step_cpu(struct gb_t *gb)
 		8,12,12, 0,12,16, 8,32, 8, 8,12, 0,12, 0, 8,32,		/* 0xD0 */
 		12,12,8, 0, 0,16, 8,32,16, 4,16, 0, 0, 0, 8,32,		/* 0xE0 */
 		12,12,8, 4, 0,16, 8,32,12, 8,16, 4, 0, 0, 8,32		/* 0xF0 */
+		/* *INDENT-ON* */
 	};
 
 	/* Handle interrupts */
