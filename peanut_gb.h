@@ -3270,6 +3270,8 @@ void gb_init_lcd(struct gb_t *gb,
 	gb->display.lcd_draw_line = lcd_draw_line;
 	gb->direct.interlace = 0;
 	gb->display.interlace_count = 0;
+	gb->display.window_clear = 0;
+	gb->display.WY = 0;
 
 	return;
 }
