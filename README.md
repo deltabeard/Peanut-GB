@@ -5,6 +5,8 @@ gameboy emulator](https://github.com/gregtour/gameboy). The aim is to make a
 high speed and portable Game Boy (DMG) emulator library that may be used for any
 platform that has a C99 compiler.
 
+Check out [BENCHMARK.md](BENCHMARK.md) for benchmarks of peanut-gb.
+
 Only the original Game Boy (DMG) is supported at this time.
 
 This emulator is inaccurate and is very much a work in progress (although it
