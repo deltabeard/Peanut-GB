@@ -133,7 +133,7 @@ int main(int argc, char **argv)
 		struct priv_t priv;
 
 		clock_t start_time;
-		uint_fast16_t frames = 0;
+		uint_fast32_t frames = 0;
 		enum gb_init_error_e ret;
 
 		/* Copy input ROM file to allocated memory. */
