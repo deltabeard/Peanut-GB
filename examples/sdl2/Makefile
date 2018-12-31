@@ -17,24 +17,10 @@ CXXWARNINGS = -w
 CC = cc
 CFLAGS = -std=c99 $(SDL2_CFLAGS) $(OPTIMIZE_FLAG) $(CWARNINGS)
 CXXFLAGS = $(SDL2_CFLAGS) $(OPTIMIZE_FLAG) $(CXXWARNINGS)
-LDLIBS = -lm
-
-# nativefiledialog has separate build procedures dependant on operating system.
-# Support for Mac OS is ignored.
-ifeq ($(OS),Windows_NT)
-	LDLIBS += -lcomctl32 -lole32 -loleaut32 -luuid
-	FILE_GUI_LIB = nativefiledialog/build/lib/Release/x64/nfd.lib
-	NFD_MAKEFILE = nativefiledialog/build/gmake_windows
-	# Enable static builds on Windows by default so that the application may
-	# be distributed without DLL files.
-	STATIC ?= yes
-else
-	LDLIBS += $(shell pkg-config --cflags --libs gtk+-3.0)
-	NFD_MAKEFILE = nativefiledialog/build/gmake_linux
-endif
+LDLIBS = -lm -L/usr/lib
 
 ifeq ($(STATIC),yes)
-	SDL2_LDLIBS = $(shell sdl2-config --libs --static-libs)
+	SDL2_LDLIBS = $(shell sdl2-config --static-libs)
 	SDL2_ERRCHECK = $(.SHELLSTATUS)
 	CFLAGS += -static
 else
@@ -65,10 +51,25 @@ FILEGUI ?= yes
 ifeq ($(FILEGUI),yes)
 	# Object file defined above since it's platform independent.
 	CFLAGS += -D ENABLE_FILE_GUI
+
+# nativefiledialog has separate build procedures dependant on operating system.
+# Support for Mac OS is ignored.
+ifeq ($(OS),Windows_NT)
+	LDLIBS += -lcomctl32 -lole32 -loleaut32 -luuid
+	FILE_GUI_LIB = nativefiledialog/build/lib/Release/x64/nfd.lib
+	NFD_MAKEFILE = nativefiledialog/build/gmake_windows
+	# Enable static builds on Windows by default so that the application may
+	# be distributed without DLL files.
+	STATIC ?= yes
+else
+	LDLIBS += $(shell pkg-config --cflags --libs gtk+-3.0)
+	NFD_MAKEFILE = nativefiledialog/build/gmake_linux
+endif # OS Selection for FILEGUI
+
 else
 	# Reset lib path if we want to disable the file picker.
 	FILE_GUI_LIB =
-endif
+endif # FILEGUI
 
 
 all: peanut-sdl
