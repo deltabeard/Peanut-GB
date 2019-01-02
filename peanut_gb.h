@@ -3192,8 +3192,8 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 	gb->gb_error = gb_error;
 	gb->direct.priv = priv;
 
-	/* Initialise serial transfer function to NULL. If the front-end does not
-	 * provide serial support, peanut-gb will emulate no cable connected
+	/* Initialise serial transfer function to NULL. If the front-end does
+	 * not provide serial support, Peanut-GB will emulate no cable connected
 	 * automatically. */
 	gb->gb_serial_transfer = NULL;
 

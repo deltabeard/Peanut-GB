@@ -1,11 +1,11 @@
-# peanut-gb
+# Peanut-GB
 
-Peanut-gb is a single file header Game Boy emulator library based off of [this
+Peanut-GB is a single file header Game Boy emulator library based off of [this
 gameboy emulator](https://github.com/gregtour/gameboy). The aim is to make a
 high speed and portable Game Boy (DMG) emulator library that may be used for any
 platform that has a C99 compiler.
 
-Check out [BENCHMARK.md](BENCHMARK.md) for benchmarks of peanut-gb.
+Check out [BENCHMARK.md](BENCHMARK.md) for benchmarks of Peanut-GB.
 
 Only the original Game Boy (DMG) is supported at this time.
 
