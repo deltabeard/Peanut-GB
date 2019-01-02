@@ -825,6 +825,10 @@ int main(int argc, char **argv)
 						case SDLK_i:
 							     gb.direct.interlace = ~gb.direct.interlace;
 							     break;
+
+						case SDLK_f:
+							     gb.direct.frame_skip = ~gb.direct.frame_skip;
+							     break;
 #endif
 						case SDLK_p:
 							if(event.key.keysym.mod == KMOD_LSHIFT)

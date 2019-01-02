@@ -445,7 +445,9 @@ struct gb_t
 		uint8_t window_clear;
 		uint8_t WY; // FIXME: Check requirement
 
-		uint_least8_t interlace_count;
+		/* Only support 30fps frame skip. */
+		unsigned int frame_skip_count : 1;
+		unsigned int interlace_count : 1;
 	} display;
 
 #if INTERNAL_AUDIO
@@ -466,6 +468,7 @@ struct gb_t
 		 * (at the next line drawing).
 		 */
 		unsigned int interlace : 1;
+		unsigned int frame_skip : 1;
 
 		union
 		{
@@ -1110,6 +1113,11 @@ void __gb_draw_line(struct gb_t *gb)
 	if(gb->display.lcd_draw_line == NULL)
 		return;
 
+	if(gb->direct.frame_skip && !gb->display.frame_skip_count)
+		return;
+
+	/* If interlaced mode is activated, check if we need to draw the current
+	 * line. */
 	if(gb->direct.interlace)
 	{
 		if((gb->display.interlace_count == 0
@@ -3062,9 +3070,24 @@ void __gb_step_cpu(struct gb_t *gb)
 				gb->gb_reg.IF |= LCDC_INTR;
 
 #if ENABLE_LCD
-			/* Interlace code */
-			if(gb->direct.interlace)
-				gb->display.interlace_count = !gb->display.interlace_count;
+			/* If frame skip is activated, check if we need to draw
+			 * the frame or skip it. */
+			if(gb->direct.frame_skip)
+			{
+				gb->display.frame_skip_count =
+					!gb->display.frame_skip_count;
+			}
+
+			/* If interlaced is activated, change which lines get
+			 * updated. Also, only update lines on frames that are
+			 * actually drawn when frame skip is enabled. */
+			if(gb->direct.interlace &&
+					(!gb->direct.frame_skip ||
+					 gb->display.frame_skip_count))
+			{
+				gb->display.interlace_count =
+					!gb->display.interlace_count;
+			}
 #endif
 		}
 		/* Normal Line */
@@ -3268,8 +3291,12 @@ void gb_init_lcd(struct gb_t *gb,
 				const uint_least8_t line))
 {
 	gb->display.lcd_draw_line = lcd_draw_line;
+
 	gb->direct.interlace = 0;
 	gb->display.interlace_count = 0;
+	gb->direct.frame_skip = 0;
+	gb->display.frame_skip_count = 0;
+
 	gb->display.window_clear = 0;
 	gb->display.WY = 0;
 
