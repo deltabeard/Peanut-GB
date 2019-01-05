@@ -662,20 +662,21 @@ int main(int argc, char **argv)
 		time(&rawtime);
 		timeinfo = localtime(&rawtime);
 
-		/* You could potentially force the game to allow the player to reset the
-		 * time by setting the RTC to invalid values.
+		/* You could potentially force the game to allow the player to
+		 * reset the time by setting the RTC to invalid values.
 		 *
-		 * Using memset(&gb->cart_rtc, 0xFF, sizeof(gb->cart_rtc)) for example
-		 * causes Pokemon Gold/Silver to say "TIME NOT SET", allowing the player
-		 * to set the time without having some dumb password.
+		 * Using memset(&gb->cart_rtc, 0xFF, sizeof(gb->cart_rtc)) for
+		 * example causes Pokemon Gold/Silver to say "TIME NOT SET",
+		 * allowing the player to set the time without having some dumb
+		 * password.
 		 *
 		 * The memset has to be done directly to gb->cart_rtc because
-		 * gb_set_rtc() processes the input values, which may cause games to not
-		 * detect invalid values.
+		 * gb_set_rtc() processes the input values, which may cause
+		 * games to not detect invalid values.
 		 */
 
-		/* Set RTC. Only games that specify support for RTC will use these
-		 * values. */
+		/* Set RTC. Only games that specify support for RTC will use
+		 * these values. */
 		gb_set_rtc(&gb, timeinfo);
 	}
 
@@ -722,16 +723,18 @@ int main(int argc, char **argv)
 		}
 	}
 
-	window = SDL_CreateWindow("Peanut-sdl",
+	window = SDL_CreateWindow("Peanut-SDL",
 			SDL_WINDOWPOS_UNDEFINED,
 			SDL_WINDOWPOS_UNDEFINED,
-			LCD_WIDTH, LCD_HEIGHT,
+			LCD_WIDTH * 2, LCD_HEIGHT * 2,
 			SDL_WINDOW_RESIZABLE | SDL_WINDOW_INPUT_FOCUS);
 	if(window == NULL)
 	{
 		printf("Could not create window: %s\n", SDL_GetError());
 		return EXIT_FAILURE;
 	}
+
+	SDL_SetWindowMinimumSize(window, LCD_WIDTH, LCD_HEIGHT);
 
 	renderer = SDL_CreateRenderer(window, -1,
 			SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
@@ -760,7 +763,7 @@ int main(int argc, char **argv)
 
 	texture = SDL_CreateTexture(renderer,
 			SDL_PIXELFORMAT_RGB555,
-			SDL_TEXTUREACCESS_STATIC,
+			SDL_TEXTUREACCESS_STREAMING,
 			LCD_WIDTH, LCD_HEIGHT);
 	if(texture == NULL)
 	{
