@@ -58,6 +58,11 @@ use a file picker native to your running operating system to select the ROM.
 | Change Palette    | p          |
 | Reset Palette     | Shift + p  |
 | Fullscreen        | F11        |
+| Frameskip (Toggle)| f          |
+| Interlace (Toggle)| i          |
+
+Frameskip and Interlaced modes are both off by default. The Frameskip toggles
+between 60 FPS and 30 FPS.
 
 ## License
 
