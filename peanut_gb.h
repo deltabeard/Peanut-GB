@@ -3285,6 +3285,36 @@ void gb_init_audio(struct gb_t *gb, uint8_t *buffer, unsigned int len,
 }
 #endif
 
+/**
+ * Returns the title of ROM.
+ *
+ * \param gb		Initialised context.
+ * \param title_str	Allocated string at least 16 characters.
+ * \returns		Pointer to start of string, null terminated.
+ */
+const char* gb_get_rom_name(struct gb_t* gb, char* title_str)
+{
+	uint_least16_t title_loc = 0x134;
+	const uint_least16_t title_end = 0x143;
+	const char* title_start = title_str;
+
+	for(; title_loc <= title_end; title_loc++)
+	{
+		const char title_char = gb->gb_rom_read(gb, title_loc);
+
+		if(title_char >= ' ' && title_char <= 'Z')
+		{
+			*title_str = title_char;
+			title_str++;
+		}
+		else
+			break;
+	}
+
+	*title_str = '\0';
+	return title_start;
+}
+
 #if ENABLE_LCD
 void gb_init_lcd(struct gb_t *gb,
 		void (*lcd_draw_line)(struct gb_t*, const uint8_t pixels[160],

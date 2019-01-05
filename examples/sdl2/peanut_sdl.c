@@ -723,16 +723,23 @@ int main(int argc, char **argv)
 		}
 	}
 
-	window = SDL_CreateWindow("Peanut-SDL",
-			SDL_WINDOWPOS_UNDEFINED,
-			SDL_WINDOWPOS_UNDEFINED,
-			LCD_WIDTH * 2, LCD_HEIGHT * 2,
-			SDL_WINDOW_RESIZABLE | SDL_WINDOW_INPUT_FOCUS);
-	if(window == NULL)
 	{
-		printf("Could not create window: %s\n", SDL_GetError());
-		return EXIT_FAILURE;
+		/* 12 for "Peanut-SDL: " and a maximum of 16 for the title. */
+		char title_str[28] = "Peanut-SDL: ";
+		printf("ROM: %s\n", gb_get_rom_name(&gb, title_str + 12));
+
+		window = SDL_CreateWindow(title_str,
+				SDL_WINDOWPOS_UNDEFINED,
+				SDL_WINDOWPOS_UNDEFINED,
+				LCD_WIDTH * 2, LCD_HEIGHT * 2,
+				SDL_WINDOW_RESIZABLE | SDL_WINDOW_INPUT_FOCUS);
+		if(window == NULL)
+		{
+			printf("Could not create window: %s\n", SDL_GetError());
+			return EXIT_FAILURE;
+		}
 	}
+
 
 	SDL_SetWindowMinimumSize(window, LCD_WIDTH, LCD_HEIGHT);
 
