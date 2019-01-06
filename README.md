@@ -38,7 +38,12 @@ use a file picker native to your running operating system to select the ROM.
 
 ### Screenshot
 
-![Screenshot of SDL2 frontend](/examples/sdl2/sdl2_example_screenshot.png)
+![Pokemon Blue - Main screen animation](/screencaps/PKMN_BLUE.gif)
+![Legend of Zelda: Links Awakening - animation](/screencaps/ZELDA.gif) 
+![Megaman V](/screencaps/MEGAMANV.png) 
+
+![Shantae](/screencaps/SHANTAE.png) 
+![Dragon Ball Z](/screencaps/DRAGONBALL:BBZP.png) 
 
 ### Controls
 
@@ -60,9 +65,13 @@ use a file picker native to your running operating system to select the ROM.
 | Fullscreen        | F11        |
 | Frameskip (Toggle)| f          |
 | Interlace (Toggle)| i          |
+| Dump BMP (Toggle) | b          |
 
 Frameskip and Interlaced modes are both off by default. The Frameskip toggles
 between 60 FPS and 30 FPS.
+
+Pressing 'b' will dump each frame as a 24-bit bitmap file in the current
+folder. See /screencaps/README.md for more information.
 
 ## License
 
