@@ -20,8 +20,8 @@
 #endif
 
 #include "../../peanut_gb.h"
-
 #include "nativefiledialog/src/include/nfd.h"
+#include "bmp.h"
 
 struct priv_t
 {
@@ -522,6 +522,50 @@ void lcd_draw_line(struct gb_t *gb, const uint8_t pixels[160],
 }
 #endif
 
+/**
+ * Saves the LCD screen as a 24-bit BMP file.
+ */
+void save_lcd_bmp(struct gb_t* gb, uint16_t fb[LCD_HEIGHT][LCD_WIDTH])
+{
+	static uint_least32_t file_num = 0;
+	char file_name[32];
+	char scratch[16];
+	static unsigned long bmp_len = BMP_SIZE(LCD_WIDTH, LCD_HEIGHT);
+	void* bmp_buffer = malloc(bmp_len);
+	FILE* f;
+
+	snprintf(file_name, 32, "%.16s_%010d.bmp",
+			gb_get_rom_name(gb, scratch), file_num);
+	bmp_init(bmp_buffer, LCD_WIDTH, LCD_HEIGHT);
+
+	f = fopen(file_name, "wb");
+
+	for(uint_least8_t y = 0; y < LCD_HEIGHT; y++)
+	{
+		for(uint_least8_t x = 0; x < LCD_WIDTH; x++)
+		{
+			/* Convert 555RGB to 888RGB */
+			uint_least32_t bmp_pixel =
+				(fb[y][x] & 0b0000000000011111) << 3 |
+				((fb[y][x] & 0b000001111100000) << 6) |
+				((fb[y][x] & 0b111110000000000) << 9);
+
+			/* Set pixel */
+			bmp_set(bmp_buffer, x, y, bmp_pixel);
+		}
+	}
+
+	fwrite(bmp_buffer, 1, bmp_len, f);
+	fclose(f);
+
+	file_num++;
+	free(bmp_buffer);
+
+	/* Each dot shows a new frame being saved. */
+	putc('.', stdout);
+	fflush(stdout);
+}
+
 int main(int argc, char **argv)
 {
 	struct gb_t gb;
@@ -785,6 +829,7 @@ int main(int argc, char **argv)
 		int delay;
 		static unsigned int rtc_timer = 0;
 		static unsigned int selected_palette = 4;
+		static unsigned int dump_bmp = 0;
 
 		/* Calculate the time taken to draw frame, then later add a
 		 * delay to cap at 60 fps. */
@@ -838,6 +883,15 @@ int main(int argc, char **argv)
 
 						case SDLK_f:
 							     gb.direct.frame_skip = ~gb.direct.frame_skip;
+							     break;
+
+						case SDLK_b:
+							     dump_bmp = ~dump_bmp;
+							     if(dump_bmp)
+								     puts("Dumping frames");
+							     else
+								     printf("\nStopped dumping frames\n");
+
 							     break;
 #endif
 						case SDLK_p:
@@ -923,6 +977,9 @@ int main(int argc, char **argv)
 		SDL_RenderClear(renderer);
 		SDL_RenderCopy(renderer, texture, NULL, NULL);
 		SDL_RenderPresent(renderer);
+
+		if(dump_bmp)
+			save_lcd_bmp(&gb, priv.fb);
 #endif
 
 		/* Use a delay that will draw the screen at a rate of 59.7275 Hz. */
