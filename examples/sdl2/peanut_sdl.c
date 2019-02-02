@@ -844,7 +844,7 @@ int main(int argc, char **argv)
 	{
 		int delay;
 		static unsigned int rtc_timer = 0;
-		static unsigned int selected_palette = 4;
+		static unsigned int selected_palette = 3;
 		static unsigned int dump_bmp = 0;
 
 		/* Calculate the time taken to draw frame, then later add a
