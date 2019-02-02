@@ -569,7 +569,10 @@ void save_lcd_bmp(struct gb_t* gb, uint16_t fb[LCD_HEIGHT][LCD_WIDTH])
 int main(int argc, char **argv)
 {
 	struct gb_t gb;
-	struct priv_t priv;
+	struct priv_t priv = {
+		.rom = NULL,
+		.cart_ram = NULL
+	};
 	const double target_speed_ms = 1000.0/VERTICAL_SYNC;
 	double speed_compensation = 0.0;
 	unsigned int running = 1;
@@ -579,7 +582,7 @@ int main(int argc, char **argv)
 	SDL_Event event;
 	SDL_GameController *controller = NULL;
 	uint32_t new_ticks, old_ticks;
-	enum gb_init_error_e ret;
+	enum gb_init_error_e gb_ret;
 	unsigned int fast_mode = 1;
 	unsigned int fast_mode_timer = 1;
 	/* Record save file every 60 seconds. */
@@ -587,6 +590,7 @@ int main(int argc, char **argv)
 	/* Must be freed */
 	char *rom_file_name = NULL;
 	char *save_file_name = NULL;
+	int ret = EXIT_SUCCESS;
 
 	switch(argc)
 	{
@@ -599,7 +603,7 @@ int main(int argc, char **argv)
 
 			if(result == NFD_CANCEL)
 			{
-				puts("User pressed cancel.");
+				puts("No ROM selected.");
 				exit(EXIT_FAILURE);
 			}
 			else if(result != NFD_OKAY)
@@ -632,14 +636,16 @@ int main(int argc, char **argv)
 		printf("Usage: %s ROM [SAVE]\n", argv[0]);
 #endif
 		puts("SAVE is set by default if not provided.");
-		return EXIT_FAILURE;
+		ret = EXIT_FAILURE;
+		goto out;
 	}
 
 	/* Copy input ROM file to allocated memory. */
 	if((priv.rom = read_rom_to_ram(rom_file_name)) == NULL)
 	{
 		printf("%d: %s\n", __LINE__, strerror(errno));
-		return EXIT_FAILURE;
+		ret = EXIT_FAILURE;
+		goto out;
 	}
 
 	/* If no save file is specified, copy save file (with specific name) to
@@ -656,7 +662,8 @@ int main(int argc, char **argv)
 		if(save_file_name == NULL)
 		{
 			printf("%d: %s\n", __LINE__, strerror(errno));
-			return EXIT_FAILURE;
+			ret = EXIT_FAILURE;
+			goto out;
 		}
 
 		/* Copy the ROM file name to allocated space. */
@@ -678,22 +685,25 @@ int main(int argc, char **argv)
 	/* TODO: Sanity check input GB file. */
 
 	/* Initialise emulator context. */
-	ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write,
+	gb_ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write,
 			&gb_error, &priv);
 
-	switch(ret)
+	switch(gb_ret)
 	{
 	case GB_INIT_NO_ERROR:
 		break;
 	case GB_INIT_CARTRIDGE_UNSUPPORTED:
 		puts("Unsupported cartridge.");
-		exit(EXIT_FAILURE);
+		ret = EXIT_FAILURE;
+		goto out;
 	case GB_INIT_INVALID_CHECKSUM:
 		puts("Invalid ROM: Checksum failure.");
-		exit(EXIT_FAILURE);
+		ret = EXIT_FAILURE;
+		goto out;
 	default:
-		printf("Unknown error: %d\n", ret);
-		exit(EXIT_FAILURE);
+		printf("Unknown error: %d\n", gb_ret);
+		ret = EXIT_FAILURE;
+		goto out;
 	}
 
 	/* Load Save File. */
@@ -728,7 +738,8 @@ int main(int argc, char **argv)
 	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO) < 0)
 	{
 		printf("Could not initialise SDL: %s\n", SDL_GetError());
-		return EXIT_FAILURE;
+		ret = EXIT_FAILURE;
+		goto out;
 	}
 
 #if ENABLE_SOUND
@@ -780,7 +791,8 @@ int main(int argc, char **argv)
 		if(window == NULL)
 		{
 			printf("Could not create window: %s\n", SDL_GetError());
-			return EXIT_FAILURE;
+			ret = EXIT_FAILURE;
+			goto out;
 		}
 	}
 
@@ -792,19 +804,22 @@ int main(int argc, char **argv)
 	if(renderer == NULL)
 	{
 		printf("Could not create renderer: %s\n", SDL_GetError());
-		return EXIT_FAILURE;
+		ret = EXIT_FAILURE;
+		goto out;
 	}
 
 	if(SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255) < 0)
 	{
 		printf("Renderer could not draw color: %s\n", SDL_GetError());
-		return EXIT_FAILURE;
+		ret = EXIT_FAILURE;
+		goto out;
 	}
 
 	if(SDL_RenderClear(renderer) < 0)
 	{
 		printf("Renderer could not clear: %s\n", SDL_GetError());
-		return EXIT_FAILURE;
+		ret = EXIT_FAILURE;
+		goto out;
 	}
 	SDL_RenderPresent(renderer);
 
@@ -819,7 +834,8 @@ int main(int argc, char **argv)
 	if(texture == NULL)
 	{
 		printf("Texture could not be created: %s\n", SDL_GetError());
-		return EXIT_FAILURE;
+		ret = EXIT_FAILURE;
+		goto out;
 	}
 
 	auto_assign_palette(&priv, gb_colour_hash(&gb));
@@ -940,10 +956,6 @@ int main(int argc, char **argv)
 			}
 		}
 
-		/* Calculate the time taken to draw frame, then later add a
-		 * delay to cap at 60 fps. */
-		old_ticks = SDL_GetTicks();
-
 		/* Execute CPU cycles until the screen has to be redrawn. */
 		gb_run_frame(&gb);
 
@@ -1059,6 +1071,7 @@ int main(int argc, char **argv)
 	/* Record save file. */
 	write_cart_ram_file(save_file_name, &priv.cart_ram, gb_get_save_size(&gb));
 
+out:
 	free(priv.rom);
 	free(priv.cart_ram);
 	
@@ -1070,5 +1083,5 @@ int main(int argc, char **argv)
 	if(argc == 1)
 		free(rom_file_name);
 
-	return EXIT_SUCCESS;
+	return ret;
 }
