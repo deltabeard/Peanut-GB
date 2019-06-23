@@ -28,7 +28,7 @@ struct priv_t
 /**
  * Returns a byte from the ROM file at the given address.
  */
-uint8_t gb_rom_read(struct gb_t *gb, const uint32_t addr)
+uint8_t gb_rom_read(struct gb_t *gb, const uint_fast32_t addr)
 {
 	const struct priv_t * const p = gb->direct.priv;
 	return p->rom[addr];
@@ -37,7 +37,7 @@ uint8_t gb_rom_read(struct gb_t *gb, const uint32_t addr)
 /**
  * Returns a byte from the cartridge RAM at the given address.
  */
-uint8_t gb_cart_ram_read(struct gb_t *gb, const uint32_t addr)
+uint8_t gb_cart_ram_read(struct gb_t *gb, const uint_fast32_t addr)
 {
 	const struct priv_t * const p = gb->direct.priv;
 	return p->cart_ram[addr];
@@ -46,7 +46,7 @@ uint8_t gb_cart_ram_read(struct gb_t *gb, const uint32_t addr)
 /**
  * Writes a given byte to the cartridge RAM at the given address.
  */
-void gb_cart_ram_write(struct gb_t *gb, const uint32_t addr,
+void gb_cart_ram_write(struct gb_t *gb, const uint_fast32_t addr,
 		const uint8_t val)
 {
 	const struct priv_t * const p = gb->direct.priv;

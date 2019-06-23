@@ -1,6 +1,6 @@
 .POSIX:
 .SUFFIXES:
-OPTIMIZE_FLAG = -g -Og
+OPT = -g -Og
 SDL2_CFLAGS = $(shell sdl2-config --cflags)
 SDL2_LDLIBS =
 
@@ -15,8 +15,8 @@ CWARNINGS = -Wall -Wextra
 CXXWARNINGS = -w
 
 CC = cc
-CFLAGS = -std=c99 $(SDL2_CFLAGS) $(OPTIMIZE_FLAG) $(CWARNINGS)
-CXXFLAGS = $(SDL2_CFLAGS) $(OPTIMIZE_FLAG) $(CXXWARNINGS)
+CFLAGS = -std=c99 $(SDL2_CFLAGS) $(OPT) $(CWARNINGS)
+CXXFLAGS = $(SDL2_CFLAGS) $(OPT) $(CXXWARNINGS)
 LDLIBS = -lm -L/usr/lib
 
 ifeq ($(STATIC),yes)

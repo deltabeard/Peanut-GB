@@ -327,7 +327,7 @@ struct gb_t
 	 * \param addr	address
 	 * \return		byte at address in ROM
 	 */
-	uint8_t (*gb_rom_read)(struct gb_t*, const uint32_t addr);
+	uint8_t (*gb_rom_read)(struct gb_t*, const uint_fast32_t addr);
 
 	/**
 	 * Return byte from cart RAM at given address.
@@ -336,7 +336,7 @@ struct gb_t
 	 * \param addr	address
 	 * \return		byte at address in RAM
 	 */
-	uint8_t (*gb_cart_ram_read)(struct gb_t*, const uint32_t addr);
+	uint8_t (*gb_cart_ram_read)(struct gb_t*, const uint_fast32_t addr);
 
 	/**
 	 * Write byte to cart RAM at given address.
@@ -345,7 +345,7 @@ struct gb_t
 	 * \param addr	address
 	 * \param val	value to write to address in RAM
 	 */
-	void (*gb_cart_ram_write)(struct gb_t*, const uint32_t addr,
+	void (*gb_cart_ram_write)(struct gb_t*, const uint_fast32_t addr,
 			const uint8_t val);
 
 	/**
@@ -538,7 +538,7 @@ void gb_set_rtc(struct gb_t *gb, const struct tm * const time)
 /**
  * Internal function used to read bytes.
  */
-uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
+uint8_t __gb_read(struct gb_t *gb, const uint_fast16_t addr)
 {
 	switch(addr >> 12)
 	{
@@ -666,7 +666,7 @@ uint8_t __gb_read(struct gb_t *gb, const uint16_t addr)
 /**
  * Internal function used to write bytes.
  */
-void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
+void __gb_write(struct gb_t *gb, const uint_fast16_t addr, const uint8_t val)
 {
 	switch(addr >> 12)
 	{
@@ -1487,7 +1487,7 @@ void __gb_step_cpu(struct gb_t *gb)
 			}
 		case 0x09: /* ADD HL, BC */
 			{
-				uint32_t temp = gb->cpu_reg.hl + gb->cpu_reg.bc;
+				uint_fast32_t temp = gb->cpu_reg.hl + gb->cpu_reg.bc;
 				gb->cpu_reg.f_bits.n = 0;
 				gb->cpu_reg.f_bits.h =
 					(temp ^ gb->cpu_reg.hl ^ gb->cpu_reg.bc) & 0x1000 ? 1 : 0;
@@ -1569,7 +1569,7 @@ void __gb_step_cpu(struct gb_t *gb)
 			}
 		case 0x19: /* ADD HL, DE */
 			{
-				uint32_t temp = gb->cpu_reg.hl + gb->cpu_reg.de;
+				uint_fast32_t temp = gb->cpu_reg.hl + gb->cpu_reg.de;
 				gb->cpu_reg.f_bits.n = 0;
 				gb->cpu_reg.f_bits.h =
 					(temp ^ gb->cpu_reg.hl ^ gb->cpu_reg.de) & 0x1000 ? 1 : 0;
@@ -1684,7 +1684,7 @@ void __gb_step_cpu(struct gb_t *gb)
 			break;
 		case 0x29: /* ADD HL, HL */
 			{
-				uint32_t temp = gb->cpu_reg.hl + gb->cpu_reg.hl;
+				uint_fast32_t temp = gb->cpu_reg.hl + gb->cpu_reg.hl;
 				gb->cpu_reg.f_bits.n = 0;
 				gb->cpu_reg.f_bits.h = (temp & 0x1000) ? 1 : 0;
 				gb->cpu_reg.f_bits.c = (temp & 0xFFFF0000) ? 1 : 0;
@@ -1776,7 +1776,7 @@ void __gb_step_cpu(struct gb_t *gb)
 			break;
 		case 0x39: /* ADD HL, SP */
 			{
-				uint32_t temp = gb->cpu_reg.hl + gb->cpu_reg.sp;
+				uint_fast32_t temp = gb->cpu_reg.hl + gb->cpu_reg.sp;
 				gb->cpu_reg.f_bits.n = 0;
 				gb->cpu_reg.f_bits.h =
 					((gb->cpu_reg.hl & 0xFFF) + (gb->cpu_reg.sp & 0xFFF)) & 0x1000 ? 1 : 0;
@@ -3133,13 +3133,13 @@ void gb_run_frame(struct gb_t *gb)
 /**
  * Gets the size of the save file required for the ROM.
  */
-uint32_t gb_get_save_size(struct gb_t *gb)
+uint_fast32_t gb_get_save_size(struct gb_t *gb)
 {
-	const uint16_t ram_size_location = 0x0149;
-	const uint32_t ram_sizes[] = {
+	const uint_fast16_t ram_size_location = 0x0149;
+	const uint_fast32_t ram_sizes[] = {
 		0x00, 0x800, 0x2000, 0x8000, 0x20000
 	};
-	uint32_t ram_size = gb->gb_rom_read(gb, ram_size_location);
+	uint8_t ram_size = gb->gb_rom_read(gb, ram_size_location);
 	return ram_sizes[ram_size];
 }
 
@@ -3172,9 +3172,9 @@ uint8_t gb_colour_hash(struct gb_t *gb)
  * the CPU.
  */
 enum gb_init_error_e gb_init(struct gb_t *gb,
-		uint8_t (*gb_rom_read)(struct gb_t*, const uint32_t),
-		uint8_t (*gb_cart_ram_read)(struct gb_t*, const uint32_t),
-		void (*gb_cart_ram_write)(struct gb_t*, const uint32_t, const uint8_t),
+		uint8_t (*gb_rom_read)(struct gb_t*, const uint_fast32_t),
+		uint8_t (*gb_cart_ram_read)(struct gb_t*, const uint_fast32_t),
+		void (*gb_cart_ram_write)(struct gb_t*, const uint_fast32_t, const uint8_t),
 		void (*gb_error)(struct gb_t*, const enum gb_error_e, const uint16_t),
 		void *priv)
 {

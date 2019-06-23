@@ -38,7 +38,7 @@ struct priv_t
 /**
  * Returns a byte from the ROM file at the given address.
  */
-uint8_t gb_rom_read(struct gb_t *gb, const uint32_t addr)
+uint8_t gb_rom_read(struct gb_t *gb, const uint_fast32_t addr)
 {
 	const struct priv_t * const p = gb->direct.priv;
 	return p->rom[addr];
@@ -47,7 +47,7 @@ uint8_t gb_rom_read(struct gb_t *gb, const uint32_t addr)
 /**
  * Returns a byte from the cartridge RAM at the given address.
  */
-uint8_t gb_cart_ram_read(struct gb_t *gb, const uint32_t addr)
+uint8_t gb_cart_ram_read(struct gb_t *gb, const uint_fast32_t addr)
 {
 	const struct priv_t * const p = gb->direct.priv;
 	return p->cart_ram[addr];
@@ -56,7 +56,7 @@ uint8_t gb_cart_ram_read(struct gb_t *gb, const uint32_t addr)
 /**
  * Writes a given byte to the cartridge RAM at the given address.
  */
-void gb_cart_ram_write(struct gb_t *gb, const uint32_t addr,
+void gb_cart_ram_write(struct gb_t *gb, const uint_fast32_t addr,
 		const uint8_t val)
 {
 	const struct priv_t * const p = gb->direct.priv;
@@ -581,7 +581,7 @@ int main(int argc, char **argv)
 	SDL_Texture *texture;
 	SDL_Event event;
 	SDL_GameController *controller = NULL;
-	uint32_t new_ticks, old_ticks;
+	uint_fast32_t new_ticks, old_ticks;
 	enum gb_init_error_e gb_ret;
 	unsigned int fast_mode = 1;
 	unsigned int fast_mode_timer = 1;
@@ -760,7 +760,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Open the first available controller. */
-	for (int i = 0; i < SDL_NumJoysticks(); ++i)
+	for(uint_fast8_t i = 0; i < SDL_NumJoysticks(); i++)
 	{
 		if (SDL_IsGameController(i))
 		{
@@ -1015,8 +1015,8 @@ int main(int argc, char **argv)
 		/* Only run delay logic if required. */
 		if(delay > 0)
 		{
-			uint32_t delay_ticks = SDL_GetTicks();
-			uint32_t after_delay_ticks;
+			uint_fast32_t delay_ticks = SDL_GetTicks();
+			uint_fast32_t after_delay_ticks;
 
 			/* Tick the internal RTC when 1 second has passed. */
 			rtc_timer += delay;
