@@ -3018,7 +3018,7 @@ void __gb_step_cpu(struct gb_s *gb)
 	/* TODO: Change tac_enable to struct of TAC timer control bits. */
 	if(gb->gb_reg.tac_enable)
 	{
-		static const unsigned int TAC_CYCLES[4] = {1024, 16, 64, 256};
+		static const uint_fast16_t TAC_CYCLES[4] = {1024, 16, 64, 256};
 
 		gb->counter.tima_count += inst_cycles;
 		if(gb->counter.tima_count >= TAC_CYCLES[gb->gb_reg.tac_rate])
