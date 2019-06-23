@@ -782,6 +782,7 @@ int main(int argc, char **argv)
 		/* 12 for "Peanut-SDL: " and a maximum of 16 for the title. */
 		char title_str[28] = "Peanut-SDL: ";
 		printf("ROM: %s\n", gb_get_rom_name(&gb, title_str + 12));
+		printf("MBC: %d\n", gb.mbc);
 
 		window = SDL_CreateWindow(title_str,
 				SDL_WINDOWPOS_UNDEFINED,
