@@ -3295,6 +3295,7 @@ void gb_init_audio(struct gb_t *gb, uint8_t *buffer, unsigned int len,
 const char* gb_get_rom_name(struct gb_t* gb, char* title_str)
 {
 	uint_least16_t title_loc = 0x134;
+	/* End of title may be 0x13E for newer games. */
 	const uint_least16_t title_end = 0x143;
 	const char* title_start = title_str;
 
@@ -3302,7 +3303,7 @@ const char* gb_get_rom_name(struct gb_t* gb, char* title_str)
 	{
 		const char title_char = gb->gb_rom_read(gb, title_loc);
 
-		if(title_char >= ' ' && title_char <= 'Z')
+		if(title_char >= ' ' && title_char <= '_')
 		{
 			*title_str = title_char;
 			title_str++;
