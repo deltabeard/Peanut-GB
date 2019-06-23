@@ -16,7 +16,7 @@
 #include <SDL2/SDL.h>
 
 #if ENABLE_SOUND
-#include "gb_apu/audio.h"
+	#include "gb_apu/audio.h"
 #endif
 
 #include "../../peanut_gb.h"
@@ -57,7 +57,7 @@ uint8_t gb_cart_ram_read(struct gb_s *gb, const uint_fast32_t addr)
  * Writes a given byte to the cartridge RAM at the given address.
  */
 void gb_cart_ram_write(struct gb_s *gb, const uint_fast32_t addr,
-		const uint8_t val)
+		       const uint8_t val)
 {
 	const struct priv_t * const p = gb->direct.priv;
 	p->cart_ram[addr] = val;
@@ -92,7 +92,7 @@ uint8_t *read_rom_to_ram(const char *file_name)
 }
 
 void read_cart_ram_file(const char *save_file_name, uint8_t **dest,
-		const size_t len)
+			const size_t len)
 {
 	FILE *f;
 
@@ -126,7 +126,7 @@ void read_cart_ram_file(const char *save_file_name, uint8_t **dest,
 }
 
 void write_cart_ram_file(const char *save_file_name, uint8_t **dest,
-		const size_t len)
+			 const size_t len)
 {
 	FILE *f;
 
@@ -155,31 +155,32 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
 
 	switch(gb_err)
 	{
-		case GB_INVALID_OPCODE:
-			/* We compensate for the post-increment in the __gb_step_cpu
-			 * function. */
-			fprintf(stdout, "Invalid opcode %#04x at PC: %#06x, SP: %#06x\n",
-					val,
-					gb->cpu_reg.pc - 1,
-					gb->cpu_reg.sp);
-			break;
+	case GB_INVALID_OPCODE:
+		/* We compensate for the post-increment in the __gb_step_cpu
+		 * function. */
+		fprintf(stdout, "Invalid opcode %#04x at PC: %#06x, SP: %#06x\n",
+			val,
+			gb->cpu_reg.pc - 1,
+			gb->cpu_reg.sp);
+		break;
 
-			/* Ignoring non fatal errors. */
-		case GB_INVALID_WRITE:
-		case GB_INVALID_READ:
-			return;
+	/* Ignoring non fatal errors. */
+	case GB_INVALID_WRITE:
+	case GB_INVALID_READ:
+		return;
 
-		default:
-			printf("Unknown error");
-			break;
+	default:
+		printf("Unknown error");
+		break;
 	}
 
 	fprintf(stderr, "Error. Press q to exit, or any other key to continue.");
+
 	if(getchar() == 'q')
 	{
 		/* Record save file. */
 		write_cart_ram_file("recovery.sav", &priv->cart_ram,
-				gb_get_save_size(gb));
+				    gb_get_save_size(gb));
 
 		free(priv->rom);
 		free(priv->cart_ram);
@@ -204,7 +205,8 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 	case 0x71:
 	case 0xFF:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7FFF, 0x7E60, 0x7C00, 0x0000 }, /* OBJ0 */
 			{ 0x7FFF, 0x7E60, 0x7C00, 0x0000 }, /* OBJ1 */
 			{ 0x7FFF, 0x7E60, 0x7C00, 0x0000 }  /* BG */
@@ -218,7 +220,8 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 	case 0xDB:
 	case 0x95: /* Not officially */
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7FFF, 0x7FE0, 0x7C00, 0x0000 }, /* OBJ0 */
 			{ 0x7FFF, 0x7FE0, 0x7C00, 0x0000 }, /* OBJ1 */
 			{ 0x7FFF, 0x7FE0, 0x7C00, 0x0000 }  /* BG */
@@ -230,7 +233,8 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 	/* Donkey Kong */
 	case 0x19:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }, /* OBJ0 */
 			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }, /* OBJ1 */
 			{ 0x7FFF, 0x7E60, 0x7C00, 0x0000 }  /* BG */
@@ -242,10 +246,12 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 	/* Pokemon Blue */
 	case 0x61:
 	case 0x45:
+
 	/* Pokemon Blue Star */
 	case 0xD8:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }, /* OBJ0 */
 			{ 0x7FFF, 0x329F, 0x001F, 0x0000 }, /* OBJ1 */
 			{ 0x7FFF, 0x329F, 0x001F, 0x0000 }  /* BG */
@@ -257,7 +263,8 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 	/* Pokemon Red */
 	case 0x14:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7FFF, 0x3FE6, 0x0200, 0x0000 }, /* OBJ0 */
 			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }, /* OBJ1 */
 			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }  /* BG */
@@ -269,7 +276,8 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 	/* Pokemon Red Star */
 	case 0x8B:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }, /* OBJ0 */
 			{ 0x7FFF, 0x329F, 0x001F, 0x0000 }, /* OBJ1 */
 			{ 0x7FFF, 0x3FE6, 0x0200, 0x0000 }  /* BG */
@@ -277,14 +285,15 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
 	}
-	
+
 	/* Kirby */
 	case 0x27:
 	case 0x49:
 	case 0x5C:
 	case 0xB3:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7D8A, 0x6800, 0x3000, 0x0000 }, /* OBJ0 */
 			{ 0x001F, 0x7FFF, 0x7FEF, 0x021F }, /* OBJ1 */
 			{ 0x527F, 0x7FE0, 0x0180, 0x0000 }  /* BG */
@@ -299,7 +308,8 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 	case 0x4B:
 	case 0x6B:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7F08, 0x7F40, 0x48E0, 0x2400 }, /* OBJ0 */
 			{ 0x7FFF, 0x2EFF, 0x7C00, 0x001F }, /* OBJ1 */
 			{ 0x7FFF, 0x463B, 0x2951, 0x0000 }  /* BG */
@@ -311,7 +321,8 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 	/* Link's Awakening */
 	case 0x70:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7FFF, 0x03E0, 0x1A00, 0x0120 }, /* OBJ0 */
 			{ 0x7FFF, 0x329F, 0x001F, 0x001F }, /* OBJ1 */
 			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }  /* BG */
@@ -330,7 +341,8 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 	case 0x6D:
 	case 0xF6:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7FFF, 0x329F, 0x001F, 0x0000 }, /* OBJ0 */
 			{ 0x7FFF, 0x3FE6, 0x0200, 0x0000 }, /* OBJ1 */
 			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 }  /* BG */
@@ -338,10 +350,11 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
 	}
-	
+
 	default:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7FFF, 0x5294, 0x294A, 0x0000 },
 			{ 0x7FFF, 0x5294, 0x294A, 0x0000 },
 			{ 0x7FFF, 0x5294, 0x294A, 0x0000 }
@@ -369,7 +382,8 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 	/* 0x05 (Right) */
 	case 0:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7FFF, 0x2BE0, 0x7D00, 0x0000 },
 			{ 0x7FFF, 0x2BE0, 0x7D00, 0x0000 },
 			{ 0x7FFF, 0x2BE0, 0x7D00, 0x0000 }
@@ -377,10 +391,12 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
 	}
+
 	/* 0x07 (A + Down) */
 	case 1:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7FFF, 0x7FE0, 0x7C00, 0x0000 },
 			{ 0x7FFF, 0x7FE0, 0x7C00, 0x0000 },
 			{ 0x7FFF, 0x7FE0, 0x7C00, 0x0000 }
@@ -388,10 +404,12 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
 	}
+
 	/* 0x12 (Up) */
 	case 2:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 },
 			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 },
 			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 }
@@ -399,10 +417,12 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
 	}
+
 	/* 0x13 (B + Right) */
 	case 3:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x0000, 0x0210, 0x7F60, 0x7FFF },
 			{ 0x0000, 0x0210, 0x7F60, 0x7FFF },
 			{ 0x0000, 0x0210, 0x7F60, 0x7FFF }
@@ -410,11 +430,13 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
 	}
+
 	/* 0x16 (B + Left, DMG Palette) */
 	default:
 	case 4:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7FFF, 0x5294, 0x294A, 0x0000 },
 			{ 0x7FFF, 0x5294, 0x294A, 0x0000 },
 			{ 0x7FFF, 0x5294, 0x294A, 0x0000 }
@@ -422,10 +444,12 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
 	}
+
 	/* 0x17 (Down) */
 	case 5:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7FF4, 0x7E52, 0x4A5F, 0x0000 },
 			{ 0x7FF4, 0x7E52, 0x4A5F, 0x0000 },
 			{ 0x7FF4, 0x7E52, 0x4A5F, 0x0000 }
@@ -433,10 +457,12 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
 	}
+
 	/* 0x19 (B + Up) */
 	case 6:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 },
 			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 },
 			{ 0x7F98, 0x6670, 0x41A5, 0x2CC1 }
@@ -444,10 +470,12 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
 	}
+
 	/* 0x1C (A + Right) */
 	case 7:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 },
 			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 },
 			{ 0x7FFF, 0x3FE6, 0x0198, 0x0000 }
@@ -455,10 +483,12 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
 	}
+
 	/* 0x0D (A + Left) */
 	case 8:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 },
 			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 },
 			{ 0x7FFF, 0x463B, 0x2951, 0x0000 }
@@ -466,10 +496,12 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
 	}
+
 	/* 0x10 (A + Up) */
 	case 9:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7FFF, 0x3FE6, 0x0200, 0x0000 },
 			{ 0x7FFF, 0x329F, 0x001F, 0x0000 },
 			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }
@@ -477,10 +509,12 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
 	}
+
 	/* 0x18 (Left) */
 	case 10:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 },
 			{ 0x7FFF, 0x3FE6, 0x0200, 0x0000 },
 			{ 0x7FFF, 0x329F, 0x001F, 0x0000 }
@@ -488,10 +522,12 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
 	}
+
 	/* 0x1A (B + Down) */
 	case 11:
 	{
-		const uint16_t palette[3][4] = {
+		const uint16_t palette[3][4] =
+		{
 			{ 0x7FFF, 0x329F, 0x001F, 0x0000 },
 			{ 0x7FFF, 0x3FE6, 0x0200, 0x0000 },
 			{ 0x7FFF, 0x7FE0, 0x3D20, 0x0000 }
@@ -509,15 +545,15 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
  * Draws scanline into framebuffer.
  */
 void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
-		const uint_least8_t line)
+		   const uint_least8_t line)
 {
 	struct priv_t *priv = gb->direct.priv;
 
-	for (unsigned int x = 0; x < LCD_WIDTH; x++)
+	for(unsigned int x = 0; x < LCD_WIDTH; x++)
 	{
 		priv->fb[line][x] = priv->selected_palette
-				[(pixels[x] & LCD_PALETTE_ALL) >> 4]
-				[pixels[x] & 3];
+				    [(pixels[x] & LCD_PALETTE_ALL) >> 4]
+				    [pixels[x] & 3];
 	}
 }
 #endif
@@ -535,7 +571,7 @@ void save_lcd_bmp(struct gb_s* gb, uint16_t fb[LCD_HEIGHT][LCD_WIDTH])
 	FILE* f;
 
 	snprintf(file_name, 32, "%.16s_%010d.bmp",
-			gb_get_rom_name(gb, scratch), file_num);
+		 gb_get_rom_name(gb, scratch), file_num);
 	bmp_init(bmp_buffer, LCD_WIDTH, LCD_HEIGHT);
 
 	f = fopen(file_name, "wb");
@@ -569,11 +605,12 @@ void save_lcd_bmp(struct gb_s* gb, uint16_t fb[LCD_HEIGHT][LCD_WIDTH])
 int main(int argc, char **argv)
 {
 	struct gb_s gb;
-	struct priv_t priv = {
+	struct priv_t priv =
+	{
 		.rom = NULL,
 		.cart_ram = NULL
 	};
-	const double target_speed_ms = 1000.0/VERTICAL_SYNC;
+	const double target_speed_ms = 1000.0 / VERTICAL_SYNC;
 	double speed_compensation = 0.0;
 	unsigned int running = 1;
 	SDL_Window *window;
@@ -595,24 +632,25 @@ int main(int argc, char **argv)
 	switch(argc)
 	{
 #if ENABLE_FILE_GUI
-	case 1:
-		{
-			/* Invoke file picker */
-			nfdresult_t result =
-				NFD_OpenDialog("gb,gbc", NULL, &rom_file_name);
 
-			if(result == NFD_CANCEL)
-			{
-				puts("No ROM selected.");
-				exit(EXIT_FAILURE);
-			}
-			else if(result != NFD_OKAY)
-			{
-				printf("Error: %s\n", NFD_GetError());
-				exit(EXIT_FAILURE);
-			}
+	case 1:
+	{
+		/* Invoke file picker */
+		nfdresult_t result =
+			NFD_OpenDialog("gb,gbc", NULL, &rom_file_name);
+
+		if(result == NFD_CANCEL)
+		{
+			puts("No ROM selected.");
+			exit(EXIT_FAILURE);
 		}
-		break;
+		else if(result != NFD_OKAY)
+		{
+			printf("Error: %s\n", NFD_GetError());
+			exit(EXIT_FAILURE);
+		}
+	}
+	break;
 #endif
 
 	case 2:
@@ -686,20 +724,23 @@ int main(int argc, char **argv)
 
 	/* Initialise emulator context. */
 	gb_ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write,
-			&gb_error, &priv);
+			 &gb_error, &priv);
 
 	switch(gb_ret)
 	{
 	case GB_INIT_NO_ERROR:
 		break;
+
 	case GB_INIT_CARTRIDGE_UNSUPPORTED:
 		puts("Unsupported cartridge.");
 		ret = EXIT_FAILURE;
 		goto out;
+
 	case GB_INIT_INVALID_CHECKSUM:
 		puts("Invalid ROM: Checksum failure.");
 		ret = EXIT_FAILURE;
 		goto out;
+
 	default:
 		printf("Unknown error: %d\n", gb_ret);
 		ret = EXIT_FAILURE;
@@ -756,25 +797,24 @@ int main(int argc, char **argv)
 	if(SDL_GameControllerAddMappingsFromFile("gamecontrollerdb.txt") < 0)
 	{
 		printf("Unable to assign joystick mappings: %s\n",
-				SDL_GetError());
+		       SDL_GetError());
 	}
 
 	/* Open the first available controller. */
 	for(uint_fast8_t i = 0; i < SDL_NumJoysticks(); i++)
 	{
-		if (SDL_IsGameController(i))
+		if(SDL_IsGameController(i))
 		{
 			controller = SDL_GameControllerOpen(i);
-			if (controller)
+
+			if(controller)
 			{
 				printf("Game Controller %s connected.\n",
-						SDL_GameControllerName(controller));
+				       SDL_GameControllerName(controller));
 				break;
 			}
 			else
-			{
 				printf("Could not open gamecontroller %i: %s\n", i, SDL_GetError());
-			}
 		}
 	}
 
@@ -785,10 +825,11 @@ int main(int argc, char **argv)
 		printf("MBC: %d\n", gb.mbc);
 
 		window = SDL_CreateWindow(title_str,
-				SDL_WINDOWPOS_UNDEFINED,
-				SDL_WINDOWPOS_UNDEFINED,
-				LCD_WIDTH * 2, LCD_HEIGHT * 2,
-				SDL_WINDOW_RESIZABLE | SDL_WINDOW_INPUT_FOCUS);
+					  SDL_WINDOWPOS_UNDEFINED,
+					  SDL_WINDOWPOS_UNDEFINED,
+					  LCD_WIDTH * 2, LCD_HEIGHT * 2,
+					  SDL_WINDOW_RESIZABLE | SDL_WINDOW_INPUT_FOCUS);
+
 		if(window == NULL)
 		{
 			printf("Could not create window: %s\n", SDL_GetError());
@@ -801,7 +842,8 @@ int main(int argc, char **argv)
 	SDL_SetWindowMinimumSize(window, LCD_WIDTH, LCD_HEIGHT);
 
 	renderer = SDL_CreateRenderer(window, -1,
-			SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
+				      SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
+
 	if(renderer == NULL)
 	{
 		printf("Could not create renderer: %s\n", SDL_GetError());
@@ -822,6 +864,7 @@ int main(int argc, char **argv)
 		ret = EXIT_FAILURE;
 		goto out;
 	}
+
 	SDL_RenderPresent(renderer);
 
 	/* Use integer scale. */
@@ -829,9 +872,10 @@ int main(int argc, char **argv)
 	SDL_RenderSetIntegerScale(renderer, 1);
 
 	texture = SDL_CreateTexture(renderer,
-			SDL_PIXELFORMAT_RGB555,
-			SDL_TEXTUREACCESS_STREAMING,
-			LCD_WIDTH, LCD_HEIGHT);
+				    SDL_PIXELFORMAT_RGB555,
+				    SDL_TEXTUREACCESS_STREAMING,
+				    LCD_WIDTH, LCD_HEIGHT);
+
 	if(texture == NULL)
 	{
 		printf("Texture could not be created: %s\n", SDL_GetError());
@@ -857,103 +901,202 @@ int main(int argc, char **argv)
 		{
 			switch(event.type)
 			{
-				case SDL_QUIT:
-					running = 0;
+			case SDL_QUIT:
+				running = 0;
+				break;
+
+			case SDL_CONTROLLERBUTTONDOWN:
+			case SDL_CONTROLLERBUTTONUP:
+				switch(event.cbutton.button)
+				{
+				case SDL_CONTROLLER_BUTTON_A:
+					gb.direct.joypad_bits.a = !event.cbutton.state;
 					break;
 
-				case SDL_CONTROLLERBUTTONDOWN:
-				case SDL_CONTROLLERBUTTONUP:
-					switch(event.cbutton.button)
-					{
-						case SDL_CONTROLLER_BUTTON_A: gb.direct.joypad_bits.a = !event.cbutton.state; break;
-						case SDL_CONTROLLER_BUTTON_B: gb.direct.joypad_bits.b = !event.cbutton.state; break;
-						case SDL_CONTROLLER_BUTTON_BACK: gb.direct.joypad_bits.select = !event.cbutton.state; break;
-						case SDL_CONTROLLER_BUTTON_START: gb.direct.joypad_bits.start = !event.cbutton.state; break;
-						case SDL_CONTROLLER_BUTTON_DPAD_UP: gb.direct.joypad_bits.up = !event.cbutton.state; break;
-						case SDL_CONTROLLER_BUTTON_DPAD_RIGHT: gb.direct.joypad_bits.right = !event.cbutton.state; break;
-						case SDL_CONTROLLER_BUTTON_DPAD_DOWN: gb.direct.joypad_bits.down = !event.cbutton.state; break;
-						case SDL_CONTROLLER_BUTTON_DPAD_LEFT: gb.direct.joypad_bits.left = !event.cbutton.state; break;
-					}
+				case SDL_CONTROLLER_BUTTON_B:
+					gb.direct.joypad_bits.b = !event.cbutton.state;
 					break;
 
-				case SDL_KEYDOWN:
-					switch(event.key.keysym.sym)
-					{
-						case SDLK_RETURN: gb.direct.joypad_bits.start = 0; break;
-						case SDLK_BACKSPACE: gb.direct.joypad_bits.select = 0; break;
-						case SDLK_z: gb.direct.joypad_bits.a = 0; break;
-						case SDLK_x: gb.direct.joypad_bits.b = 0; break;
-						case SDLK_UP: gb.direct.joypad_bits.up = 0; break;
-						case SDLK_RIGHT: gb.direct.joypad_bits.right = 0; break;
-						case SDLK_DOWN: gb.direct.joypad_bits.down = 0; break;
-						case SDLK_LEFT: gb.direct.joypad_bits.left = 0; break;
-						case SDLK_SPACE: fast_mode = 2; break;
-						case SDLK_1: fast_mode = 1; break;
-						case SDLK_2: fast_mode = 2; break;
-						case SDLK_3: fast_mode = 3; break;
-						case SDLK_4: fast_mode = 4; break;
-						case SDLK_r: gb_reset(&gb); break;
+				case SDL_CONTROLLER_BUTTON_BACK:
+					gb.direct.joypad_bits.select = !event.cbutton.state;
+					break;
+
+				case SDL_CONTROLLER_BUTTON_START:
+					gb.direct.joypad_bits.start = !event.cbutton.state;
+					break;
+
+				case SDL_CONTROLLER_BUTTON_DPAD_UP:
+					gb.direct.joypad_bits.up = !event.cbutton.state;
+					break;
+
+				case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
+					gb.direct.joypad_bits.right = !event.cbutton.state;
+					break;
+
+				case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
+					gb.direct.joypad_bits.down = !event.cbutton.state;
+					break;
+
+				case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
+					gb.direct.joypad_bits.left = !event.cbutton.state;
+					break;
+				}
+
+				break;
+
+			case SDL_KEYDOWN:
+				switch(event.key.keysym.sym)
+				{
+				case SDLK_RETURN:
+					gb.direct.joypad_bits.start = 0;
+					break;
+
+				case SDLK_BACKSPACE:
+					gb.direct.joypad_bits.select = 0;
+					break;
+
+				case SDLK_z:
+					gb.direct.joypad_bits.a = 0;
+					break;
+
+				case SDLK_x:
+					gb.direct.joypad_bits.b = 0;
+					break;
+
+				case SDLK_UP:
+					gb.direct.joypad_bits.up = 0;
+					break;
+
+				case SDLK_RIGHT:
+					gb.direct.joypad_bits.right = 0;
+					break;
+
+				case SDLK_DOWN:
+					gb.direct.joypad_bits.down = 0;
+					break;
+
+				case SDLK_LEFT:
+					gb.direct.joypad_bits.left = 0;
+					break;
+
+				case SDLK_SPACE:
+					fast_mode = 2;
+					break;
+
+				case SDLK_1:
+					fast_mode = 1;
+					break;
+
+				case SDLK_2:
+					fast_mode = 2;
+					break;
+
+				case SDLK_3:
+					fast_mode = 3;
+					break;
+
+				case SDLK_4:
+					fast_mode = 4;
+					break;
+
+				case SDLK_r:
+					gb_reset(&gb);
+					break;
 #if ENABLE_LCD
-						case SDLK_i:
-							     gb.direct.interlace = ~gb.direct.interlace;
-							     break;
 
-						case SDLK_f:
-							     gb.direct.frame_skip = ~gb.direct.frame_skip;
-							     break;
-
-						case SDLK_b:
-							     dump_bmp = ~dump_bmp;
-							     if(dump_bmp)
-								     puts("Dumping frames");
-							     else
-								     printf("\nStopped dumping frames\n");
-
-							     break;
-#endif
-						case SDLK_p:
-							if(event.key.keysym.mod == KMOD_LSHIFT)
-							{
-							auto_assign_palette(&priv, gb_colour_hash(&gb));
-							break;
-							}
-							if(++selected_palette == NUMBER_OF_PALETTES)
-								selected_palette = 0;
-
-							manual_assign_palette(&priv, selected_palette);
-							break;
-					}
+				case SDLK_i:
+					gb.direct.interlace = ~gb.direct.interlace;
 					break;
 
-				case SDL_KEYUP:
-					switch(event.key.keysym.sym)
+				case SDLK_f:
+					gb.direct.frame_skip = ~gb.direct.frame_skip;
+					break;
+
+				case SDLK_b:
+					dump_bmp = ~dump_bmp;
+
+					if(dump_bmp)
+						puts("Dumping frames");
+					else
+						printf("\nStopped dumping frames\n");
+
+					break;
+#endif
+
+				case SDLK_p:
+					if(event.key.keysym.mod == KMOD_LSHIFT)
 					{
-						case SDLK_RETURN: gb.direct.joypad_bits.start = 1; break;
-						case SDLK_BACKSPACE: gb.direct.joypad_bits.select = 1; break;
-						case SDLK_z: gb.direct.joypad_bits.a = 1; break;
-						case SDLK_x: gb.direct.joypad_bits.b = 1; break;
-						case SDLK_UP: gb.direct.joypad_bits.up = 1; break;
-						case SDLK_RIGHT: gb.direct.joypad_bits.right = 1; break;
-						case SDLK_DOWN: gb.direct.joypad_bits.down = 1; break;
-						case SDLK_LEFT: gb.direct.joypad_bits.left = 1; break;
-						case SDLK_SPACE: fast_mode = 1; break;
-						case SDLK_F11:
-						{
-							static int fullscreen = 0;
-							if(fullscreen)
-							{
-								SDL_SetWindowFullscreen(window, 0);
-								fullscreen = 0;
-							}
-							else
-							{
-								SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
-								fullscreen = SDL_WINDOW_FULLSCREEN;
-							}
-						}
+						auto_assign_palette(&priv, gb_colour_hash(&gb));
 						break;
 					}
+
+					if(++selected_palette == NUMBER_OF_PALETTES)
+						selected_palette = 0;
+
+					manual_assign_palette(&priv, selected_palette);
 					break;
+				}
+
+				break;
+
+			case SDL_KEYUP:
+				switch(event.key.keysym.sym)
+				{
+				case SDLK_RETURN:
+					gb.direct.joypad_bits.start = 1;
+					break;
+
+				case SDLK_BACKSPACE:
+					gb.direct.joypad_bits.select = 1;
+					break;
+
+				case SDLK_z:
+					gb.direct.joypad_bits.a = 1;
+					break;
+
+				case SDLK_x:
+					gb.direct.joypad_bits.b = 1;
+					break;
+
+				case SDLK_UP:
+					gb.direct.joypad_bits.up = 1;
+					break;
+
+				case SDLK_RIGHT:
+					gb.direct.joypad_bits.right = 1;
+					break;
+
+				case SDLK_DOWN:
+					gb.direct.joypad_bits.down = 1;
+					break;
+
+				case SDLK_LEFT:
+					gb.direct.joypad_bits.left = 1;
+					break;
+
+				case SDLK_SPACE:
+					fast_mode = 1;
+					break;
+
+				case SDLK_F11:
+				{
+					static int fullscreen = 0;
+
+					if(fullscreen)
+					{
+						SDL_SetWindowFullscreen(window, 0);
+						fullscreen = 0;
+					}
+					else
+					{
+						SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
+						fullscreen = SDL_WINDOW_FULLSCREEN;
+					}
+				}
+				break;
+				}
+
+				break;
 			}
 		}
 
@@ -961,7 +1104,8 @@ int main(int argc, char **argv)
 		gb_run_frame(&gb);
 
 		/* Tick the internal RTC when 1 second has passed. */
-		rtc_timer += target_speed_ms/fast_mode;
+		rtc_timer += target_speed_ms / fast_mode;
+
 		if(rtc_timer >= 1000)
 		{
 			rtc_timer -= 1000;
@@ -993,6 +1137,7 @@ int main(int argc, char **argv)
 
 		if(dump_bmp)
 			save_lcd_bmp(&gb, priv.fb);
+
 #endif
 
 		/* Use a delay that will draw the screen at a rate of 59.7275 Hz. */
@@ -1020,6 +1165,7 @@ int main(int argc, char **argv)
 
 			/* Tick the internal RTC when 1 second has passed. */
 			rtc_timer += delay;
+
 			if(rtc_timer >= 1000)
 			{
 				rtc_timer -= 1000;
@@ -1032,6 +1178,7 @@ int main(int argc, char **argv)
 				 * TODO: Remove use of assert in audio library
 				 * in release build. */
 				--save_timer;
+
 				if(!save_timer)
 				{
 #if ENABLE_SOUND
@@ -1040,8 +1187,8 @@ int main(int argc, char **argv)
 					SDL_LockAudioDevice(dev);
 #endif
 					write_cart_ram_file(save_file_name,
-							&priv.cart_ram,
-							gb_get_save_size(&gb));
+							    &priv.cart_ram,
+							    gb_get_save_size(&gb));
 #if ENABLE_SOUND
 					SDL_UnlockAudioDevice(dev);
 #endif
@@ -1056,7 +1203,7 @@ int main(int argc, char **argv)
 
 			after_delay_ticks = SDL_GetTicks();
 			speed_compensation += (double)delay -
-				(int)(after_delay_ticks - delay_ticks);
+					      (int)(after_delay_ticks - delay_ticks);
 		}
 	}
 
@@ -1075,7 +1222,7 @@ int main(int argc, char **argv)
 out:
 	free(priv.rom);
 	free(priv.cart_ram);
-	
+
 	/* If the save file name was automatically generated (which required memory
 	 * allocated on the help), then free it here. */
 	if(argc == 2)

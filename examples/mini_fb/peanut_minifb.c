@@ -47,7 +47,7 @@ uint8_t gb_cart_ram_read(struct gb_s *gb, const uint_fast32_t addr)
  * Writes a given byte to the cartridge RAM at the given address.
  */
 void gb_cart_ram_write(struct gb_s *gb, const uint_fast32_t addr,
-		const uint8_t val)
+		       const uint8_t val)
 {
 	const struct priv_t * const p = gb->direct.priv;
 	p->cart_ram[addr] = val;
@@ -86,16 +86,17 @@ uint8_t *read_rom_to_ram(const char *file_name)
  */
 void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
 {
-	const char* gb_err_str[4] = {
+	const char* gb_err_str[4] =
+	{
 		"UNKNOWN",
 		"INVALID OPCODE",
 		"INVALID READ",
 		"INVALID WRITE"
 	};
 	fprintf(stderr, "Error %d occurred: %s\n. Abort.\n",
-			gb_err,
-			gb_err >= GB_INVALID_MAX ?
-				gb_err_str[0] : gb_err_str[gb_err]);
+		gb_err,
+		gb_err >= GB_INVALID_MAX ?
+		gb_err_str[0] : gb_err_str[gb_err]);
 	abort();
 }
 
@@ -104,12 +105,12 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
  * Draws scanline into framebuffer.
  */
 void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
-		const uint_least8_t line)
+		   const uint_least8_t line)
 {
 	struct priv_t *priv = gb->direct.priv;
 	const uint32_t palette[] = { 0xFFFFFF, 0xA5A5A5, 0x525252, 0x000000 };
 
-	for (unsigned int x = 0; x < LCD_WIDTH; x++)
+	for(unsigned int x = 0; x < LCD_WIDTH; x++)
 		priv->fb[line][x] = palette[pixels[x] & 3];
 }
 #endif
@@ -124,13 +125,13 @@ int main(int argc, char **argv)
 
 	switch(argc)
 	{
-		case 2:
-			rom_file_name = argv[1];
-			break;
+	case 2:
+		rom_file_name = argv[1];
+		break;
 
-		default:
-			fprintf(stderr, "%s ROM\n", argv[0]);
-			exit(EXIT_FAILURE);
+	default:
+		fprintf(stderr, "%s ROM\n", argv[0]);
+		exit(EXIT_FAILURE);
 	}
 
 	/* Copy input ROM file to allocated memory. */
@@ -142,7 +143,7 @@ int main(int argc, char **argv)
 
 	/* Initialise context. */
 	ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read,
-			&gb_cart_ram_write, &gb_error, &priv);
+		      &gb_cart_ram_write, &gb_error, &priv);
 
 	if(ret != GB_INIT_NO_ERROR)
 	{
@@ -157,12 +158,12 @@ int main(int argc, char **argv)
 	// gb.direct.interlace = 1;
 #endif
 
-	if (!mfb_open("Peanut-minifb", LCD_WIDTH, LCD_HEIGHT))
+	if(!mfb_open("Peanut-minifb", LCD_WIDTH, LCD_HEIGHT))
 		return EXIT_FAILURE;
 
 	while(1)
 	{
-		const double target_speed_us = 1000000.0/VERTICAL_SYNC;
+		const double target_speed_us = 1000000.0 / VERTICAL_SYNC;
 		int_fast16_t delay;
 		unsigned long start, end;
 		struct timeval timecheck;
@@ -178,12 +179,12 @@ int main(int argc, char **argv)
 		state = mfb_update(priv.fb);
 
 		/* ESC pressed */
-		if (state < 0)
+		if(state < 0)
 			break;
 
 		gettimeofday(&timecheck, NULL);
 		end = (long)timecheck.tv_sec * 1000000 +
-			(long)timecheck.tv_usec;
+		      (long)timecheck.tv_usec;
 
 		delay = target_speed_us - (end - start);
 
@@ -194,7 +195,7 @@ int main(int argc, char **argv)
 		 */
 		if(delay < 0)
 			continue;
-		
+
 		usleep(delay);
 	}
 

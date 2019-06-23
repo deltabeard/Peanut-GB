@@ -1,0 +1,12 @@
+--style=allman
+--indent=force-tab=8
+--attach-closing-while
+--indent-preproc-block
+--indent-preproc-define
+--indent-col1-comments
+--break-blocks
+--pad-oper
+--unpad-paren
+--align-reference=name
+--remove-braces
+--max-code-length=80
