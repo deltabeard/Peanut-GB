@@ -20,7 +20,7 @@ struct priv_t
 /**
  * Return byte from blarrg test ROM.
  */
-uint8_t gb_rom_read(struct gb_t *gb, const uint_fast32_t addr)
+uint8_t gb_rom_read(struct gb_s *gb, const uint_fast32_t addr)
 {
 	const struct priv_t * const p = gb->direct.priv;
 	return p->rom[addr];
@@ -29,7 +29,7 @@ uint8_t gb_rom_read(struct gb_t *gb, const uint_fast32_t addr)
 /**
  * Ignore cart RAM writes, since the test doesn't require it.
  */
-void gb_cart_ram_write(struct gb_t *gb, const uint_fast32_t addr, const uint8_t val)
+void gb_cart_ram_write(struct gb_s *gb, const uint_fast32_t addr, const uint8_t val)
 {
 	(void)gb;
 	(void)addr;
@@ -40,7 +40,7 @@ void gb_cart_ram_write(struct gb_t *gb, const uint_fast32_t addr, const uint8_t 
 /**
  * Ignore cart RAM reads, since the test doesn't require it.
  */
-uint8_t gb_cart_ram_read(struct gb_t *gb, const uint_fast32_t addr)
+uint8_t gb_cart_ram_read(struct gb_s *gb, const uint_fast32_t addr)
 {
 	(void)gb;
 	(void)addr;
@@ -50,7 +50,7 @@ uint8_t gb_cart_ram_read(struct gb_t *gb, const uint_fast32_t addr)
 /**
  * Ignore all errors.
  */
-void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
+void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
 {
 	(void)gb;
 	(void)gb_err;
@@ -110,7 +110,7 @@ int main(int argc, char **argv)
 	for(unsigned int i = 0; i < 5; i++)
 	{
 		/* Start benchmark. */
-		struct gb_t gb;
+		struct gb_s gb;
 		const uint_fast64_t start_time = (uint_fast64_t)clock();
 		uint_fast64_t bench_ticks;
 		uint_fast64_t bench_fps;

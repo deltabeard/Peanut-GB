@@ -154,7 +154,7 @@
 #define MIN(a, b)   ((a) < (b) ? (a) : (b))
 #endif
 
-struct cpu_registers_t
+struct cpu_registers_s
 {
 	/* Combine A and F registers. */
 	union {
@@ -203,7 +203,7 @@ struct cpu_registers_t
 	uint16_t pc; /* Program counter */
 };
 
-struct count_t
+struct count_s
 {
 	uint16_t lcd_count;		/* LCD Timing */
 	uint16_t div_count;		/* Divider Register Counter */
@@ -227,7 +227,7 @@ struct count_t
 #endif
 };
 
-struct gb_registers_t
+struct gb_registers_s
 {
 	/* TODO: Sort variables in address order. */
 	/* Timing */
@@ -318,47 +318,47 @@ enum gb_init_error_e
  * Only values within the `direct` struct may be modified directly by the
  * front-end implementation. Other variables must not be modified.
  */
-struct gb_t
+struct gb_s
 {
 	/**
 	 * Return byte from ROM at given address.
 	 *
-	 * \param gb_t	emulator context
+	 * \param gb_s	emulator context
 	 * \param addr	address
 	 * \return		byte at address in ROM
 	 */
-	uint8_t (*gb_rom_read)(struct gb_t*, const uint_fast32_t addr);
+	uint8_t (*gb_rom_read)(struct gb_s*, const uint_fast32_t addr);
 
 	/**
 	 * Return byte from cart RAM at given address.
 	 *
-	 * \param gb_t	emulator context
+	 * \param gb_s	emulator context
 	 * \param addr	address
 	 * \return		byte at address in RAM
 	 */
-	uint8_t (*gb_cart_ram_read)(struct gb_t*, const uint_fast32_t addr);
+	uint8_t (*gb_cart_ram_read)(struct gb_s*, const uint_fast32_t addr);
 
 	/**
 	 * Write byte to cart RAM at given address.
 	 *
-	 * \param gb_t	emulator context
+	 * \param gb_s	emulator context
 	 * \param addr	address
 	 * \param val	value to write to address in RAM
 	 */
-	void (*gb_cart_ram_write)(struct gb_t*, const uint_fast32_t addr,
+	void (*gb_cart_ram_write)(struct gb_s*, const uint_fast32_t addr,
 			const uint8_t val);
 
 	/**
 	 * Notify front-end of error.
 	 *
-	 * \param gb_t			emulator context
+	 * \param gb_s			emulator context
 	 * \param gb_error_e	error code
 	 * \param val			arbitrary value related to error
 	 */
-	void (*gb_error)(struct gb_t*, const enum gb_error_e, const uint16_t val);
+	void (*gb_error)(struct gb_s*, const enum gb_error_e, const uint16_t val);
 
 	/* Transmit one byte and return the received byte. */
-	uint8_t (*gb_serial_transfer)(struct gb_t*, const uint8_t);
+	uint8_t (*gb_serial_transfer)(struct gb_s*, const uint8_t);
 
 	struct
 	{
@@ -404,9 +404,9 @@ struct gb_t
 		uint8_t cart_rtc[5];
 	};
 
-	struct cpu_registers_t cpu_reg;
-	struct gb_registers_t gb_reg;
-	struct count_t counter;
+	struct cpu_registers_s cpu_reg;
+	struct gb_registers_s gb_reg;
+	struct count_s counter;
 
 	/* TODO: Allow implementation to allocate WRAM, VRAM and Frame Buffer. */
 	uint8_t wram[WRAM_SIZE];
@@ -419,7 +419,7 @@ struct gb_t
 		/**
 		 * Draw line on screen.
 		 *
-		 * \param gb_t		emulator context
+		 * \param gb_s		emulator context
 		 * \param pixels	pixels to draw.
 		 * 			Bits 1-0 are the colour to draw.
 		 * 			Bits 5-4 are the palette, where:
@@ -435,7 +435,7 @@ struct gb_t
 		 * \param line		Line to draw pixels on. This is
 		 * guaranteed to be between 0-144 inclusive.
 		 */
-		void (*lcd_draw_line)(struct gb_t*, const uint8_t pixels[160],
+		void (*lcd_draw_line)(struct gb_s*, const uint8_t pixels[160],
 				const uint_least8_t line);
 
 		/* Palettes */
@@ -494,7 +494,7 @@ struct gb_t
 /**
  * Tick the internal RTC by one second.
  */
-void gb_tick_rtc(struct gb_t *gb)
+void gb_sick_rtc(struct gb_s *gb)
 {
 	/* is timer running? */
 	if((gb->cart_rtc[4] & 0x40) == 0)
@@ -526,7 +526,7 @@ void gb_tick_rtc(struct gb_t *gb)
  * Set initial values in RTC.
  * Should be called after gb_init().
  */
-void gb_set_rtc(struct gb_t *gb, const struct tm * const time)
+void gb_set_rtc(struct gb_s *gb, const struct tm * const time)
 {
 	gb->cart_rtc[0] = time->tm_sec;
 	gb->cart_rtc[1] = time->tm_min;
@@ -538,7 +538,7 @@ void gb_set_rtc(struct gb_t *gb, const struct tm * const time)
 /**
  * Internal function used to read bytes.
  */
-uint8_t __gb_read(struct gb_t *gb, const uint_fast16_t addr)
+uint8_t __gb_read(struct gb_s *gb, const uint_fast16_t addr)
 {
 	switch(addr >> 12)
 	{
@@ -666,7 +666,7 @@ uint8_t __gb_read(struct gb_t *gb, const uint_fast16_t addr)
 /**
  * Internal function used to write bytes.
  */
-void __gb_write(struct gb_t *gb, const uint_fast16_t addr, const uint8_t val)
+void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 {
 	switch(addr >> 12)
 	{
@@ -911,7 +911,7 @@ void __gb_write(struct gb_t *gb, const uint_fast16_t addr, const uint8_t val)
 /**
  * Resets the context, and initialises startup values.
  */
-void gb_reset(struct gb_t *gb)
+void gb_reset(struct gb_s *gb)
 {
 	gb->gb_halt = 0;
 	gb->gb_ime = 1;
@@ -972,7 +972,7 @@ void gb_reset(struct gb_t *gb)
 	gb->gb_reg.P1 = 0xCF;
 }
 
-void __gb_execute_cb(struct gb_t *gb)
+void __gb_execute_cb(struct gb_s *gb)
 {
 	uint8_t cbop = __gb_read(gb, gb->cpu_reg.pc++);
 	uint8_t r = (cbop & 0x7);
@@ -1105,7 +1105,7 @@ void __gb_execute_cb(struct gb_t *gb)
 }
 
 #if ENABLE_LCD
-void __gb_draw_line(struct gb_t *gb)
+void __gb_draw_line(struct gb_s *gb)
 {
 	uint8_t pixels[160] = {0};
 
@@ -1367,7 +1367,7 @@ void __gb_draw_line(struct gb_t *gb)
 /**
  * Internal function used to step the CPU.
  */
-void __gb_step_cpu(struct gb_t *gb)
+void __gb_step_cpu(struct gb_s *gb)
 {
 	uint8_t opcode, inst_cycles;
 	static const uint8_t op_cycles[0x100] = {
@@ -3123,7 +3123,7 @@ void __gb_step_cpu(struct gb_t *gb)
 	}
 }
 
-void gb_run_frame(struct gb_t *gb)
+void gb_run_frame(struct gb_s *gb)
 {
 	gb->gb_frame = 0;
 	while(!gb->gb_frame)
@@ -3133,7 +3133,7 @@ void gb_run_frame(struct gb_t *gb)
 /**
  * Gets the size of the save file required for the ROM.
  */
-uint_fast32_t gb_get_save_size(struct gb_t *gb)
+uint_fast32_t gb_get_save_size(struct gb_s *gb)
 {
 	const uint_fast16_t ram_size_location = 0x0149;
 	const uint_fast32_t ram_sizes[] = {
@@ -3149,13 +3149,13 @@ uint_fast32_t gb_get_save_size(struct gb_t *gb)
  * gb_serial_transfer takes a byte to transmit and returns the received byte. If
  * no cable is connected to the console, return 0xFF.
  */
-void gb_init_serial(struct gb_t *gb,
-		uint8_t (*gb_serial_transfer)(struct gb_t*, const uint8_t))
+void gb_init_serial(struct gb_s *gb,
+		uint8_t (*gb_serial_transfer)(struct gb_s*, const uint8_t))
 {
 	gb->gb_serial_transfer = gb_serial_transfer;
 }
 
-uint8_t gb_colour_hash(struct gb_t *gb)
+uint8_t gb_colour_hash(struct gb_s *gb)
 {
 #define ROM_TITLE_START_ADDR	0x0134
 #define ROM_TITLE_END_ADDR	0x0143 
@@ -3171,11 +3171,11 @@ uint8_t gb_colour_hash(struct gb_t *gb)
  * Initialise the emulator context. gb_reset() is also called to initialise
  * the CPU.
  */
-enum gb_init_error_e gb_init(struct gb_t *gb,
-		uint8_t (*gb_rom_read)(struct gb_t*, const uint_fast32_t),
-		uint8_t (*gb_cart_ram_read)(struct gb_t*, const uint_fast32_t),
-		void (*gb_cart_ram_write)(struct gb_t*, const uint_fast32_t, const uint8_t),
-		void (*gb_error)(struct gb_t*, const enum gb_error_e, const uint16_t),
+enum gb_init_error_e gb_init(struct gb_s *gb,
+		uint8_t (*gb_rom_read)(struct gb_s*, const uint_fast32_t),
+		uint8_t (*gb_cart_ram_read)(struct gb_s*, const uint_fast32_t),
+		void (*gb_cart_ram_write)(struct gb_s*, const uint_fast32_t, const uint8_t),
+		void (*gb_error)(struct gb_s*, const enum gb_error_e, const uint16_t),
 		void *priv)
 {
 	const uint16_t mbc_location = 0x0147;
@@ -3259,7 +3259,7 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
 /**
  * Used to initialise audio. Must be called after gb_init().
  * TODO: Make gb_init_audio() optional.
- * TODO: Don't pass gb_t to front-end functions elsewhere.
+ * TODO: Don't pass gb_s to front-end functions elsewhere.
  *
  * @param gb		Emulator context.
  * @param buffer	Buffer to store u8 stereo audio samples.
@@ -3268,7 +3268,7 @@ enum gb_init_error_e gb_init(struct gb_t *gb,
  * @param queue_audio	Function to call to queue buffer filled with new
  * 						samples.
  */
-void gb_init_audio(struct gb_t *gb, uint8_t *buffer, unsigned int len,
+void gb_init_audio(struct gb_s *gb, uint8_t *buffer, unsigned int len,
 		unsigned int rate,
 		void (*queue_audio)(void *priv, const uint8_t * const buffer,
 			const unsigned int len))
@@ -3292,7 +3292,7 @@ void gb_init_audio(struct gb_t *gb, uint8_t *buffer, unsigned int len,
  * \param title_str	Allocated string at least 16 characters.
  * \returns		Pointer to start of string, null terminated.
  */
-const char* gb_get_rom_name(struct gb_t* gb, char* title_str)
+const char* gb_get_rom_name(struct gb_s* gb, char* title_str)
 {
 	uint_least16_t title_loc = 0x134;
 	/* End of title may be 0x13E for newer games. */
@@ -3317,8 +3317,8 @@ const char* gb_get_rom_name(struct gb_t* gb, char* title_str)
 }
 
 #if ENABLE_LCD
-void gb_init_lcd(struct gb_t *gb,
-		void (*lcd_draw_line)(struct gb_t*, const uint8_t pixels[160],
+void gb_init_lcd(struct gb_s *gb,
+		void (*lcd_draw_line)(struct gb_s*, const uint8_t pixels[160],
 				const uint_least8_t line))
 {
 	gb->display.lcd_draw_line = lcd_draw_line;

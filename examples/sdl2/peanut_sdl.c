@@ -38,7 +38,7 @@ struct priv_t
 /**
  * Returns a byte from the ROM file at the given address.
  */
-uint8_t gb_rom_read(struct gb_t *gb, const uint_fast32_t addr)
+uint8_t gb_rom_read(struct gb_s *gb, const uint_fast32_t addr)
 {
 	const struct priv_t * const p = gb->direct.priv;
 	return p->rom[addr];
@@ -47,7 +47,7 @@ uint8_t gb_rom_read(struct gb_t *gb, const uint_fast32_t addr)
 /**
  * Returns a byte from the cartridge RAM at the given address.
  */
-uint8_t gb_cart_ram_read(struct gb_t *gb, const uint_fast32_t addr)
+uint8_t gb_cart_ram_read(struct gb_s *gb, const uint_fast32_t addr)
 {
 	const struct priv_t * const p = gb->direct.priv;
 	return p->cart_ram[addr];
@@ -56,7 +56,7 @@ uint8_t gb_cart_ram_read(struct gb_t *gb, const uint_fast32_t addr)
 /**
  * Writes a given byte to the cartridge RAM at the given address.
  */
-void gb_cart_ram_write(struct gb_t *gb, const uint_fast32_t addr,
+void gb_cart_ram_write(struct gb_s *gb, const uint_fast32_t addr,
 		const uint8_t val)
 {
 	const struct priv_t * const p = gb->direct.priv;
@@ -149,7 +149,7 @@ void write_cart_ram_file(const char *save_file_name, uint8_t **dest,
  * Handles an error reported by the emulator. The emulator context may be used
  * to better understand why the error given in gb_err was reported.
  */
-void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
+void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
 {
 	struct priv_t *priv = gb->direct.priv;
 
@@ -508,7 +508,7 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 /**
  * Draws scanline into framebuffer.
  */
-void lcd_draw_line(struct gb_t *gb, const uint8_t pixels[160],
+void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
 		const uint_least8_t line)
 {
 	struct priv_t *priv = gb->direct.priv;
@@ -525,7 +525,7 @@ void lcd_draw_line(struct gb_t *gb, const uint8_t pixels[160],
 /**
  * Saves the LCD screen as a 24-bit BMP file.
  */
-void save_lcd_bmp(struct gb_t* gb, uint16_t fb[LCD_HEIGHT][LCD_WIDTH])
+void save_lcd_bmp(struct gb_s* gb, uint16_t fb[LCD_HEIGHT][LCD_WIDTH])
 {
 	static uint_least32_t file_num = 0;
 	char file_name[32];
@@ -568,7 +568,7 @@ void save_lcd_bmp(struct gb_t* gb, uint16_t fb[LCD_HEIGHT][LCD_WIDTH])
 
 int main(int argc, char **argv)
 {
-	struct gb_t gb;
+	struct gb_s gb;
 	struct priv_t priv = {
 		.rom = NULL,
 		.cart_ram = NULL
@@ -965,7 +965,7 @@ int main(int argc, char **argv)
 		if(rtc_timer >= 1000)
 		{
 			rtc_timer -= 1000;
-			gb_tick_rtc(&gb);
+			gb_sick_rtc(&gb);
 		}
 
 		/* Skip frames during fast mode. */
@@ -1023,7 +1023,7 @@ int main(int argc, char **argv)
 			if(rtc_timer >= 1000)
 			{
 				rtc_timer -= 1000;
-				gb_tick_rtc(&gb);
+				gb_sick_rtc(&gb);
 
 				/* If 60 seconds has passed, record save file.
 				 * We do this because the external audio library
