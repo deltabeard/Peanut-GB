@@ -686,7 +686,7 @@ void __gb_write(struct gb_t *gb, const uint16_t addr, const uint8_t val)
 					gb->selected_rom_bank % gb->num_rom_banks;
 				return;
 			}
-			/* TODO: Check if this should continue to next case. */
+			/* Intentional fall through. */
 
 		case 0x3:
 			if(gb->mbc == 1)
