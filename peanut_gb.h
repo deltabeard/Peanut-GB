@@ -42,18 +42,18 @@
 #define INTERNAL_AUDIO 0
 
 /* Interrupt masks */
-#define VBLANK_INTR		0x01
-#define LCDC_INTR		0x02
-#define TIMER_INTR		0x04
-#define SERIAL_INTR		0x08
+#define VBLANK_INTR	0x01
+#define LCDC_INTR	0x02
+#define TIMER_INTR	0x04
+#define SERIAL_INTR	0x08
 #define CONTROL_INTR	0x10
-#define ANY_INTR		0x1F
+#define ANY_INTR	0x1F
 
 /* Memory section sizes for DMG */
-#define WRAM_SIZE		0x2000
-#define VRAM_SIZE		0x2000
-#define HRAM_SIZE		0x0100
-#define OAM_SIZE		0x00A0
+#define WRAM_SIZE	0x2000
+#define VRAM_SIZE	0x2000
+#define HRAM_SIZE	0x0100
+#define OAM_SIZE	0x00A0
 
 /* Memory addresses */
 #define ROM_0_ADDR      0x0000
