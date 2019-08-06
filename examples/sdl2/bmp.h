@@ -150,6 +150,31 @@ bmp_set(void *buf, long x, long y, unsigned long color)
     p[2]  = color >> 16;
 }
 
+static void
+bmp_set_rgb(void *buf, long x, long y, unsigned char r, unsigned char g, unsigned char b)
+{
+    unsigned char *p;
+    unsigned char *hdr = (unsigned char *)buf;
+    unsigned long width =
+        (unsigned long)hdr[18] <<  0 |
+        (unsigned long)hdr[19] <<  8 |
+        (unsigned long)hdr[20] << 16 |
+        (unsigned long)hdr[21] << 24;
+    long pad = (width * 3) % 4;
+#ifdef BMP_COMPAT
+    unsigned long height =
+        (unsigned long)hdr[22] <<  0 |
+        (unsigned long)hdr[23] <<  8 |
+        (unsigned long)hdr[24] << 16 |
+        (unsigned long)hdr[25] << 24;
+    y = height - y - 1;
+#endif
+    p = hdr + 14 + 40 + y * (width + pad) * 3 + x * 3;
+    p[0]  = b;
+    p[1]  = g;
+    p[2]  = r;
+}
+
 static unsigned long
 bmp_get(const void *buf, long x, long y)
 {

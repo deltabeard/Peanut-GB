@@ -581,13 +581,15 @@ void save_lcd_bmp(struct gb_s* gb, uint16_t fb[LCD_HEIGHT][LCD_WIDTH])
 		for(uint_least8_t x = 0; x < LCD_WIDTH; x++)
 		{
 			/* Convert 555RGB to 888RGB */
-			uint_least32_t bmp_pixel =
-				(fb[y][x] & 0b0000000000011111) << 3 |
-				((fb[y][x] & 0b000001111100000) << 6) |
-				((fb[y][x] & 0b111110000000000) << 9);
+
+			// RGB555: 0b X RRRRR GGGGG BBBBB
+			// RGB888: 0b XXXXXXXX RRRRRRRR GGGGGGGG BBBBBBBB
 
 			/* Set pixel */
-			bmp_set(bmp_buffer, x, y, bmp_pixel);
+			bmp_set_rgb(bmp_buffer, x, y,
+					(fb[y][x] & 0b0111110000000000) >> 7,
+					(fb[y][x] & 0b0000001111100000) >> 2,
+					(fb[y][x] & 0b0000000000011111) << 3);
 		}
 	}
 
@@ -1177,6 +1179,8 @@ int main(int argc, char **argv)
 				 * program without save.
 				 * TODO: Remove use of assert in audio library
 				 * in release build. */
+				/* TODO: Remove all workarounds due to faulty
+				 * external libraries. */
 				--save_timer;
 
 				if(!save_timer)
