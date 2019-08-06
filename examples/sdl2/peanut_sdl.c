@@ -901,6 +901,8 @@ int main(int argc, char **argv)
 		/* Get joypad input. */
 		while(SDL_PollEvent(&event))
 		{
+			static int fullscreen = 0;
+
 			switch(event.type)
 			{
 			case SDL_QUIT:
@@ -1010,7 +1012,7 @@ int main(int argc, char **argv)
 					gb.direct.interlace = ~gb.direct.interlace;
 					break;
 
-				case SDLK_f:
+				case SDLK_o:
 					gb.direct.frame_skip = ~gb.direct.frame_skip;
 					break;
 
@@ -1080,19 +1082,34 @@ int main(int argc, char **argv)
 					fast_mode = 1;
 					break;
 
-				case SDLK_F11:
-				{
-					static int fullscreen = 0;
-
+				case SDLK_f:
 					if(fullscreen)
 					{
 						SDL_SetWindowFullscreen(window, 0);
 						fullscreen = 0;
+						SDL_ShowCursor(SDL_ENABLE);
+					}
+					else
+					{
+						SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+						fullscreen = SDL_WINDOW_FULLSCREEN_DESKTOP;
+						SDL_ShowCursor(SDL_DISABLE);
+					}
+					break;
+
+				case SDLK_F11:
+				{
+					if(fullscreen)
+					{
+						SDL_SetWindowFullscreen(window, 0);
+						fullscreen = 0;
+						SDL_ShowCursor(SDL_ENABLE);
 					}
 					else
 					{
 						SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
 						fullscreen = SDL_WINDOW_FULLSCREEN;
+						SDL_ShowCursor(SDL_DISABLE);
 					}
 				}
 				break;
