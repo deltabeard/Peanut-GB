@@ -15,8 +15,10 @@
 
 #include <SDL2/SDL.h>
 
-#if ENABLE_SOUND
-	#include "gb_apu/audio.h"
+#ifdef ENABLE_SOUND_BLARGG
+#	include "blargg_apu/audio.h"
+#elif defined ENABLE_SOUND_PEANUT
+#	include "peanut_apu/peanut_apu.h"
 #endif
 
 #include "../../peanut_gb.h"
@@ -785,10 +787,33 @@ int main(int argc, char **argv)
 		goto out;
 	}
 
-#if ENABLE_SOUND
 	SDL_AudioDeviceID dev;
+#ifdef ENABLE_SOUND_BLARGG
 	audio_init(&dev);
+#elif defined ENABLE_SOUND_PEANUT
+	{
+		SDL_AudioSpec want, have;
+
+		want.freq = AUDIO_SAMPLE_RATE;
+		want.format   = AUDIO_F32SYS,
+		want.channels = 2;
+		want.samples = 1024;
+		want.callback = audio_callback;
+		want.userdata = NULL;
+
+		printf("Audio driver: %s\n", SDL_GetAudioDeviceName(0, 0));
+
+		if((dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0)) == 0)
+		{
+			printf("SDL could not open audio device: %s\n", SDL_GetError());
+			exit(EXIT_FAILURE);
+		}
+
+		audio_init();
+		SDL_PauseAudioDevice(dev, 0);
+	}
 #endif
+
 #if ENABLE_LCD
 	gb_init_lcd(&gb, &lcd_draw_line);
 #endif
@@ -1142,7 +1167,7 @@ int main(int argc, char **argv)
 
 		fast_mode_timer = fast_mode;
 
-#if ENABLE_SOUND
+#if ENABLE_SOUND_BLARGG
 		/* Process audio. */
 		audio_frame();
 #endif
@@ -1202,7 +1227,7 @@ int main(int argc, char **argv)
 
 				if(!save_timer)
 				{
-#if ENABLE_SOUND
+#if ENABLE_SOUND_BLARGG
 					/* Locking the audio thread to reduce
 					 * possibility of abort during save. */
 					SDL_LockAudioDevice(dev);
@@ -1210,7 +1235,7 @@ int main(int argc, char **argv)
 					write_cart_ram_file(save_file_name,
 							    &priv.cart_ram,
 							    gb_get_save_size(&gb));
-#if ENABLE_SOUND
+#if ENABLE_SOUND_BLARGG
 					SDL_UnlockAudioDevice(dev);
 #endif
 					save_timer = 60;
@@ -1233,8 +1258,10 @@ int main(int argc, char **argv)
 	SDL_DestroyTexture(texture);
 	SDL_GameControllerClose(controller);
 	SDL_Quit();
-#if ENABLE_SOUND
+#ifdef ENABLE_SOUND_BLARGG
 	audio_cleanup();
+#elif defined ENABLE_SOUND_PEANUT
+	audio_deinit();
 #endif
 
 	/* Record save file. */

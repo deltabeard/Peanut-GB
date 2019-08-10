@@ -27,19 +27,17 @@
 
 #include <assert.h>
 
-/* Enable sound support, including sound registers. Off by default due to no
- * implementation. */
-#ifndef ENABLE_SOUND
-	#define ENABLE_SOUND 0
-#endif
+/**
+ * Sound support must be provided by an external library. When audio_read() and
+ * audio_write() functions are provided, define ENABLE_SOUND before including
+ * peanut_gb.h in order for these functions to be used.
+ */
+//#define ENABLE_SOUND 0
 
 /* Enable LCD drawing. On by default. May be turned off for testing purposes. */
 #ifndef ENABLE_LCD
 	#define ENABLE_LCD 1
 #endif
-
-/* Disable incomplete audio implementation. */
-#define INTERNAL_AUDIO 0
 
 /* Interrupt masks */
 #define VBLANK_INTR	0x01
@@ -219,22 +217,6 @@ struct count_s
 	uint16_t div_count;		/* Divider Register Counter */
 	uint16_t tima_count;	/* Timer Counter */
 	uint16_t serial_count;
-
-#if INTERNAL_AUDIO
-	uint16_t apu_len_count;	/* Length counter */
-	uint16_t apu_swp_count;	/* Sweep counter */
-	uint32_t apu_env_count;	/* Volume envelope counter */
-	uint8_t apu_wav_count; /* Count which wav sample is set to be mixed. */
-
-	/* Counts when a new audio sample should be recorded. */
-	uint32_t apu_sample_count;
-	/* Number of cycles per new audio sample. When apu_sample_count >=
-	 * apu_sample_cycles, then a new audio sample must be taken. */
-	uint16_t apu_sample_cycles;
-	/* Counts the number of samples in audio buffer. Audio is queued to the
-	 * front-end when the buffer is filled. */
-	uint16_t apu_buffer_count;
-#endif
 };
 
 struct gb_registers_s
@@ -280,17 +262,6 @@ struct gb_registers_s
 	/* Interrupt enable. */
 	uint8_t IE;
 };
-
-#if INTERNAL_AUDIO
-struct audio_t
-{
-	uint8_t *buffer;
-	unsigned int len;
-	unsigned int rate;
-	void (*queue_audio)(void *priv, const uint8_t * const buffer,
-			    const unsigned int len);
-};
-#endif
 
 #if ENABLE_LCD
 	/* Bit mask for the shade of pixel to display */
@@ -472,11 +443,6 @@ struct gb_s
 		unsigned int interlace_count : 1;
 	} display;
 
-#if INTERNAL_AUDIO
-	/* Audio */
-	struct audio_t audio;
-#endif
-
 	/**
 	 * Variables that may be modified directly by the front-end.
 	 * This method seems to be easier and possibly less overhead than
@@ -632,9 +598,9 @@ uint8_t __gb_read(struct gb_s *gb, const uint_fast16_t addr)
 		if(HRAM_ADDR <= addr && addr < INTR_EN_ADDR)
 			return gb->hram[addr - HRAM_ADDR];
 
-		if((addr >= 0xFF10) && (addr <= 0xFF3F))
+		if((addr >= 0xFF06) && (addr <= 0xFF3F))
 		{
-#if ENABLE_SOUND
+#ifdef ENABLE_SOUND
 			return audio_read(addr);
 #else
 			return 1;
@@ -660,12 +626,6 @@ uint8_t __gb_read(struct gb_s *gb, const uint_fast16_t addr)
 
 		case 0x05:
 			return gb->gb_reg.TIMA;
-
-		case 0x06:
-			return gb->gb_reg.TMA;
-
-		case 0x07:
-			return gb->gb_reg.TAC;
 
 		/* Interrupt Flag Register */
 		case 0x0F:
@@ -860,9 +820,9 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 			return;
 		}
 
-		if((addr >= 0xFF10) && (addr <= 0xFF3F))
+		if((addr >= 0xFF06) && (addr <= 0xFF3F))
 		{
-#if ENABLE_SOUND
+#ifdef ENABLE_SOUND
 			audio_write(addr, val);
 #endif
 			return;
@@ -903,14 +863,6 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 
 		case 0x05:
 			gb->gb_reg.TIMA = val;
-			return;
-
-		case 0x06:
-			gb->gb_reg.TMA = val;
-			return;
-
-		case 0x07:
-			gb->gb_reg.TAC = val;
 			return;
 
 		/* Interrupt Flag Register */
@@ -1044,12 +996,6 @@ void gb_reset(struct gb_s *gb)
 	gb->counter.div_count = 0;
 	gb->counter.tima_count = 0;
 	gb->counter.serial_count = 0;
-
-#if INTERNAL_AUDIO
-	gb->counter.apu_len_count = 0;
-	gb->counter.apu_swp_count = 0;
-	gb->counter.apu_env_count = 0;
-#endif
 
 	gb->gb_reg.TIMA      = 0x00;
 	gb->gb_reg.TMA       = 0x00;
@@ -3693,48 +3639,12 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	gb->num_rom_banks = num_rom_banks[gb->gb_rom_read(gb, bank_count_location)];
 	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(gb, ram_size_location)];
 
-#if INTERNAL_AUDIO
-	/* Initialise the audio buffer to NULL in-case audio is not initialised
-	 * when the emulator starts stepping CPU. */
-	gb->audio.buffer = NULL;
-#endif
-
 	gb->display.lcd_draw_line = NULL;
 
 	gb_reset(gb);
 
 	return GB_INIT_NO_ERROR;
 }
-
-#if INTERNAL_AUDIO
-/**
- * Used to initialise audio. Must be called after gb_init().
- * TODO: Make gb_init_audio() optional.
- * TODO: Don't pass gb_s to front-end functions elsewhere.
- *
- * @param gb		Emulator context.
- * @param buffer	Buffer to store u8 stereo audio samples.
- * @param len		Length of buffer in bytes.
- * @param rate		Sampling rate of audio to be stored in buffer.
- * @param queue_audio	Function to call to queue buffer filled with new
- * 						samples.
- */
-void gb_init_audio(struct gb_s *gb, uint8_t *buffer, unsigned int len,
-		   unsigned int rate,
-		   void (*queue_audio)(void *priv, const uint8_t * const buffer,
-				       const unsigned int len))
-{
-	gb->audio.buffer = buffer;
-	gb->audio.len = len;
-	gb->audio.rate = rate;
-	gb->audio.queue_audio = queue_audio;
-	gb->counter.apu_sample_count = 0;
-	gb->counter.apu_buffer_count = 0;
-	gb->counter.apu_sample_cycles = DMG_CPU_CLOCK / rate;
-
-	return;
-}
-#endif
 
 /**
  * Returns the title of ROM.

@@ -29,13 +29,18 @@ endif
 LDLIBS += $(SDL2_LDLIBS)
 
 # Enable sound by default
-SOUND ?= yes
-ifeq ($(SOUND),yes)
-	SOUND_OBJECTS = gb_apu/audio.o gb_apu/Basic_Gb_Apu.o \
-			gb_apu/Blip_Buffer.o gb_apu/Gb_Apu.o gb_apu/Gb_Oscs.o \
-			gb_apu/Multi_Buffer.o
+SOUND ?= peanut
+ifeq ($(SOUND),blargg)
+	SOUND_OBJECTS = blargg_apu/audio.o blargg_apu/Basic_Gb_Apu.o \
+			blargg_apu/Blip_Buffer.o blargg_apu/Gb_Apu.o blargg_apu/Gb_Oscs.o \
+			blargg_apu/Multi_Buffer.o
 	# Enable sound support definitions within peanut_gb and peanut_sdl
-	CFLAGS += -D ENABLE_SOUND
+	CFLAGS += -D ENABLE_SOUND -D ENABLE_SOUND_BLARGG
+endif
+ifeq ($(SOUND),peanut)
+	SOUND_OBJECTS = peanut_apu/peanut_apu.o
+	# Enable sound support definitions within peanut_gb and peanut_sdl
+	CFLAGS += -D ENABLE_SOUND -D ENABLE_SOUND_PEANUT
 endif
 
 # Enable LCD by default
@@ -79,33 +84,33 @@ peanut_sdl.o: sdl2_check peanut_sdl.c ../../peanut_gb.h \
 	nativefiledialog/src/include/nfd.h
 
 # Sound objects that are compiled when sound output is enabled.
-gb_apu/audio.o: gb_apu/audio.cpp gb_apu/audio.h gb_apu/Basic_Gb_Apu.h \
-	gb_apu/Gb_Apu.h gb_apu/Gb_Oscs.h gb_apu/Blip_Buffer.h \
-	gb_apu/blargg_common.h gb_apu/boost/config.hpp \
-	gb_apu/boost/cstdint.hpp gb_apu/boost/static_assert.hpp \
-	gb_apu/Blip_Synth.h gb_apu/Multi_Buffer.h
-gb_apu/Basic_Gb_Apu.o: gb_apu/Basic_Gb_Apu.cpp gb_apu/Basic_Gb_Apu.h \
-	gb_apu/Gb_Apu.h gb_apu/Gb_Oscs.h gb_apu/Blip_Buffer.h \
-	gb_apu/blargg_common.h gb_apu/boost/config.hpp \
-	gb_apu/boost/cstdint.hpp gb_apu/boost/static_assert.hpp \
-	gb_apu/Blip_Synth.h gb_apu/Multi_Buffer.h
-gb_apu/Blip_Buffer.o: gb_apu/Blip_Buffer.cpp gb_apu/Blip_Buffer.h \
-	gb_apu/blargg_common.h gb_apu/boost/config.hpp \
-	gb_apu/boost/cstdint.hpp gb_apu/boost/static_assert.hpp \
-	gb_apu/Blip_Synth.h gb_apu/blargg_source.h
-gb_apu/Gb_Apu.o: gb_apu/Gb_Apu.cpp gb_apu/Gb_Apu.h gb_apu/Gb_Oscs.h \
-	gb_apu/Blip_Buffer.h gb_apu/blargg_common.h gb_apu/boost/config.hpp \
-	gb_apu/boost/cstdint.hpp gb_apu/boost/static_assert.hpp \
-	gb_apu/Blip_Synth.h gb_apu/blargg_source.h
-gb_apu/Gb_Oscs.o: gb_apu/Gb_Oscs.cpp gb_apu/Gb_Apu.h gb_apu/Gb_Oscs.h \
-	gb_apu/Blip_Buffer.h gb_apu/blargg_common.h \
-	gb_apu/boost/config.hpp gb_apu/boost/cstdint.hpp \
-	gb_apu/boost/static_assert.hpp gb_apu/Blip_Synth.h \
-	gb_apu/blargg_source.h
-gb_apu/Multi_Buffer.o: gb_apu/Multi_Buffer.cpp gb_apu/Multi_Buffer.h \
-	gb_apu/Blip_Buffer.h gb_apu/blargg_common.h gb_apu/boost/config.hpp \
-	gb_apu/boost/cstdint.hpp gb_apu/boost/static_assert.hpp \
-	gb_apu/Blip_Synth.h gb_apu/blargg_source.h
+blargg_apu/audio.o: blargg_apu/audio.cpp blargg_apu/audio.h blargg_apu/Basic_Gb_Apu.h \
+	blargg_apu/Gb_Apu.h blargg_apu/Gb_Oscs.h blargg_apu/Blip_Buffer.h \
+	blargg_apu/blargg_common.h blargg_apu/boost/config.hpp \
+	blargg_apu/boost/cstdint.hpp blargg_apu/boost/static_assert.hpp \
+	blargg_apu/Blip_Synth.h blargg_apu/Multi_Buffer.h
+blargg_apu/Basic_Gb_Apu.o: blargg_apu/Basic_Gb_Apu.cpp blargg_apu/Basic_Gb_Apu.h \
+	blargg_apu/Gb_Apu.h blargg_apu/Gb_Oscs.h blargg_apu/Blip_Buffer.h \
+	blargg_apu/blargg_common.h blargg_apu/boost/config.hpp \
+	blargg_apu/boost/cstdint.hpp blargg_apu/boost/static_assert.hpp \
+	blargg_apu/Blip_Synth.h blargg_apu/Multi_Buffer.h
+blargg_apu/Blip_Buffer.o: blargg_apu/Blip_Buffer.cpp blargg_apu/Blip_Buffer.h \
+	blargg_apu/blargg_common.h blargg_apu/boost/config.hpp \
+	blargg_apu/boost/cstdint.hpp blargg_apu/boost/static_assert.hpp \
+	blargg_apu/Blip_Synth.h blargg_apu/blargg_source.h
+blargg_apu/Gb_Apu.o: blargg_apu/Gb_Apu.cpp blargg_apu/Gb_Apu.h blargg_apu/Gb_Oscs.h \
+	blargg_apu/Blip_Buffer.h blargg_apu/blargg_common.h blargg_apu/boost/config.hpp \
+	blargg_apu/boost/cstdint.hpp blargg_apu/boost/static_assert.hpp \
+	blargg_apu/Blip_Synth.h blargg_apu/blargg_source.h
+blargg_apu/Gb_Oscs.o: blargg_apu/Gb_Oscs.cpp blargg_apu/Gb_Apu.h blargg_apu/Gb_Oscs.h \
+	blargg_apu/Blip_Buffer.h blargg_apu/blargg_common.h \
+	blargg_apu/boost/config.hpp blargg_apu/boost/cstdint.hpp \
+	blargg_apu/boost/static_assert.hpp blargg_apu/Blip_Synth.h \
+	blargg_apu/blargg_source.h
+blargg_apu/Multi_Buffer.o: blargg_apu/Multi_Buffer.cpp blargg_apu/Multi_Buffer.h \
+	blargg_apu/Blip_Buffer.h blargg_apu/blargg_common.h blargg_apu/boost/config.hpp \
+	blargg_apu/boost/cstdint.hpp blargg_apu/boost/static_assert.hpp \
+	blargg_apu/Blip_Synth.h blargg_apu/blargg_source.h
 $(FILE_GUI_LIB): nativefiledialog/src/include/nfd.h
 	$(MAKE) nfd -C $(NFD_MAKEFILE)
 
@@ -115,17 +120,18 @@ ifneq (0,$(SDL2_ERRCHECK))
 endif
 
 clean:
-	rm -f peanut-sdl peanut_sdl.o gb_apu/audio.o gb_apu/Basic_Gb_Apu.o \
-		gb_apu/Blip_Buffer.o gb_apu/Gb_Apu.o gb_apu/Gb_Oscs.o \
-		gb_apu/Multi_Buffer.o $(FILE_GUI_LIB)
+	rm -f peanut-sdl peanut_sdl.o $(SOUND_OBJECTS) $(FILE_GUI_LIB)
 
 help:
 	@echo Options:
 	@echo \ STATIC=yes\	Enable static build. Default on Windows.
-	@echo \ SOUND=yes\	Enable sound output using Gb_Snd_Emu. Default.
+	@echo \ SOUND=peanut\	Sound output:
+	@echo \	 	\	\	peanut \(default\)
+	@echo \	 	\	\	blargg
+	@echo \	 	\	\	none
 	@echo \ FILEGUI=yes\	Enable graphical file picker. Default.
 	@echo
-	@echo Values other than \"yes\" will disable the option.
+	@echo Values other than those specified will disable the option.
 	@echo
 
 .SUFFIXES: .c .cpp .o
