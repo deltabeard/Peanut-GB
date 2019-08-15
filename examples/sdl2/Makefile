@@ -79,7 +79,7 @@ endif # FILEGUI
 
 all: peanut-sdl
 peanut-sdl: peanut_sdl.o $(SOUND_OBJECTS) $(FILE_GUI_LIB)
-	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) 
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) 
 peanut_sdl.o: sdl2_check peanut_sdl.c ../../peanut_gb.h \
 	nativefiledialog/src/include/nfd.h
 
@@ -125,11 +125,13 @@ clean:
 help:
 	@echo Options:
 	@echo \ STATIC=yes\	Enable static build. Default on Windows.
+	@echo \	 	\	Requires that SDL2 be compiled with --static-libs enabled.
 	@echo \ SOUND=peanut\	Sound output:
 	@echo \	 	\	\	peanut \(default\)
-	@echo \	 	\	\	blargg
+	@echo \	 	\	\	blargg \(requires C++ compiler\)
 	@echo \	 	\	\	none
 	@echo \ FILEGUI=yes\	Enable graphical file picker. Default.
+	@echo \	 	\	Requires C++ compiler.
 	@echo
 	@echo Values other than those specified will disable the option.
 	@echo
