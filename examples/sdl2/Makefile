@@ -10,9 +10,7 @@ SDL2_LDLIBS =
 SDL2_ERRCHECK = 0
 FILE_GUI_LIB = nativefiledialog/build/lib/Release/x64/libnfd.a
 CWARNINGS = -Wall -Wextra
-# Not interested in the many warnings in blarggs APU library, so not enabling
-# warnings for CXX targets.
-CXXWARNINGS = -w
+CXXWARNINGS = -Wall -Wextra
 
 CC = cc
 CFLAGS = -std=c99 $(SDL2_CFLAGS) $(OPT) $(CWARNINGS)
@@ -111,6 +109,8 @@ blargg_apu/Multi_Buffer.o: blargg_apu/Multi_Buffer.cpp blargg_apu/Multi_Buffer.h
 	blargg_apu/Blip_Buffer.h blargg_apu/blargg_common.h blargg_apu/boost/config.hpp \
 	blargg_apu/boost/cstdint.hpp blargg_apu/boost/static_assert.hpp \
 	blargg_apu/Blip_Synth.h blargg_apu/blargg_source.h
+
+# File GUI picker.
 $(FILE_GUI_LIB): nativefiledialog/src/include/nfd.h
 	$(MAKE) nfd -C $(NFD_MAKEFILE)
 
