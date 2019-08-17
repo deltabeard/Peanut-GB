@@ -23,7 +23,6 @@
 
 #include "../../peanut_gb.h"
 #include "nativefiledialog/src/include/nfd.h"
-#include "bmp.h"
 
 struct priv_t
 {
@@ -561,45 +560,35 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
 #endif
 
 /**
- * Saves the LCD screen as a 24-bit BMP file.
+ * Saves the LCD screen as a 15-bit BMP file.
  */
 void save_lcd_bmp(struct gb_s* gb, uint16_t fb[LCD_HEIGHT][LCD_WIDTH])
 {
-	static uint_least32_t file_num = 0;
+	/* Should be enough to record up to 828 days worth of frames. */
+	static uint_fast32_t file_num = 0;
 	char file_name[32];
-	char scratch[16];
-	static unsigned long bmp_len = BMP_SIZE(LCD_WIDTH, LCD_HEIGHT);
-	void* bmp_buffer = malloc(bmp_len);
+	char title_str[16];
 	FILE* f;
 
-	snprintf(file_name, 32, "%.16s_%010d.bmp",
-		 gb_get_rom_name(gb, scratch), file_num);
-	bmp_init(bmp_buffer, LCD_WIDTH, LCD_HEIGHT);
+	snprintf(file_name, 32, "%.16s_%010ld.bmp",
+		 gb_get_rom_name(gb, title_str), file_num);
 
 	f = fopen(file_name, "wb");
 
-	for(uint_least8_t y = 0; y < LCD_HEIGHT; y++)
-	{
-		for(uint_least8_t x = 0; x < LCD_WIDTH; x++)
-		{
-			/* Convert 555RGB to 888RGB */
+	const uint8_t bmp_hdr_rgb555[] = {
+		0x42, 0x4d, 0x36, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x36, 0x00, 0x00, 0x00, 0x28, 0x00, 0x00, 0x00, 0xa0, 0x00,
+		0x00, 0x00, 0x70, 0xff, 0xff, 0xff, 0x01, 0x00, 0x10, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0xb4, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00 
+	};
 
-			// RGB555: 0b X RRRRR GGGGG BBBBB
-			// RGB888: 0b XXXXXXXX RRRRRRRR GGGGGGGG BBBBBBBB
-
-			/* Set pixel */
-			bmp_set_rgb(bmp_buffer, x, y,
-					(fb[y][x] & 0b0111110000000000) >> 7,
-					(fb[y][x] & 0b0000001111100000) >> 2,
-					(fb[y][x] & 0b0000000000011111) << 3);
-		}
-	}
-
-	fwrite(bmp_buffer, 1, bmp_len, f);
+	fwrite(bmp_hdr_rgb555, sizeof(uint8_t), sizeof(bmp_hdr_rgb555), f);
+	fwrite(fb, sizeof(uint16_t), LCD_HEIGHT * LCD_WIDTH, f);
 	fclose(f);
 
 	file_num++;
-	free(bmp_buffer);
 
 	/* Each dot shows a new frame being saved. */
 	putc('.', stdout);
