@@ -776,7 +776,10 @@ int main(int argc, char **argv)
 		goto out;
 	}
 
+#ifdef ENABLE_SOUND
 	SDL_AudioDeviceID dev;
+#endif
+
 #ifdef ENABLE_SOUND_BLARGG
 	audio_init(&dev);
 #elif defined ENABLE_SOUND_PEANUT
