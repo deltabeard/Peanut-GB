@@ -473,7 +473,7 @@ struct gb_s
 /**
  * Tick the internal RTC by one second.
  */
-void gb_sick_rtc(struct gb_s *gb)
+void gb_tick_rtc(struct gb_s *gb)
 {
 	/* is timer running? */
 	if((gb->cart_rtc[4] & 0x40) == 0)

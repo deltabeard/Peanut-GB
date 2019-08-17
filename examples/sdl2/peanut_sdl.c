@@ -1145,7 +1145,7 @@ int main(int argc, char **argv)
 		if(rtc_timer >= 1000)
 		{
 			rtc_timer -= 1000;
-			gb_sick_rtc(&gb);
+			gb_tick_rtc(&gb);
 		}
 
 		/* Skip frames during fast mode. */
@@ -1205,7 +1205,7 @@ int main(int argc, char **argv)
 			if(rtc_timer >= 1000)
 			{
 				rtc_timer -= 1000;
-				gb_sick_rtc(&gb);
+				gb_tick_rtc(&gb);
 
 				/* If 60 seconds has passed, record save file.
 				 * We do this because the external audio library
