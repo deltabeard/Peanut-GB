@@ -73,18 +73,9 @@
 #define CRAM_BANK_SIZE  0x2000
 #define VRAM_BANK_SIZE  0x2000
 
-#define DMG_CPU_CLOCK	4194304
-
 /* DIV Register is incremented at rate of 16384Hz.
  * 4194304 / 16384 = 256 clock cycles for one increment. */
 #define DIV_CYCLES          256
-
-/* Sound timers */
-/* TODO: Possibility of combining these APU timers. Using the faster 256Hz
- * timer, then deriving the other two counters from that. */
-#define APU_LEN_CYCLES		16384	/* Length counter 256Hz */
-#define APU_SWP_CYCLES		32768	/* Sweep counter 128Hz */
-#define APU_ENV_CYCLES		65536	/* Volume Envelope counter 64Hz */
 
 /* Serial clock locked to 8192Hz on DMG.
  * 4194304 / (8192 / 8) = 4096 clock cycles for sending 1 byte. */
