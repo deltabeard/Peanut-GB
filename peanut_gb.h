@@ -20,6 +20,13 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
+ *
+ * Please note that at least three parts of source code within this project was
+ * taken from the SameBoy project at https://github.com/LIJI32/SameBoy/ which at
+ * the time of this writing is released under the MIT License. Occurrences of
+ * this code is marked as being taken from SameBoy with a comment.
+ * SameBoy, and code marked as being taken from SameBoy,
+ * is Copyright (c) 2015-2019 Lior Halphon.
  */
 
 #include <stdint.h>	/* Required for int types */
@@ -472,6 +479,7 @@ struct gb_s
 
 /**
  * Tick the internal RTC by one second.
+ * This was taken from SameBoy, which is released under MIT Licence.
  */
 void gb_tick_rtc(struct gb_s *gb)
 {
