@@ -475,6 +475,9 @@ struct gb_s
 		/* Implementation defined data. Set to NULL if not required. */
 		void *priv;
 	} direct;
+
+
+	uint8_t joypad_intr_track;
 };
 
 /**
@@ -1021,6 +1024,7 @@ void gb_reset(struct gb_s *gb)
 	gb->gb_reg.IE        = 0x00;
 
 	gb->direct.joypad = 0xFF;
+	gb->joypad_intr_track = 0xFF;
 	gb->gb_reg.P1 = 0xCF;
 }
 
@@ -3414,11 +3418,20 @@ void __gb_step_cpu(struct gb_s *gb)
 		}
 	}
 
+	/* If joypad interrupts are enabled, check if we should trigger it. */
+	if(gb->gb_reg.IE & CONTROL_INTR &&
+			gb->direct.joypad != gb->joypad_intr_track)
+	{
+		gb->gb_reg.IF |= CONTROL_INTR;
+		gb->joypad_intr_track = gb->direct.joypad;
+	}
+
 	/* TODO Check behaviour of LCD during LCD power off state. */
 	/* If LCD is off, don't update LCD state. */
 	if((gb->gb_reg.LCDC & LCDC_ENABLE) == 0)
 		return;
 
+	/* LCD logic from here. */
 	/* LCD Timing */
 	gb->counter.lcd_count += inst_cycles;
 
