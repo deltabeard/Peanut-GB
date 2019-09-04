@@ -1,6 +1,7 @@
 #include <stdint.h>
 
-#define AUDIO_SAMPLE_RATE 48000.0f
+#define DMG_CLOCK_FREQ		4194304.0
+#define AUDIO_SAMPLE_RATE 48000.0
 
 /**
  * Fill allocated buffer "data" with "len" number of 32-bit floating point

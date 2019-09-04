@@ -13,8 +13,8 @@
 #define SCREEN_REFRESH_CYCLES 70224.0
 #define VERTICAL_SYNC (DMG_CLOCK_FREQ / SCREEN_REFRESH_CYCLES)
 
-#define AUDIO_MEM_SIZE (0xFF3F - 0xFF06 + 1)
-#define AUDIO_ADDR_COMPENSATION 0xFF06
+#define AUDIO_MEM_SIZE (0xFF3F - 0xFF10 + 1)
+#define AUDIO_ADDR_COMPENSATION 0xFF10
 
 #define MAX(a, b) ({ a > b ? a : b; })
 #define MIN(a, b) ({ a <= b ? a : b; })
@@ -383,26 +383,6 @@ void audio_callback(void *restrict const userdata,
 	} while (len);
 }
 
-static void audio_update_rate(void)
-{
-	float audio_rate = VERTICAL_SYNC;
-
-	const uint8_t tma = audio_mem[0xff06 - AUDIO_ADDR_COMPENSATION];
-	const uint8_t tac = audio_mem[0xff07 - AUDIO_ADDR_COMPENSATION];
-
-	if (tac & 0x04) {
-		const int rates[] = { 4096, 262144, 65536, 16384 };
-		audio_rate	= rates[tac & 0x03] / (float)(256 - tma);
-		if (tac & 0x80)
-			audio_rate *= 2.0f;
-	}
-
-	free(samples);
-	nsamples   = (int)(AUDIO_SAMPLE_RATE / audio_rate) * 2;
-	samples    = calloc(nsamples, sizeof(float));
-	sample_ptr = samples;
-}
-
 static void chan_trigger(int i)
 {
 	struct chan *c = chans + i;
@@ -455,7 +435,7 @@ static void chan_trigger(int i)
 
 /**
  * Read audio register.
- * \param addr	Address of audio register. Must be 0xFF06 <= addr <= 0xFF3F.
+ * \param addr	Address of audio register. Must be 0xFF10 <= addr <= 0xFF3F.
  *				This is not checked in this function.
  * \return		Byte at address.
  */
@@ -468,16 +448,13 @@ uint8_t audio_read(const uint16_t addr)
 
 	if (addr > 0xFF26)
 		return audio_mem[addr - AUDIO_ADDR_COMPENSATION];
-	else if (addr >= 0xFF10)
-		return audio_mem[addr - AUDIO_ADDR_COMPENSATION] |
-		       ortab[addr - 0xFF10];
-
-	return audio_mem[addr - AUDIO_ADDR_COMPENSATION];
+	
+	return audio_mem[addr - AUDIO_ADDR_COMPENSATION] | ortab[addr - 0xFF10];
 }
 
 /**
  * Write audio register.
- * \param addr	Address of audio register. Must be 0xFF06 <= addr <= 0xFF3F.
+ * \param addr	Address of audio register. Must be 0xFF10 <= addr <= 0xFF3F.
  *				This is not checked in this function.
  * \param val	Byte to write at address.
  */
@@ -488,11 +465,6 @@ void audio_write(const uint16_t addr, const uint8_t val)
 	audio_mem[addr - AUDIO_ADDR_COMPENSATION] = val;
 
 	switch (addr) {
-	case 0xFF06:
-	case 0xFF07:
-		audio_update_rate();
-		break;
-
 	case 0xFF12:
 	case 0xFF17:
 	case 0xFF21: {
@@ -583,7 +555,6 @@ void audio_init(void)
 {
 	/* Initialise channels and samples. */
 	memset(chans, 0, sizeof(chans));
-	memset(samples, 0, nsamples * sizeof(float));
 	sample_ptr   = samples;
 	chans[0].val = chans[1].val = -1;
 
@@ -610,7 +581,10 @@ void audio_init(void)
 			audio_write(0xFF30 + i, wave_init[i]);
 	}
 
-	audio_update_rate();
+	free(samples);
+	nsamples   = (int)(AUDIO_SAMPLE_RATE / VERTICAL_SYNC) * 2;
+	samples    = calloc(nsamples, sizeof(float));
+	sample_ptr = samples;
 }
 
 void audio_deinit(void)

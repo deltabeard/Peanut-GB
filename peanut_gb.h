@@ -597,7 +597,7 @@ uint8_t __gb_read(struct gb_s *gb, const uint_fast16_t addr)
 		if(HRAM_ADDR <= addr && addr < INTR_EN_ADDR)
 			return gb->hram[addr - HRAM_ADDR];
 
-		if((addr >= 0xFF06) && (addr <= 0xFF3F))
+		if((addr >= 0xFF10) && (addr <= 0xFF3F))
 		{
 #ifdef ENABLE_SOUND
 			return audio_read(addr);
@@ -625,6 +625,12 @@ uint8_t __gb_read(struct gb_s *gb, const uint_fast16_t addr)
 
 		case 0x05:
 			return gb->gb_reg.TIMA;
+
+		case 0x06:
+			return gb->gb_reg.TMA;
+
+		case 0x07:
+			return gb->gb_reg.TAC;
 
 		/* Interrupt Flag Register */
 		case 0x0F:
@@ -819,7 +825,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 			return;
 		}
 
-		if((addr >= 0xFF06) && (addr <= 0xFF3F))
+		if((addr >= 0xFF10) && (addr <= 0xFF3F))
 		{
 #ifdef ENABLE_SOUND
 			audio_write(addr, val);
@@ -862,6 +868,14 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 
 		case 0x05:
 			gb->gb_reg.TIMA = val;
+			return;
+
+		case 0x06:
+			gb->gb_reg.TMA = val;
+			return;
+
+		case 0x07:
+			gb->gb_reg.TAC = val;
 			return;
 
 		/* Interrupt Flag Register */
