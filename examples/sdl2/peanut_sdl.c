@@ -776,7 +776,7 @@ int main(int argc, char **argv)
 		goto out;
 	}
 
-#ifdef ENABLE_SOUND
+#if ENABLE_SOUND
 	SDL_AudioDeviceID dev;
 #endif
 

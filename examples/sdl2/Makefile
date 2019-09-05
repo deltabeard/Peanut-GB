@@ -16,6 +16,7 @@ CC = cc
 CFLAGS = -std=c99 $(SDL2_CFLAGS) $(OPT) $(CWARNINGS)
 CXXFLAGS = $(SDL2_CFLAGS) $(OPT) $(CXXWARNINGS)
 LDLIBS = -lm -L/usr/lib
+LINKER = $(CC)
 
 ifeq ($(STATIC),yes)
 	SDL2_LDLIBS = $(shell sdl2-config --static-libs)
@@ -34,6 +35,7 @@ ifeq ($(SOUND),blargg)
 			blargg_apu/Multi_Buffer.o
 	# Enable sound support definitions within peanut_gb and peanut_sdl
 	CFLAGS += -D ENABLE_SOUND -D ENABLE_SOUND_BLARGG
+	LINKER = $(CXX)
 endif
 ifeq ($(SOUND),peanut)
 	SOUND_OBJECTS = peanut_apu/peanut_apu.o
@@ -77,7 +79,7 @@ endif # FILEGUI
 
 all: peanut-sdl
 peanut-sdl: peanut_sdl.o $(SOUND_OBJECTS) $(FILE_GUI_LIB)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) 
+	$(LINKER) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) 
 peanut_sdl.o: sdl2_check peanut_sdl.c ../../peanut_gb.h \
 	nativefiledialog/src/include/nfd.h
 
