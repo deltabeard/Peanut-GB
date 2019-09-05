@@ -36,14 +36,16 @@
 
 /**
  * Sound support must be provided by an external library. When audio_read() and
- * audio_write() functions are provided, define ENABLE_SOUND before including
- * peanut_gb.h in order for these functions to be used.
+ * audio_write() functions are provided, define ENABLE_SOUND to a non-zero value
+ * before including peanut_gb.h in order for these functions to be used.
  */
-//#define ENABLE_SOUND 0
+#ifndef ENABLE_SOUND
+#	define ENABLE_SOUND 0
+#endif
 
 /* Enable LCD drawing. On by default. May be turned off for testing purposes. */
 #ifndef ENABLE_LCD
-	#define ENABLE_LCD 1
+#	define ENABLE_LCD 1
 #endif
 
 /* Interrupt masks */
@@ -599,7 +601,7 @@ uint8_t __gb_read(struct gb_s *gb, const uint_fast16_t addr)
 
 		if((addr >= 0xFF06) && (addr <= 0xFF3F))
 		{
-#ifdef ENABLE_SOUND
+#if ENABLE_SOUND
 			return audio_read(addr);
 #else
 			return 1;
@@ -821,7 +823,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 
 		if((addr >= 0xFF06) && (addr <= 0xFF3F))
 		{
-#ifdef ENABLE_SOUND
+#if ENABLE_SOUND
 			audio_write(addr, val);
 #endif
 			return;
