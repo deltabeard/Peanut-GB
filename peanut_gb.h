@@ -146,6 +146,9 @@
 #define OBJ_FLIP_X          0x20
 #define OBJ_PALETTE         0x10
 
+/* MBC Identifiers */
+#define MBC_TPP1	(UINT8_MAX - 1)
+
 #define ROM_HEADER_CHECKSUM_LOC	0x014D
 
 #ifndef MIN
@@ -3628,12 +3631,22 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	}
 
 	/* Check if cartridge type is supported, and set MBC type. */
+	while(1)
 	{
 		const uint8_t mbc_value = gb->gb_rom_read(gb, mbc_location);
 
-		if(mbc_value > sizeof(cart_mbc) - 1 ||
-				(gb->mbc = cart_mbc[gb->gb_rom_read(gb, mbc_location)]) == 255u)
-			return GB_INIT_CARTRIDGE_UNSUPPORTED;
+		if(mbc_value < sizeof(cart_mbc) &&
+				(gb->mbc = cart_mbc[gb->gb_rom_read(gb, mbc_location)]) != 255u)
+			break;
+
+		/* Irregular MBCs. */
+		switch(mbc_value)
+		{
+		case MBC_TPP1:
+			break;
+		}
+
+		return GB_INIT_CARTRIDGE_UNSUPPORTED;
 	}
 
 	gb->cart_ram = cart_ram[gb->gb_rom_read(gb, mbc_location)];
