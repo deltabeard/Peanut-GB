@@ -12,41 +12,52 @@
 /**
  * Return byte from blarrg test ROM.
  */
-uint8_t gb_rom_read(struct gb_t *gb, const uint32_t addr)
+uint8_t gb_rom_read(struct gb_s *gb, const uint_fast32_t addr)
 {
 	/* Import blarrg CPU test ROM. */
 #include "../../test/cpu_instrs.h"
+	(void)gb;
 	return cpu_instrs_gb[addr];
 }
 
 /**
  * Ignore cart RAM writes, since the test doesn't require it.
  */
-void gb_cart_ram_write(struct gb_t *gb, const uint32_t addr, const uint8_t val)
+void gb_cart_ram_write(struct gb_s *gb, const uint_fast32_t addr,
+		const uint8_t val)
 {
+	(void)gb;
+	(void)addr;
+	(void)val;
 	return;
 }
 
 /**
  * Ignore cart RAM reads, since the test doesn't require it.
  */
-uint8_t gb_cart_ram_read(struct gb_t *gb, const uint32_t addr)
+uint8_t gb_cart_ram_read(struct gb_s *gb, const uint_fast32_t addr)
 {
+	(void)gb;
+	(void)addr;
 	return 0xFF;
 }
 
 /**
  * Ignore all errors.
  */
-void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
+void gb_error(struct gb_s *gb, const enum gb_error_e gb_err,
+		const uint16_t val)
 {
+	(void)gb;
+	(void)gb_err;
+	(void)val;
 	return;
 }
 
 int main(void)
 {
 	const unsigned short pc_end = 0x06F1; /* Test ends when PC is this value. */
-	struct gb_t gb;
+	struct gb_s gb;
 	int ret;
 
 	PROF_START();
