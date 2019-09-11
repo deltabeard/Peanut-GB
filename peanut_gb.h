@@ -3390,8 +3390,8 @@ void __gb_step_cpu(struct gb_s *gb)
 		gb->counter.div_count -= DIV_CYCLES;
 	}
 
-	/* Check serial transfer. */
-	if(gb->gb_reg.SC & 0x80)
+	/* Check serial transmission. */
+	if((gb->gb_reg.SC & 0x81) == 0x81)
 	{
 		gb->counter.serial_count += inst_cycles;
 
