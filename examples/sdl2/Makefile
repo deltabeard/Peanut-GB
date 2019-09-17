@@ -78,10 +78,13 @@ endif # FILEGUI
 
 
 all: peanut-sdl
-peanut-sdl: peanut_sdl.o $(SOUND_OBJECTS) $(FILE_GUI_LIB)
+peanut-sdl: peanut_sdl.o $(SOUND_OBJECTS) $(FILE_GUI_LIB) socket99/socket99.o
 	$(LINKER) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) 
 peanut_sdl.o: sdl2_check peanut_sdl.c ../../peanut_gb.h \
 	nativefiledialog/src/include/nfd.h
+
+socket99:
+	$(MAKE) -C socket99
 
 # Sound objects that are compiled when sound output is enabled.
 blargg_apu/audio.o: blargg_apu/audio.cpp blargg_apu/audio.h blargg_apu/Basic_Gb_Apu.h \

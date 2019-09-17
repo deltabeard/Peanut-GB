@@ -21,6 +21,8 @@
 #	include "peanut_apu/peanut_apu.h"
 #endif
 
+#include "socket99/socket99.h"
+
 #include "../../peanut_gb.h"
 #include "nativefiledialog/src/include/nfd.h"
 
@@ -144,6 +146,18 @@ void write_cart_ram_file(const char *save_file_name, uint8_t **dest,
 	/* Record save file. */
 	fwrite(*dest, sizeof(uint8_t), len, f);
 	fclose(f);
+}
+
+void gb_serial_tx(struct gb_s *gb, const uint8_t tx)
+{
+	(void)gb;
+	fprintf(stderr, "0x%02X\n", tx);
+}
+
+uint8_t gb_serial_rx(struct gb_s *gb)
+{
+	(void)gb;
+	return 0xFF;
 }
 
 /**
@@ -809,6 +823,22 @@ int main(int argc, char **argv)
 #if ENABLE_LCD
 	gb_init_lcd(&gb, &lcd_draw_line);
 #endif
+
+	socket99_config cfg = {
+		.host = "127.0.0.1",
+		.port = 9098,
+		.server = true,
+		.nonblocking = false,
+	};
+	socket99_result res;   // result output in this struct
+	bool ok = socket99_open(&cfg, &res);
+	if(ok == false)
+		printf("Opening socket failed.\n");
+	else
+	{
+		puts("Serial connection open on localhost:9098 as server.");
+		gb_init_serial(&gb, &gb_serial_tx, &gb_serial_rx);
+	}
 
 	/* Allow the joystick input even if game is in background. */
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
