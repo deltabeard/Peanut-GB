@@ -13,6 +13,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+#include <unistd.h>
+
 #include <SDL2/SDL.h>
 
 #ifdef ENABLE_SOUND_BLARGG
@@ -20,8 +26,6 @@
 #elif defined ENABLE_SOUND_PEANUT
 #	include "peanut_apu/peanut_apu.h"
 #endif
-
-#include "socket99/socket99.h"
 
 #include "../../peanut_gb.h"
 #include "nativefiledialog/src/include/nfd.h"
@@ -36,6 +40,9 @@ struct priv_t
 	/* Colour palette for each BG, OBJ0, and OBJ1. */
 	uint16_t selected_palette[3][4];
 	uint16_t fb[LCD_HEIGHT][LCD_WIDTH];
+
+	/* File descriptor for serial communications. */
+	int serial_fd;
 };
 
 /**
@@ -150,20 +157,39 @@ void write_cart_ram_file(const char *save_file_name, uint8_t **dest,
 
 void gb_serial_tx(struct gb_s *gb, const uint8_t tx)
 {
+#if 1
 	static uint_fast8_t col = 12; // Good for 80-char terminals
 
 	(void)gb;
-	fprintf(stderr, "0x%02X,%c", tx, --col ? ' ' : '\n');
+	//fprintf(stderr, "0x%02X,%c", tx, --col ? ' ' : '\n');
+	fprintf(stderr, "\e[92m0x%02X\e[39m, ", tx);
 
-	if(col == 0)
+	if(--col == 0)
+	{
 		col = 12;
+		putc('\n', stderr);
+	}
+#endif
+	struct priv_t *priv = gb->direct.priv;
+	write(priv->serial_fd, &tx, 1);
 }
 
 enum gb_serial_rx_ret_e gb_serial_rx(struct gb_s *gb, uint8_t *rx)
 {
+#if 0
 	(void)gb;
 	(void)rx;
 	//*rx = 0xFF;
+	return GB_SERIAL_RX_NO_CONNECTION;
+#endif
+	struct priv_t *priv = gb->direct.priv;
+	if(read(priv->serial_fd, rx, 1))
+	{
+		fprintf(stderr, "\e[91m0x%02X\e[39m, ", *rx);
+		return GB_SERIAL_RX_SUCCESS;
+	}
+
+	fprintf(stderr, "\e[91m0x--\e[39m, ");
 	return GB_SERIAL_RX_NO_CONNECTION;
 }
 
@@ -831,20 +857,23 @@ int main(int argc, char **argv)
 	gb_init_lcd(&gb, &lcd_draw_line);
 #endif
 
-	socket99_config cfg = {
-		.host = "127.0.0.1",
-		.port = 9098,
-		.server = true,
-		.nonblocking = false,
-	};
-	socket99_result res;   // result output in this struct
-	bool ok = socket99_open(&cfg, &res);
-	if(ok == false)
-		printf("Opening socket failed.\n");
-	else
+#define SERIAL_PIPE_PATH "peanut_serial.pipe"
 	{
-		puts("Serial connection open on localhost:9098 as server.");
-		//gb_init_serial(&gb, &gb_serial_tx, &gb_serial_rx);
+		mode_t mode = 0600;
+		if(mkfifo(SERIAL_PIPE_PATH, mode) != 0)
+		{
+			perror("Can't create fifo");
+			/* Ignore error. */
+		}
+
+		if((priv.serial_fd =
+			open(SERIAL_PIPE_PATH, O_RDWR|O_NONBLOCK)) == -1)
+		{
+			perror("Could not open FIFO");
+			puts("Serial communications will be unavailable.");
+		}
+		else
+			gb_init_serial(&gb, &gb_serial_tx, &gb_serial_rx);
 	}
 
 	/* Allow the joystick input even if game is in background. */
