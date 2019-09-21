@@ -150,14 +150,21 @@ void write_cart_ram_file(const char *save_file_name, uint8_t **dest,
 
 void gb_serial_tx(struct gb_s *gb, const uint8_t tx)
 {
+	static uint_fast8_t col = 12; // Good for 80-char terminals
+
 	(void)gb;
-	fprintf(stderr, "0x%02X\n", tx);
+	fprintf(stderr, "0x%02X,%c", tx, --col ? ' ' : '\n');
+
+	if(col == 0)
+		col = 12;
 }
 
-uint8_t gb_serial_rx(struct gb_s *gb)
+enum gb_serial_rx_ret_e gb_serial_rx(struct gb_s *gb, uint8_t *rx)
 {
 	(void)gb;
-	return 0xFF;
+	(void)rx;
+	//*rx = 0xFF;
+	return GB_SERIAL_RX_NO_CONNECTION;
 }
 
 /**
@@ -837,7 +844,7 @@ int main(int argc, char **argv)
 	else
 	{
 		puts("Serial connection open on localhost:9098 as server.");
-		gb_init_serial(&gb, &gb_serial_tx, &gb_serial_rx);
+		//gb_init_serial(&gb, &gb_serial_tx, &gb_serial_rx);
 	}
 
 	/* Allow the joystick input even if game is in background. */
