@@ -1,6 +1,6 @@
 .POSIX:
 .SUFFIXES:
-OPT = -g -Og
+OPTIMIZE = -g -Og
 SDL2_CFLAGS = $(shell sdl2-config --cflags)
 SDL2_LDLIBS =
 
@@ -13,8 +13,9 @@ CWARNINGS = -Wall -Wextra
 CXXWARNINGS = -Wall -Wextra
 
 CC = cc
-CFLAGS = -std=c99 $(SDL2_CFLAGS) $(OPT) $(CWARNINGS)
-CXXFLAGS = $(SDL2_CFLAGS) $(OPT) $(CXXWARNINGS)
+CFLAGS = -std=c99 $(SDL2_CFLAGS) $(OPTIMIZE) $(CWARNINGS) \
+	 -D_POSIX_C_SOURCE=200112L -D_C99_SOURCE
+CXXFLAGS = $(SDL2_CFLAGS) $(OPTIMIZE) $(CXXWARNINGS)
 LDLIBS = -lm -L/usr/lib
 LINKER = $(CC)
 
@@ -83,8 +84,7 @@ peanut-sdl: peanut_sdl.o $(SOUND_OBJECTS) $(FILE_GUI_LIB) socket99/socket99.o
 peanut_sdl.o: sdl2_check peanut_sdl.c ../../peanut_gb.h \
 	nativefiledialog/src/include/nfd.h
 
-socket99:
-	$(MAKE) -C socket99
+socket99/socket99.o: socket99/socket99.c socket99/socket99.h
 
 # Sound objects that are compiled when sound output is enabled.
 blargg_apu/audio.o: blargg_apu/audio.cpp blargg_apu/audio.h blargg_apu/Basic_Gb_Apu.h \
