@@ -30,6 +30,9 @@
 #include "../../peanut_gb.h"
 #include "nativefiledialog/src/include/nfd.h"
 
+#define SERIAL_PIPE_PATH_M	"peanut_serial_ext.pipe"
+#define SERIAL_PIPE_PATH_S	"peanut_serial_int.pipe"
+
 struct priv_t
 {
 	/* Pointer to allocated memory holding GB file. */
@@ -42,7 +45,8 @@ struct priv_t
 	uint16_t fb[LCD_HEIGHT][LCD_WIDTH];
 
 	/* File descriptor for serial communications. */
-	int serial_fd;
+	int serial_tx_fd;
+	int serial_rx_fd;
 };
 
 /**
@@ -171,7 +175,7 @@ void gb_serial_tx(struct gb_s *gb, const uint8_t tx)
 	}
 #endif
 	struct priv_t *priv = gb->direct.priv;
-	write(priv->serial_fd, &tx, 1);
+	write(priv->serial_tx_fd, &tx, 1);
 }
 
 enum gb_serial_rx_ret_e gb_serial_rx(struct gb_s *gb, uint8_t *rx)
@@ -183,7 +187,7 @@ enum gb_serial_rx_ret_e gb_serial_rx(struct gb_s *gb, uint8_t *rx)
 	return GB_SERIAL_RX_NO_CONNECTION;
 #endif
 	struct priv_t *priv = gb->direct.priv;
-	if(read(priv->serial_fd, rx, 1))
+	if(read(priv->serial_rx_fd, rx, 1))
 	{
 		fprintf(stderr, "\e[91m0x%02X\e[39m, ", *rx);
 		return GB_SERIAL_RX_SUCCESS;
@@ -857,21 +861,40 @@ int main(int argc, char **argv)
 	gb_init_lcd(&gb, &lcd_draw_line);
 #endif
 
-#define SERIAL_PIPE_PATH "peanut_serial.pipe"
 	{
-		mode_t mode = 0600;
-		if(mkfifo(SERIAL_PIPE_PATH, mode) != 0)
+		mode_t pipe_mode = 0600;
+		int open_mode_m = O_RDONLY; // Receive from client only
+		int open_mode_s = O_WRONLY | O_NONBLOCK; // Write to client
+		unsigned err = 0;
+
+		/* The Server creates both pipes. */
+		if(mkfifo(SERIAL_PIPE_PATH_M, pipe_mode) != 0 &&
+				mkfifo(SERIAL_PIPE_PATH_S, pipe_mode) != 0)
 		{
-			perror("Can't create fifo");
 			/* Ignore error. */
+			puts("Using serial connection in client mode.");
+			/* Client -> Server */
+			open_mode_m = O_WRONLY | O_NONBLOCK;
+			/* Server -> Client */
+			open_mode_s = O_RDONLY;
 		}
 
-		if((priv.serial_fd =
-			open(SERIAL_PIPE_PATH, O_RDWR|O_NONBLOCK)) == -1)
+		if((priv.serial_tx_fd =
+			open(SERIAL_PIPE_PATH_M, open_mode_m)) == -1)
 		{
-			perror("Could not open FIFO");
-			puts("Serial communications will be unavailable.");
+			perror("Could not open TX FIFO");
+			err = 1;
 		}
+		
+		if((priv.serial_rx_fd =
+			open(SERIAL_PIPE_PATH_S, open_mode_s)) == -1)
+		{
+			perror("Could not open RX FIFO");
+			err = 1;
+		}
+
+		if(err)
+			puts("Serial communications will be unavailable.");
 		else
 			gb_init_serial(&gb, &gb_serial_tx, &gb_serial_rx);
 	}
@@ -1316,6 +1339,10 @@ int main(int argc, char **argv)
 	SDL_DestroyTexture(texture);
 	SDL_GameControllerClose(controller);
 	SDL_Quit();
+
+	unlink(SERIAL_PIPE_PATH_M);
+	unlink(SERIAL_PIPE_PATH_S);
+
 #ifdef ENABLE_SOUND_BLARGG
 	audio_cleanup();
 #elif defined ENABLE_SOUND_PEANUT
