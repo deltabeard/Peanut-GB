@@ -15,7 +15,7 @@ CXXWARNINGS = -Wall -Wextra
 CC = cc
 CFLAGS = -std=c99 $(SDL2_CFLAGS) $(OPT) $(CWARNINGS)
 CXXFLAGS = $(SDL2_CFLAGS) $(OPT) $(CXXWARNINGS)
-LDLIBS = -lm -L/usr/lib
+LDLIBS = 
 LINKER = $(CC)
 
 ifeq ($(STATIC),yes)

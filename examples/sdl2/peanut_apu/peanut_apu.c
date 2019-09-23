@@ -62,7 +62,6 @@ static struct chan {
 	float    freq_inc;
 
 	int val;
-	int note;
 
 	struct chan_len_ctr    len;
 	struct chan_vol_env    env;
@@ -100,10 +99,9 @@ static float hipass(struct chan *c, float sample)
 #endif
 }
 
-static void set_note_freq(struct chan *c, const float freq)
+static void set_note_freq(struct chan *c, const uint_fast16_t freq)
 {
 	c->freq_inc = freq / AUDIO_SAMPLE_RATE;
-	c->note     = fmaxf(0.0f, roundf(logf(freq / 440.0f)) + 48.0f);
 }
 
 static void chan_enable(const unsigned int i, const bool enable)
@@ -173,9 +171,8 @@ static void update_sweep(struct chan *c)
 			if (c->freq > 2047) {
 				c->enabled = 0;
 			} else {
-				set_note_freq(
-					c, 4194304.0f / (float)((2048 - c->freq)
-								<< 5));
+				set_note_freq(c,
+					4194304 / ((2048 - c->freq)<< 5));
 				c->freq_inc *= 8.0f;
 			}
 		} else if (c->sweep.rate) {
@@ -191,7 +188,7 @@ static void update_square(const bool ch2)
 	if (!c->powered)
 		return;
 
-	set_note_freq(c, 4194304.0f / (float)((2048 - c->freq) << 5));
+	set_note_freq(c, 4194304.0f / ((2048 - c->freq) << 5));
 	c->freq_inc *= 8.0f;
 
 	for (unsigned int i = 0; i < nsamples; i += 2) {
@@ -247,7 +244,7 @@ static void update_wave(void)
 	if (!c->powered)
 		return;
 
-	float freq = 4194304.0f / (float)((2048 - c->freq) << 5);
+	uint_fast16_t freq = 4194304.0f / ((2048 - c->freq) << 5);
 	set_note_freq(c, freq);
 
 	c->freq_inc *= 16.0f;
@@ -294,7 +291,7 @@ static void update_noise(void)
 	if (!c->powered)
 		return;
 
-	float freq = 4194304.0f / (float)((size_t[]){ 8, 16, 32, 48, 64, 80, 96,
+	uint_fast16_t freq = 4194304.0f / ((size_t[]){ 8, 16, 32, 48, 64, 80, 96,
 						      112 }[c->lfsr_div]
 					  << (size_t)c->freq);
 	set_note_freq(c, freq);
