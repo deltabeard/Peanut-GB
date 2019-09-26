@@ -8,11 +8,6 @@
 
 #define ENABLE_HIPASS 1
 
-/* Calculating VSYNC. */
-#define DMG_CLOCK_FREQ 4194304.0
-#define SCREEN_REFRESH_CYCLES 70224.0
-#define VERTICAL_SYNC (DMG_CLOCK_FREQ / SCREEN_REFRESH_CYCLES)
-
 #define AUDIO_MEM_SIZE (0xFF3F - 0xFF10 + 1)
 #define AUDIO_ADDR_COMPENSATION 0xFF10
 
@@ -82,7 +77,6 @@ static struct chan {
 	uint8_t sample;
 } chans[4];
 
-static unsigned int nsamples;
 static float *      samples;
 static float *      sample_ptr;
 
@@ -191,7 +185,7 @@ static void update_square(const bool ch2)
 	set_note_freq(c, 4194304.0f / ((2048 - c->freq) << 5));
 	c->freq_inc *= 8.0f;
 
-	for (unsigned int i = 0; i < nsamples; i += 2) {
+	for (unsigned int i = 0; i < AUDIO_NSAMPLES; i += 2) {
 		update_len(c);
 
 		if (c->enabled) {
@@ -249,7 +243,7 @@ static void update_wave(void)
 
 	c->freq_inc *= 16.0f;
 
-	for (unsigned int i = 0; i < nsamples; i += 2) {
+	for (unsigned int i = 0; i < AUDIO_NSAMPLES; i += 2) {
 		update_len(c);
 
 		if (c->enabled) {
@@ -299,7 +293,7 @@ static void update_noise(void)
 	if (c->freq >= 14)
 		c->enabled = 0;
 
-	for (unsigned int i = 0; i < nsamples; i += 2) {
+	for (unsigned int i = 0; i < AUDIO_NSAMPLES; i += 2) {
 		update_len(c);
 
 		if (c->enabled) {
@@ -343,14 +337,14 @@ static void update_noise(void)
 
 static void audio_update(void)
 {
-	memset(samples, 0, nsamples * sizeof(float));
+	memset(samples, 0, AUDIO_NSAMPLES * sizeof(float));
 
 	update_square(0);
 	update_square(1);
 	update_wave();
 	update_noise();
 
-	sample_ptr = samples + nsamples;
+	sample_ptr = samples + AUDIO_NSAMPLES;
 }
 
 /**
@@ -372,7 +366,7 @@ void audio_callback(void *restrict const userdata,
 
 		n = MIN(len, sample_ptr - samples);
 		memcpy(stream, samples, n * sizeof(float));
-		memmove(samples, samples + n, (nsamples - n) * sizeof(float));
+		memmove(samples, samples + n, (AUDIO_NSAMPLES - n) * sizeof(float));
 
 		stream += (n * sizeof(float));
 		sample_ptr -= n;
@@ -552,7 +546,6 @@ void audio_init(void)
 {
 	/* Initialise channels and samples. */
 	memset(chans, 0, sizeof(chans));
-	sample_ptr   = samples;
 	chans[0].val = chans[1].val = -1;
 
 	/* Initialise IO registers. */
@@ -579,8 +572,7 @@ void audio_init(void)
 	}
 
 	free(samples);
-	nsamples   = (int)(AUDIO_SAMPLE_RATE / VERTICAL_SYNC) * 2;
-	samples    = calloc(nsamples, sizeof(float));
+	samples    = calloc(AUDIO_NSAMPLES, sizeof(float));
 	sample_ptr = samples;
 }
 
