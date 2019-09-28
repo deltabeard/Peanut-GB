@@ -1252,8 +1252,6 @@ int main(int argc, char **argv)
 	SDL_Quit();
 #ifdef ENABLE_SOUND_BLARGG
 	audio_cleanup();
-#elif defined ENABLE_SOUND_PEANUT
-	audio_deinit();
 #endif
 
 	/* Record save file. */

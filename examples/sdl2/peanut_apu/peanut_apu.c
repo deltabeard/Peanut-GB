@@ -77,8 +77,6 @@ static struct chan {
 	uint8_t sample;
 } chans[4];
 
-static float *      samples;
-
 static float vol_l, vol_r;
 
 static float hipass(struct chan *c, float sample)
@@ -175,7 +173,7 @@ static void update_sweep(struct chan *c)
 	}
 }
 
-static void update_square(const bool ch2)
+static void update_square(float *samples, const bool ch2)
 {
 	struct chan *c = chans + ch2;
 	if (!c->powered)
@@ -231,7 +229,7 @@ static uint8_t wave_sample(const unsigned int pos, const unsigned int volume)
 	return volume ? (sample >> (volume - 1)) : 0;
 }
 
-static void update_wave(void)
+static void update_wave(float *samples)
 {
 	struct chan *c = chans + 2;
 	if (!c->powered)
@@ -278,7 +276,7 @@ static void update_wave(void)
 	}
 }
 
-static void update_noise(void)
+static void update_noise(float *samples)
 {
 	struct chan *c = chans + 3;
 	if (!c->powered)
@@ -334,14 +332,6 @@ static void update_noise(void)
 	}
 }
 
-static void audio_update(void)
-{
-	update_square(0);
-	update_square(1);
-	update_wave();
-	update_noise();
-}
-
 /**
  * SDL2 style audio callback function.
  */
@@ -352,9 +342,12 @@ void audio_callback(void *restrict const userdata,
 
 	memset(stream, 0, len);
 
-	samples = (float *)stream;
+	float *samples = (float *)stream;
 
-	audio_update();
+	update_square(samples, 0);
+	update_square(samples, 1);
+	update_wave(samples);
+	update_noise(samples);
 }
 
 static void chan_trigger(int i)
@@ -553,8 +546,4 @@ void audio_init(void)
 		for(uint_least8_t i = 0; i < sizeof(wave_init); ++i)
 			audio_write(0xFF30 + i, wave_init[i]);
 	}
-}
-
-void audio_deinit(void)
-{
 }

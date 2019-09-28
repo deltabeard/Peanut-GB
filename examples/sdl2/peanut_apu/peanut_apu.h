@@ -28,8 +28,3 @@ void audio_write(const uint16_t addr, const uint8_t val);
  * Initialise audio driver.
  */
 void audio_init(void);
-
-/**
- * Frees memory used by audio driver.
- */
-void audio_deinit(void);
