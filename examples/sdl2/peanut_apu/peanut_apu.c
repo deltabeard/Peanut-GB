@@ -78,7 +78,6 @@ static struct chan {
 } chans[4];
 
 static float *      samples;
-static float *      sample_ptr;
 
 static float vol_l, vol_r;
 
@@ -337,14 +336,10 @@ static void update_noise(void)
 
 static void audio_update(void)
 {
-	memset(samples, 0, AUDIO_NSAMPLES * sizeof(float));
-
 	update_square(0);
 	update_square(1);
 	update_wave();
 	update_noise();
-
-	sample_ptr = samples + AUDIO_NSAMPLES;
 }
 
 /**
@@ -355,23 +350,11 @@ void audio_callback(void *restrict const userdata,
 {
 	(void)userdata;
 
-	/* Optimisation: len = len / sizeof(float) */
-	len >>= 2;
+	memset(stream, 0, len);
 
-	do {
-		unsigned int n;
+	samples = (float *)stream;
 
-		if (sample_ptr - samples == 0)
-			audio_update();
-
-		n = MIN(len, sample_ptr - samples);
-		memcpy(stream, samples, n * sizeof(float));
-		memmove(samples, samples + n, (AUDIO_NSAMPLES - n) * sizeof(float));
-
-		stream += (n * sizeof(float));
-		sample_ptr -= n;
-		len -= n;
-	} while (len);
+	audio_update();
 }
 
 static void chan_trigger(int i)
@@ -570,16 +553,8 @@ void audio_init(void)
 		for(uint_least8_t i = 0; i < sizeof(wave_init); ++i)
 			audio_write(0xFF30 + i, wave_init[i]);
 	}
-
-	free(samples);
-	samples    = calloc(AUDIO_NSAMPLES, sizeof(float));
-	sample_ptr = samples;
 }
 
 void audio_deinit(void)
 {
-	if(samples != NULL)
-		free(samples);
-
-	samples = NULL;
 }
