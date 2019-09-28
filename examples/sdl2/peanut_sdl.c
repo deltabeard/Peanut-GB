@@ -789,7 +789,7 @@ int main(int argc, char **argv)
 		want.freq = AUDIO_SAMPLE_RATE;
 		want.format   = AUDIO_F32SYS,
 		want.channels = 2;
-		want.samples = AUDIO_NSAMPLES /2 ;
+		want.samples = AUDIO_SAMPLES;
 		want.callback = audio_callback;
 		want.userdata = NULL;
 

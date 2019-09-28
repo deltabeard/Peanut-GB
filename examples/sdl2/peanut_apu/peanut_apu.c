@@ -8,6 +8,8 @@
 
 #define ENABLE_HIPASS 1
 
+#define AUDIO_NSAMPLES ((unsigned)(AUDIO_SAMPLE_RATE / VERTICAL_SYNC) * 2)
+
 #define AUDIO_MEM_SIZE (0xFF3F - 0xFF10 + 1)
 #define AUDIO_ADDR_COMPENSATION 0xFF10
 
@@ -20,37 +22,37 @@
 static uint8_t audio_mem[AUDIO_MEM_SIZE];
 
 struct chan_len_ctr {
-	int   load;
-	bool  enabled;
+	unsigned load : 6;
+	unsigned enabled : 1;
 	float counter;
 	float inc;
 };
 
 struct chan_vol_env {
-	int   step;
-	bool  up;
+	unsigned step : 3;
+	unsigned up : 1;
 	float counter;
 	float inc;
 };
 
 struct chan_freq_sweep {
-	int   freq;
-	int   rate;
-	bool  up;
-	int   shift;
+	uint_fast16_t freq;
+	unsigned rate : 3;
+	unsigned up : 1;
+	unsigned shift : 3;
 	float counter;
 	float inc;
 };
 
 static struct chan {
-	unsigned int enabled : 1;
-	unsigned int powered : 1;
-	unsigned int on_left : 1;
-	unsigned int on_right : 1;
-	unsigned int muted : 1;
+	unsigned enabled : 1;
+	unsigned powered : 1;
+	unsigned on_left : 1;
+	unsigned on_right : 1;
+	unsigned muted : 1;
 
-	unsigned int volume : 4;
-	unsigned int volume_init : 4;
+	unsigned volume : 4;
+	unsigned volume_init : 4;
 
 	uint16_t freq;
 	float    freq_counter;
@@ -61,8 +63,6 @@ static struct chan {
 	struct chan_len_ctr    len;
 	struct chan_vol_env    env;
 	struct chan_freq_sweep sweep;
-
-	float capacitor;
 
 	// square
 	uint8_t duty;
@@ -75,6 +75,10 @@ static struct chan {
 
 	// wave
 	uint8_t sample;
+
+#if ENABLE_HIPASS
+	float capacitor;
+#endif
 } chans[4];
 
 static float vol_l, vol_r;
@@ -83,7 +87,7 @@ static float hipass(struct chan *c, float sample)
 {
 #if ENABLE_HIPASS
 	float out    = sample - c->capacitor;
-	c->capacitor = sample - out * 0.996;
+	c->capacitor = sample - out * 0.996f;
 	return out;
 #else
 	return sample;
@@ -95,7 +99,7 @@ static void set_note_freq(struct chan *c, const uint_fast16_t freq)
 	c->freq_inc = freq / AUDIO_SAMPLE_RATE;
 }
 
-static void chan_enable(const unsigned int i, const bool enable)
+static void chan_enable(const uint_fast8_t i, const bool enable)
 {
 	chans[i].enabled = enable;
 
@@ -173,7 +177,7 @@ static void update_sweep(struct chan *c)
 	}
 }
 
-static void update_square(float *samples, const bool ch2)
+static void update_square(float *restrict samples, const bool ch2)
 {
 	struct chan *c = chans + ch2;
 	if (!c->powered)
@@ -182,7 +186,7 @@ static void update_square(float *samples, const bool ch2)
 	set_note_freq(c, 4194304.0f / ((2048 - c->freq) << 5));
 	c->freq_inc *= 8.0f;
 
-	for (unsigned int i = 0; i < AUDIO_NSAMPLES; i += 2) {
+	for (uint_fast16_t i = 0; i < AUDIO_NSAMPLES; i += 2) {
 		update_len(c);
 
 		if (c->enabled) {
@@ -229,7 +233,7 @@ static uint8_t wave_sample(const unsigned int pos, const unsigned int volume)
 	return volume ? (sample >> (volume - 1)) : 0;
 }
 
-static void update_wave(float *samples)
+static void update_wave(float *restrict samples)
 {
 	struct chan *c = chans + 2;
 	if (!c->powered)
@@ -240,7 +244,7 @@ static void update_wave(float *samples)
 
 	c->freq_inc *= 16.0f;
 
-	for (unsigned int i = 0; i < AUDIO_NSAMPLES; i += 2) {
+	for (uint_fast16_t i = 0; i < AUDIO_NSAMPLES; i += 2) {
 		update_len(c);
 
 		if (c->enabled) {
@@ -276,21 +280,21 @@ static void update_wave(float *samples)
 	}
 }
 
-static void update_noise(float *samples)
+static void update_noise(float *restrict samples)
 {
 	struct chan *c = chans + 3;
 	if (!c->powered)
 		return;
 
-	uint_fast16_t freq = 4194304.0f / ((size_t[]){ 8, 16, 32, 48, 64, 80, 96,
-						      112 }[c->lfsr_div]
-					  << (size_t)c->freq);
+	uint_fast16_t freq = 4194304 / ((uint_fast8_t[]){
+			8, 16, 32, 48, 64, 80, 96, 112
+		}[c->lfsr_div] << c->freq);
 	set_note_freq(c, freq);
 
 	if (c->freq >= 14)
 		c->enabled = 0;
 
-	for (unsigned int i = 0; i < AUDIO_NSAMPLES; i += 2) {
+	for (uint_fast16_t i = 0; i < AUDIO_NSAMPLES; i += 2) {
 		update_len(c);
 
 		if (c->enabled) {
@@ -335,14 +339,14 @@ static void update_noise(float *samples)
 /**
  * SDL2 style audio callback function.
  */
-void audio_callback(void *restrict const userdata,
-		uint8_t *restrict stream, int len)
+void audio_callback(void *userdata, uint8_t *restrict stream, int len)
 {
+	float *samples = (float *)stream;
+
+	/* Appease unused variable warning. */
 	(void)userdata;
 
 	memset(stream, 0, len);
-
-	float *samples = (float *)stream;
 
 	update_square(samples, 0);
 	update_square(samples, 1);
@@ -350,7 +354,7 @@ void audio_callback(void *restrict const userdata,
 	update_noise(samples);
 }
 
-static void chan_trigger(int i)
+static void chan_trigger(uint_fast8_t i)
 {
 	struct chan *c = chans + i;
 
@@ -363,7 +367,7 @@ static void chan_trigger(int i)
 			audio_mem[(0xFF12 + (i * 5)) - AUDIO_ADDR_COMPENSATION];
 
 		c->env.step = val & 0x07;
-		c->env.up   = val & 0x08;
+		c->env.up   = val & 0x08 ? 1 : 0;
 		c->env.inc  = c->env.step ? (64.0f / (float)c->env.step) /
 						   AUDIO_SAMPLE_RATE :
 					   8.0f / AUDIO_SAMPLE_RATE;
@@ -428,7 +432,7 @@ uint8_t audio_read(const uint16_t addr)
 void audio_write(const uint16_t addr, const uint8_t val)
 {
 	/* Find sound channel corresponding to register address. */
-	int i					  = (addr - 0xFF10) / 5;
+	uint_fast8_t i = (addr - 0xFF10) / 5;
 	audio_mem[addr - AUDIO_ADDR_COMPENSATION] = val;
 
 	switch (addr) {
@@ -492,7 +496,7 @@ void audio_write(const uint16_t addr, const uint8_t val)
 		chans[i].freq |= ((val & 0x07) << 8);
 		/* Intentional fall-through. */
 	case 0xFF23:
-		chans[i].len.enabled = val & 0x40;
+		chans[i].len.enabled = val & 0x40 ? 1 : 0;
 		if (val & 0x80)
 			chan_trigger(i);
 
@@ -510,7 +514,7 @@ void audio_write(const uint16_t addr, const uint8_t val)
 		break;
 
 	case 0xFF25:
-		for (int i = 0; i < 4; ++i) {
+		for (uint_fast8_t i = 0; i < 4; ++i) {
 			chans[i].on_left  = (val >> (4 + i)) & 1;
 			chans[i].on_right = (val >> i) & 1;
 		}
@@ -532,7 +536,7 @@ void audio_init(void)
 					      0xFF, 0xFF, 0x00, 0x00, 0x3F,
 					      0x77, 0xF3, 0xF1 };
 
-		for(uint_least8_t i = 0; i < sizeof(regs_init); ++i)
+		for(uint_fast8_t i = 0; i < sizeof(regs_init); ++i)
 			audio_write(0xFF10 + i, regs_init[i]);
 	}
 
@@ -543,7 +547,7 @@ void audio_init(void)
 					      0x2c, 0x04, 0xe5, 0x2c,
 					      0xac, 0xdd, 0xda, 0x48 };
 
-		for(uint_least8_t i = 0; i < sizeof(wave_init); ++i)
+		for(uint_fast8_t i = 0; i < sizeof(wave_init); ++i)
 			audio_write(0xFF30 + i, wave_init[i]);
 	}
 }
