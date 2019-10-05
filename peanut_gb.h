@@ -211,10 +211,10 @@ struct cpu_registers_s
 
 struct count_s
 {
-	uint16_t lcd_count;		/* LCD Timing */
-	uint16_t div_count;		/* Divider Register Counter */
-	uint16_t tima_count;	/* Timer Counter */
-	uint16_t serial_count;
+	uint_fast16_t lcd_count;	/* LCD Timing */
+	uint_fast16_t div_count;	/* Divider Register Counter */
+	uint_fast16_t tima_count;	/* Timer Counter */
+	uint_fast16_t serial_count;	/* Serial Counter */
 };
 
 struct gb_registers_s
@@ -426,8 +426,9 @@ struct gb_s
 		 * \param line		Line to draw pixels on. This is
 		 * guaranteed to be between 0-144 inclusive.
 		 */
-		void (*lcd_draw_line)(struct gb_s*, const uint8_t pixels[160],
-				      const uint_least8_t line);
+		void (*lcd_draw_line)(struct gb_s*,
+				const uint8_t pixels[static 160],
+				const uint_fast8_t line);
 
 		/* Palettes */
 		uint8_t bg_palette[4];
@@ -3666,11 +3667,11 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
  * \param title_str	Allocated string at least 16 characters.
  * \returns		Pointer to start of string, null terminated.
  */
-const char* gb_get_rom_name(struct gb_s* gb, char* title_str)
+const char* gb_get_rom_name(struct gb_s* gb, char title_str[static 16])
 {
-	uint_least16_t title_loc = 0x134;
+	uint_fast16_t title_loc = 0x134;
 	/* End of title may be 0x13E for newer games. */
-	const uint_least16_t title_end = 0x143;
+	const uint_fast16_t title_end = 0x143;
 	const char* title_start = title_str;
 
 	for(; title_loc <= title_end; title_loc++)
@@ -3692,8 +3693,9 @@ const char* gb_get_rom_name(struct gb_s* gb, char* title_str)
 
 #if ENABLE_LCD
 void gb_init_lcd(struct gb_s *gb,
-		 void (*lcd_draw_line)(struct gb_s*, const uint8_t pixels[160],
-				       const uint_least8_t line))
+		void (*lcd_draw_line)(struct gb_s*,
+			const uint8_t pixels[static 160],
+			const uint_fast8_t line))
 {
 	gb->display.lcd_draw_line = lcd_draw_line;
 
