@@ -980,64 +980,6 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 	(gb->gb_error)(gb, GB_INVALID_WRITE, addr);
 }
 
-/**
- * Resets the context, and initialises startup values.
- */
-void gb_reset(struct gb_s *gb)
-{
-	gb->gb_halt = 0;
-	gb->gb_ime = 1;
-	gb->gb_bios_enable = 0;
-	gb->lcd_mode = LCD_HBLANK;
-
-	/* Initialise MBC values. */
-	gb->selected_rom_bank = 1;
-	gb->cart_ram_bank = 0;
-	gb->enable_cart_ram = 0;
-	gb->cart_mode_select = 0;
-
-	/* Initialise CPU registers as though a DMG. */
-	gb->cpu_reg.af = 0x01B0;
-	gb->cpu_reg.bc = 0x0013;
-	gb->cpu_reg.de = 0x00D8;
-	gb->cpu_reg.hl = 0x014D;
-	gb->cpu_reg.sp = 0xFFFE;
-	/* TODO: Add BIOS support. */
-	gb->cpu_reg.pc = 0x0100;
-
-	gb->counter.lcd_count = 0;
-	gb->counter.div_count = 0;
-	gb->counter.tima_count = 0;
-	gb->counter.serial_count = 0;
-
-	gb->gb_reg.TIMA      = 0x00;
-	gb->gb_reg.TMA       = 0x00;
-	gb->gb_reg.TAC       = 0xF8;
-	gb->gb_reg.DIV       = 0xAC;
-
-	gb->gb_reg.IF        = 0xE1;
-
-	gb->gb_reg.LCDC      = 0x91;
-	gb->gb_reg.SCY       = 0x00;
-	gb->gb_reg.SCX       = 0x00;
-	gb->gb_reg.LYC       = 0x00;
-
-	/* Appease valgrind for invalid reads and unconditional jumps. */
-	gb->gb_reg.SC = 0x7E;
-	gb->gb_reg.STAT = 0;
-	gb->gb_reg.LY = 0;
-
-	__gb_write(gb, 0xFF47, 0xFC);    // BGP
-	__gb_write(gb, 0xFF48, 0xFF);    // OBJP0
-	__gb_write(gb, 0xFF49, 0x0F);    // OBJP1
-	gb->gb_reg.WY        = 0x00;
-	gb->gb_reg.WX        = 0x00;
-	gb->gb_reg.IE        = 0x00;
-
-	gb->direct.joypad = 0xFF;
-	gb->gb_reg.P1 = 0xCF;
-}
-
 void __gb_execute_cb(struct gb_s *gb)
 {
 	uint8_t cbop = __gb_read(gb, gb->cpu_reg.pc++);
@@ -3570,6 +3512,64 @@ uint8_t gb_colour_hash(struct gb_s *gb)
 		x += gb->gb_rom_read(gb, i);
 
 	return x;
+}
+
+/**
+ * Resets the context, and initialises startup values.
+ */
+void gb_reset(struct gb_s *gb)
+{
+	gb->gb_halt = 0;
+	gb->gb_ime = 1;
+	gb->gb_bios_enable = 0;
+	gb->lcd_mode = LCD_HBLANK;
+
+	/* Initialise MBC values. */
+	gb->selected_rom_bank = 1;
+	gb->cart_ram_bank = 0;
+	gb->enable_cart_ram = 0;
+	gb->cart_mode_select = 0;
+
+	/* Initialise CPU registers as though a DMG. */
+	gb->cpu_reg.af = 0x01B0;
+	gb->cpu_reg.bc = 0x0013;
+	gb->cpu_reg.de = 0x00D8;
+	gb->cpu_reg.hl = 0x014D;
+	gb->cpu_reg.sp = 0xFFFE;
+	/* TODO: Add BIOS support. */
+	gb->cpu_reg.pc = 0x0100;
+
+	gb->counter.lcd_count = 0;
+	gb->counter.div_count = 0;
+	gb->counter.tima_count = 0;
+	gb->counter.serial_count = 0;
+
+	gb->gb_reg.TIMA      = 0x00;
+	gb->gb_reg.TMA       = 0x00;
+	gb->gb_reg.TAC       = 0xF8;
+	gb->gb_reg.DIV       = 0xAC;
+
+	gb->gb_reg.IF        = 0xE1;
+
+	gb->gb_reg.LCDC      = 0x91;
+	gb->gb_reg.SCY       = 0x00;
+	gb->gb_reg.SCX       = 0x00;
+	gb->gb_reg.LYC       = 0x00;
+
+	/* Appease valgrind for invalid reads and unconditional jumps. */
+	gb->gb_reg.SC = 0x7E;
+	gb->gb_reg.STAT = 0;
+	gb->gb_reg.LY = 0;
+
+	__gb_write(gb, 0xFF47, 0xFC);    // BGP
+	__gb_write(gb, 0xFF48, 0xFF);    // OBJP0
+	__gb_write(gb, 0xFF49, 0x0F);    // OBJP1
+	gb->gb_reg.WY        = 0x00;
+	gb->gb_reg.WX        = 0x00;
+	gb->gb_reg.IE        = 0x00;
+
+	gb->direct.joypad = 0xFF;
+	gb->gb_reg.P1 = 0xCF;
 }
 
 /**
