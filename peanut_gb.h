@@ -32,8 +32,6 @@
 #include <stdint.h>	/* Required for int types */
 #include <time.h>	/* Required for tm struct */
 
-#include <assert.h>
-
 /**
  * Sound support must be provided by an external library. When audio_read() and
  * audio_write() functions are provided, define ENABLE_SOUND to a non-zero value
