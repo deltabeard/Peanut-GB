@@ -1,3 +1,10 @@
+/**
+ * minigb_apu is released under the terms listed within the LICENSE file.
+ *
+ * minigb_apu emulates the audio processing unit (APU) of the Game Boy. This
+ * project is based on MiniGBS by Alex Baines: https://github.com/baines/MiniGBS
+ */
+
 #include <stdint.h>
 
 #define AUDIO_SAMPLE_RATE	48000.0

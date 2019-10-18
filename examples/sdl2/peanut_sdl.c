@@ -17,8 +17,8 @@
 
 #ifdef ENABLE_SOUND_BLARGG
 #	include "blargg_apu/audio.h"
-#elif defined ENABLE_SOUND_PEANUT
-#	include "peanut_apu/peanut_apu.h"
+#elif defined ENABLE_SOUND_MINIGB
+#	include "minigb_apu/minigb_apu.h"
 #endif
 
 #include "../../peanut_gb.h"
@@ -782,7 +782,7 @@ int main(int argc, char **argv)
 
 #ifdef ENABLE_SOUND_BLARGG
 	audio_init(&dev);
-#elif defined ENABLE_SOUND_PEANUT
+#elif defined ENABLE_SOUND_MINIGB
 	{
 		SDL_AudioSpec want, have;
 

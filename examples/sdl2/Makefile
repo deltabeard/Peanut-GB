@@ -38,9 +38,9 @@ ifeq ($(SOUND),blargg)
 	LINKER = $(CXX)
 endif
 ifeq ($(SOUND),peanut)
-	SOUND_OBJECTS = peanut_apu/peanut_apu.o
+	SOUND_OBJECTS = minigb_apu/minigb_apu.o
 	# Enable sound support definitions within peanut_gb and peanut_sdl
-	CFLAGS += -D ENABLE_SOUND -D ENABLE_SOUND_PEANUT
+	CFLAGS += -D ENABLE_SOUND -D ENABLE_SOUND_MINIGB
 endif
 
 # Enable LCD by default
@@ -128,8 +128,8 @@ help:
 	@echo Options:
 	@echo \ STATIC=yes\	Enable static build. Default on Windows.
 	@echo \	 	\	Requires that SDL2 be compiled with --static-libs enabled.
-	@echo \ SOUND=peanut\	Sound output:
-	@echo \	 	\	\	peanut \(default\)
+	@echo \ SOUND=minigb\	Sound output:
+	@echo \	 	\	\	minigb \(default\)
 	@echo \	 	\	\	blargg \(requires C++ compiler\)
 	@echo \	 	\	\	none
 	@echo \ FILEGUI=yes\	Enable graphical file picker. Default.
