@@ -24,7 +24,7 @@
 #define MIN(a, b) ({ a <= b ? a : b; })
 
 /**
- * Memory holding audio registers between 0xFF06 and 0xFF3F inclusive.
+ * Memory holding audio registers between 0xFF10 and 0xFF3F inclusive.
  */
 static uint8_t audio_mem[AUDIO_MEM_SIZE];
 
