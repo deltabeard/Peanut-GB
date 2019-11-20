@@ -1,6 +1,6 @@
 .POSIX:
 .SUFFIXES:
-OPT = -g -Og
+OPT ?= -g -Og
 SDL2_CFLAGS = $(shell sdl2-config --cflags)
 SDL2_LDLIBS =
 
@@ -28,7 +28,7 @@ endif
 LDLIBS += $(SDL2_LDLIBS)
 
 # Enable sound by default
-SOUND ?= peanut
+SOUND ?= minigb
 ifeq ($(SOUND),blargg)
 	SOUND_OBJECTS = blargg_apu/audio.o blargg_apu/Basic_Gb_Apu.o \
 			blargg_apu/Blip_Buffer.o blargg_apu/Gb_Apu.o blargg_apu/Gb_Oscs.o \
@@ -37,10 +37,11 @@ ifeq ($(SOUND),blargg)
 	CFLAGS += -D ENABLE_SOUND -D ENABLE_SOUND_BLARGG
 	LINKER = $(CXX)
 endif
-ifeq ($(SOUND),peanut)
+ifeq ($(SOUND),minigb)
 	SOUND_OBJECTS = minigb_apu/minigb_apu.o
 	# Enable sound support definitions within peanut_gb and peanut_sdl
 	CFLAGS += -D ENABLE_SOUND -D ENABLE_SOUND_MINIGB
+	LDLIBS += -lm
 endif
 
 # Enable LCD by default
