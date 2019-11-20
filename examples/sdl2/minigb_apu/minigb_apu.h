@@ -5,6 +5,8 @@
  * project is based on MiniGBS by Alex Baines: https://github.com/baines/MiniGBS
  */
 
+#pragma once
+
 #include <stdint.h>
 
 #define AUDIO_SAMPLE_RATE	48000.0

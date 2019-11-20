@@ -29,6 +29,8 @@
  * is Copyright (c) 2015-2019 Lior Halphon.
  */
 
+#pragma once
+
 #include <stdint.h>	/* Required for int types */
 #include <time.h>	/* Required for tm struct */
 
