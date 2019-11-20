@@ -820,20 +820,23 @@ int main(int argc, char **argv)
 	}
 
 	/* Open the first available controller. */
-	for(uint_fast8_t i = 0; i < SDL_NumJoysticks(); i++)
+	for(int i = 0; i < SDL_NumJoysticks(); i++)
 	{
-		if(SDL_IsGameController(i))
-		{
-			controller = SDL_GameControllerOpen(i);
+		if(!SDL_IsGameController(i))
+			continue;
 
-			if(controller)
-			{
-				printf("Game Controller %s connected.\n",
-				       SDL_GameControllerName(controller));
-				break;
-			}
-			else
-				printf("Could not open gamecontroller %i: %s\n", i, SDL_GetError());
+		controller = SDL_GameControllerOpen(i);
+
+		if(controller)
+		{
+			printf("Game Controller %s connected.\n",
+					SDL_GameControllerName(controller));
+			break;
+		}
+		else
+		{
+			printf("Could not open game controller %i: %s\n",
+					i, SDL_GetError());
 		}
 	}
 
