@@ -95,6 +95,10 @@
 #define SCREEN_REFRESH_CYCLES	70224.0
 #define VERTICAL_SYNC		(DMG_CLOCK_FREQ/SCREEN_REFRESH_CYCLES)
 
+/* SERIAL SC register masks. */
+#define SERIAL_SC_TX_START	0x80
+#define SERIAL_SC_CLOCK_SRC	0x01
+
 /* STAT register masks */
 #define STAT_LYC_INTR       0x40
 #define STAT_MODE_2_INTR    0x20
@@ -306,6 +310,15 @@ enum gb_init_error_e
 };
 
 /**
+ * Return codes for serial receive function, mainly for clarity.
+ */
+enum gb_serial_rx_ret_e
+{
+	GB_SERIAL_RX_SUCCESS = 0,
+	GB_SERIAL_RX_NO_CONNECTION = 1
+};
+
+/**
  * Emulator context.
  *
  * Only values within the `direct` struct may be modified directly by the
@@ -351,7 +364,8 @@ struct gb_s
 	void (*gb_error)(struct gb_s*, const enum gb_error_e, const uint16_t val);
 
 	/* Transmit one byte and return the received byte. */
-	uint8_t (*gb_serial_transfer)(struct gb_s*, const uint8_t);
+	void (*gb_serial_tx)(struct gb_s*, const uint8_t tx);
+	enum gb_serial_rx_ret_e (*gb_serial_rx)(struct gb_s*, uint8_t* rx);
 
 	struct
 	{
@@ -3334,21 +3348,51 @@ void __gb_step_cpu(struct gb_s *gb)
 	}
 
 	/* Check serial transmission. */
-	if((gb->gb_reg.SC & 0x81) == 0x81)
+	if(gb->gb_reg.SC & SERIAL_SC_TX_START)
 	{
+		/* If new transfer, call TX function. */
+		if(gb->counter.serial_count == 0 && gb->gb_serial_tx != NULL)
+			(gb->gb_serial_tx)(gb, gb->gb_reg.SB);
+
 		gb->counter.serial_count += inst_cycles;
 
+		/* If it's time to receive byte, call RX function. */
 		if(gb->counter.serial_count >= SERIAL_CYCLES)
 		{
-			if(gb->gb_serial_transfer == NULL)
-				gb->gb_reg.SB = 0xFF;
-			else
-				gb->gb_reg.SB = (gb->gb_serial_transfer)(gb, gb->gb_reg.SB);
+			/* If RX can be done, do it. */
+			/* If RX failed, do not change SB if using external
+			 * clock, or set to 0xFF if using internal clock. */
+			uint8_t rx;
 
-			/* Inform game of serial TX/RX completion. */
-			gb->gb_reg.SC &= 0x01;
-			gb->gb_reg.IF |= SERIAL_INTR;
-			gb->counter.serial_count -= SERIAL_CYCLES;
+			if(gb->gb_serial_rx != NULL &&
+				(gb->gb_serial_rx(gb, &rx) ==
+					 GB_SERIAL_RX_SUCCESS))
+			{
+				gb->gb_reg.SB = rx;
+
+				/* Inform game of serial TX/RX completion. */
+				gb->gb_reg.SC &= 0x01;
+				gb->gb_reg.IF |= SERIAL_INTR;
+			}
+			else if(gb->gb_reg.SC & SERIAL_SC_CLOCK_SRC)
+			{
+				/* If using internal clock, and console is not
+				 * attached to any external peripheral, shifted
+				 * bits are replaced with logic 1. */
+				gb->gb_reg.SB = 0xFF;
+
+				/* Inform game of serial TX/RX completion. */
+				gb->gb_reg.SC &= 0x01;
+				gb->gb_reg.IF |= SERIAL_INTR;
+			}
+			else
+			{
+				/* If using external clock, and console is not
+				 * attached to any external peripheral, bits are
+				 * not shifted, so SB is not modified. */
+			}
+
+			gb->counter.serial_count = 0;
 		}
 	}
 
@@ -3498,9 +3542,12 @@ uint_fast32_t gb_get_save_size(struct gb_s *gb)
  * no cable is connected to the console, return 0xFF.
  */
 void gb_init_serial(struct gb_s *gb,
-		    uint8_t (*gb_serial_transfer)(struct gb_s*, const uint8_t))
+		    void (*gb_serial_tx)(struct gb_s*, const uint8_t),
+		    enum gb_serial_rx_ret_e (*gb_serial_rx)(struct gb_s*,
+			    uint8_t*))
 {
-	gb->gb_serial_transfer = gb_serial_transfer;
+	gb->gb_serial_tx = gb_serial_tx;
+	gb->gb_serial_rx = gb_serial_rx;
 }
 
 uint8_t gb_colour_hash(struct gb_s *gb)
@@ -3628,7 +3675,8 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	/* Initialise serial transfer function to NULL. If the front-end does
 	 * not provide serial support, Peanut-GB will emulate no cable connected
 	 * automatically. */
-	gb->gb_serial_transfer = NULL;
+	gb->gb_serial_tx = NULL;
+	gb->gb_serial_rx = NULL;
 
 	/* Check valid ROM using checksum value. */
 	{
