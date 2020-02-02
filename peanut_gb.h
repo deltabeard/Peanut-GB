@@ -437,7 +437,7 @@ struct gb_s
 		uint8_t sp_palette[8];
 
 		uint8_t window_clear;
-		uint8_t WY; // FIXME: Check requirement
+		uint8_t WY;
 
 		/* Only support 30fps frame skip. */
 		unsigned int frame_skip_count : 1;
@@ -1225,11 +1225,11 @@ void __gb_draw_line(struct gb_s *gb)
 		/* The X coordinate to begin drawing the background at. */
 		uint8_t bg_x = disp_x + gb->gb_reg.SCX;
 
-		/* FIXME: Get tile index for current background tile? */
+		/* Get tile index for current background tile. */
 		uint8_t idx = gb->vram[bg_map + (bg_x >> 3)];
-		/* FIXME: Y coordinate of tile pixel to draw? */
+		/* Y coordinate of tile pixel to draw. */
 		const uint8_t py = (bg_y & 0x07);
-		/* FIXME: X coordinate of tile pixel to draw? */
+		/* X coordinate of tile pixel to draw. */
 		uint8_t px = 7 - (bg_x & 0x07);
 
 		uint16_t tile;
@@ -3439,7 +3439,6 @@ void __gb_step_cpu(struct gb_s *gb)
 			if(gb->gb_reg.LY == 0)
 			{
 				/* Clear Screen */
-				// FIXME
 				gb->display.WY = gb->gb_reg.WY;
 				gb->display.window_clear = 0;
 			}

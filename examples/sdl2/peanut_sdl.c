@@ -581,7 +581,7 @@ void save_lcd_bmp(struct gb_s* gb, uint16_t fb[LCD_HEIGHT][LCD_WIDTH])
 		0x00, 0x00, 0x70, 0xff, 0xff, 0xff, 0x01, 0x00, 0x10, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0xb4, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00 
+		0x00, 0x00, 0x00, 0x00
 	};
 
 	fwrite(bmp_hdr_rgb555, sizeof(uint8_t), sizeof(bmp_hdr_rgb555), f);
@@ -746,9 +746,14 @@ int main(int argc, char **argv)
 	/* Set the RTC of the game cartridge. Only used by games that support it. */
 	{
 		time_t rawtime;
-		struct tm *timeinfo;
 		time(&rawtime);
+#ifdef _POSIX_C_SOURCE
+		struct tm timeinfo;
+		localtime_r(&rawtime, &timeinfo);
+#else
+		struct tm *timeinfo;
 		timeinfo = localtime(&rawtime);
+#endif
 
 		/* You could potentially force the game to allow the player to
 		 * reset the time by setting the RTC to invalid values.
@@ -765,7 +770,11 @@ int main(int argc, char **argv)
 
 		/* Set RTC. Only games that specify support for RTC will use
 		 * these values. */
+#ifdef _POSIX_C_SOURCE
+		gb_set_rtc(&gb, &timeinfo);
+#else
 		gb_set_rtc(&gb, timeinfo);
+#endif
 	}
 
 	/* Initialise frontend implementation, in this case, SDL2. */
