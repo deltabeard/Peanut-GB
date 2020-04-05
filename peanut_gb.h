@@ -3404,7 +3404,7 @@ void __gb_step_cpu(struct gb_s *gb)
 
 		gb->counter.tima_count += inst_cycles;
 
-		if(gb->counter.tima_count >= TAC_CYCLES[gb->gb_reg.tac_rate])
+		while(gb->counter.tima_count >= TAC_CYCLES[gb->gb_reg.tac_rate])
 		{
 			gb->counter.tima_count -= TAC_CYCLES[gb->gb_reg.tac_rate];
 
