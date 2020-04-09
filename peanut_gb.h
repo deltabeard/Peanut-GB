@@ -997,8 +997,9 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 	(gb->gb_error)(gb, GB_INVALID_WRITE, addr);
 }
 
-void __gb_execute_cb(struct gb_s *gb)
+uint8_t __gb_execute_cb(struct gb_s *gb)
 {
+	uint8_t inst_cycles;
 	uint8_t cbop = __gb_read(gb, gb->cpu_reg.pc++);
 	uint8_t r = (cbop & 0x7);
 	uint8_t b = (cbop >> 3) & 0x7;
@@ -1006,12 +1007,18 @@ void __gb_execute_cb(struct gb_s *gb)
 	uint8_t val;
 	uint8_t writeback = 1;
 
+	inst_cycles = 8;
 	/* Add an additional 8 cycles to these sets of instructions. */
-	switch(cbop & 0x0F)
+	switch(cbop & 0xC7)
 	{
 	case 0x06:
-	case 0x0E:
-		gb->counter.div_count += 8;
+	case 0x86:
+    	case 0xC6:
+		inst_cycles += 8;
+    	break;
+    	case 0x46:
+		inst_cycles += 4;
+    	break;
 	}
 
 	switch(r)
@@ -1182,6 +1189,7 @@ void __gb_execute_cb(struct gb_s *gb)
 			break;
 		}
 	}
+	return inst_cycles;
 }
 
 #if ENABLE_LCD
@@ -2985,7 +2993,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0xCB: /* CB INST */
-		__gb_execute_cb(gb);
+		inst_cycles = __gb_execute_cb(gb);
 		break;
 
 	case 0xCC: /* CALL Z, imm */
