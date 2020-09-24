@@ -391,7 +391,7 @@ struct gb_s
 	/* Number of RAM banks in cartridge. */
 	uint8_t num_ram_banks;
 
-	uint8_t selected_rom_bank;
+	uint16_t selected_rom_bank;
 	/* WRAM and VRAM bank selection not available. */
 	uint8_t cart_ram_bank;
 	uint8_t enable_cart_ram;
