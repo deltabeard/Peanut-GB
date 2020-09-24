@@ -168,11 +168,11 @@ struct cpu_registers_s
 			{
 				struct
 				{
-					uint8_t unused : 4;
-					uint8_t c : 1; /* Carry flag. */
-					uint8_t h : 1; /* Half carry flag. */
-					uint8_t n : 1; /* Add/sub flag. */
-					uint8_t z : 1; /* Zero flag. */
+					unsigned unused : 4;
+					unsigned c : 1; /* Carry flag. */
+					unsigned h : 1; /* Half carry flag. */
+					unsigned n : 1; /* Add/sub flag. */
+					unsigned z : 1; /* Zero flag. */
 				} f_bits;
 				uint8_t f;
 			};
@@ -232,9 +232,9 @@ struct gb_registers_s
 	{
 		struct
 		{
-			uint8_t tac_rate : 2;	/* Input clock select */
-			uint8_t tac_enable : 1;	/* Timer enable */
-			uint8_t unused : 5;
+			unsigned tac_rate : 2;	/* Input clock select */
+			unsigned tac_enable : 1;	/* Timer enable */
+			unsigned unused : 5;
 		};
 		uint8_t TAC;
 	};
@@ -369,16 +369,16 @@ struct gb_s
 
 	struct
 	{
-		unsigned char	gb_halt : 1;
-		unsigned char	gb_ime : 1;
-		unsigned char	gb_bios_enable : 1;
-		unsigned char	gb_frame : 1; /* New frame drawn. */
+		unsigned gb_halt	: 1;
+		unsigned gb_ime		: 1;
+		unsigned gb_bios_enable : 1;
+		unsigned gb_frame	: 1; /* New frame drawn. */
 
 #		define LCD_HBLANK	0
 #		define LCD_VBLANK	1
 #		define LCD_SEARCH_OAM	2
 #		define LCD_TRANSFER	3
-		unsigned char	lcd_mode : 2;
+		unsigned lcd_mode	: 2;
 	};
 
 	/* Cartridge information:
@@ -453,8 +453,8 @@ struct gb_s
 		uint8_t WY;
 
 		/* Only support 30fps frame skip. */
-		unsigned int frame_skip_count : 1;
-		unsigned int interlace_count : 1;
+		unsigned frame_skip_count : 1;
+		unsigned interlace_count : 1;
 	} display;
 
 	/**
@@ -469,21 +469,21 @@ struct gb_s
 		/* Set to enable interlacing. Interlacing will start immediately
 		 * (at the next line drawing).
 		 */
-		unsigned int interlace : 1;
-		unsigned int frame_skip : 1;
+		unsigned interlace : 1;
+		unsigned frame_skip : 1;
 
 		union
 		{
 			struct
 			{
-				unsigned int a		: 1;
-				unsigned int b		: 1;
-				unsigned int select	: 1;
-				unsigned int start	: 1;
-				unsigned int right	: 1;
-				unsigned int left	: 1;
-				unsigned int up		: 1;
-				unsigned int down	: 1;
+				unsigned a		: 1;
+				unsigned b		: 1;
+				unsigned select	: 1;
+				unsigned start	: 1;
+				unsigned right	: 1;
+				unsigned left	: 1;
+				unsigned up		: 1;
+				unsigned down	: 1;
 			} joypad_bits;
 			uint8_t joypad;
 		};
