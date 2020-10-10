@@ -7,13 +7,12 @@
  */
 
 #include <errno.h>
-
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 #ifdef ENABLE_SOUND_BLARGG
 #	include "blargg_apu/audio.h"
@@ -22,7 +21,6 @@
 #endif
 
 #include "../../peanut_gb.h"
-#include "nativefiledialog/src/include/nfd.h"
 
 struct priv_t
 {
@@ -605,7 +603,6 @@ int main(int argc, char **argv)
 	};
 	const double target_speed_ms = 1000.0 / VERTICAL_SYNC;
 	double speed_compensation = 0.0;
-	unsigned int running = 1;
 	SDL_Window *window;
 	SDL_Renderer *renderer;
 	SDL_Texture *texture;
@@ -622,29 +619,55 @@ int main(int argc, char **argv)
 	char *save_file_name = NULL;
 	int ret = EXIT_SUCCESS;
 
+	/* Initialise frontend implementation, in this case, SDL2. */
+	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO) < 0)
+	{
+		char buf[128];
+		snprintf(buf, sizeof(buf),
+				"Unable to initialise SDL2: %s\n", SDL_GetError());
+		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error", buf, NULL);
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	window = SDL_CreateWindow("Peanut-SDL: Opening File",
+			SDL_WINDOWPOS_CENTERED,
+			SDL_WINDOWPOS_CENTERED,
+			LCD_WIDTH * 2, LCD_HEIGHT * 2,
+			SDL_WINDOW_RESIZABLE | SDL_WINDOW_INPUT_FOCUS);
+
+	if(window == NULL)
+	{
+		printf("Could not create window: %s\n", SDL_GetError());
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
 	switch(argc)
 	{
-#if ENABLE_FILE_GUI
-
 	case 1:
-	{
-		/* Invoke file picker */
-		nfdresult_t result =
-			NFD_OpenDialog("gb,gbc", NULL, &rom_file_name);
+		SDL_SetWindowTitle(window, "Drag and drop ROM");
+		do
+		{
+			SDL_Delay(10);
+			SDL_PollEvent(&event);
 
-		if(result == NFD_CANCEL)
-		{
-			puts("No ROM selected.");
-			exit(EXIT_FAILURE);
-		}
-		else if(result != NFD_OKAY)
-		{
-			printf("Error: %s\n", NFD_GetError());
-			exit(EXIT_FAILURE);
-		}
-	}
-	break;
-#endif
+			switch(event.type)
+			{
+				case SDL_DROPFILE:
+					rom_file_name = event.drop.file;
+					break;
+
+				case SDL_QUIT:
+					ret = EXIT_FAILURE;
+					goto out;
+
+				default:
+					break;
+			}
+		} while(rom_file_name == NULL);
+			
+		break;
 
 	case 2:
 		/* Apply file name to rom_file_name
@@ -777,14 +800,6 @@ int main(int argc, char **argv)
 #endif
 	}
 
-	/* Initialise frontend implementation, in this case, SDL2. */
-	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO) < 0)
-	{
-		printf("Could not initialise SDL: %s\n", SDL_GetError());
-		ret = EXIT_FAILURE;
-		goto out;
-	}
-
 #if ENABLE_SOUND
 	SDL_AudioDeviceID dev;
 #endif
@@ -854,21 +869,8 @@ int main(int argc, char **argv)
 		char title_str[28] = "Peanut-SDL: ";
 		printf("ROM: %s\n", gb_get_rom_name(&gb, title_str + 12));
 		printf("MBC: %d\n", gb.mbc);
-
-		window = SDL_CreateWindow(title_str,
-					  SDL_WINDOWPOS_UNDEFINED,
-					  SDL_WINDOWPOS_UNDEFINED,
-					  LCD_WIDTH * 2, LCD_HEIGHT * 2,
-					  SDL_WINDOW_RESIZABLE | SDL_WINDOW_INPUT_FOCUS);
-
-		if(window == NULL)
-		{
-			printf("Could not create window: %s\n", SDL_GetError());
-			ret = EXIT_FAILURE;
-			goto out;
-		}
+		SDL_SetWindowTitle(window, title_str);
 	}
-
 
 	SDL_SetWindowMinimumSize(window, LCD_WIDTH, LCD_HEIGHT);
 
@@ -916,7 +918,7 @@ int main(int argc, char **argv)
 
 	auto_assign_palette(&priv, gb_colour_hash(&gb));
 
-	while(running)
+	while(SDL_QuitRequested() == SDL_FALSE)
 	{
 		int delay;
 		static unsigned int rtc_timer = 0;
@@ -935,8 +937,7 @@ int main(int argc, char **argv)
 			switch(event.type)
 			{
 			case SDL_QUIT:
-				running = 0;
-				break;
+				goto quit;
 
 			case SDL_CONTROLLERBUTTONDOWN:
 			case SDL_CONTROLLERBUTTONUP:
@@ -1257,6 +1258,7 @@ int main(int argc, char **argv)
 		}
 	}
 
+quit:
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 	SDL_DestroyTexture(texture);

@@ -426,7 +426,7 @@ struct gb_s
 		 * Draw line on screen.
 		 *
 		 * \param gb_s		emulator context
-		 * \param pixels	pixels to draw.
+		 * \param pixels	The 160 pixels to draw.
 		 * 			Bits 1-0 are the colour to draw.
 		 * 			Bits 5-4 are the palette, where:
 		 * 				OBJ0 = 0b00,
@@ -441,8 +441,8 @@ struct gb_s
 		 * \param line		Line to draw pixels on. This is
 		 * guaranteed to be between 0-144 inclusive.
 		 */
-		void (*lcd_draw_line)(struct gb_s*,
-				const uint8_t pixels[static 160],
+		void (*lcd_draw_line)(struct gb_s *gb,
+				const uint8_t *pixels,
 				const uint_fast8_t line);
 
 		/* Palettes */
@@ -3723,7 +3723,7 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
  * \param title_str	Allocated string at least 16 characters.
  * \returns		Pointer to start of string, null terminated.
  */
-const char* gb_get_rom_name(struct gb_s* gb, char title_str[static 16])
+const char* gb_get_rom_name(struct gb_s* gb, char *title_str)
 {
 	uint_fast16_t title_loc = 0x134;
 	/* End of title may be 0x13E for newer games. */
@@ -3749,8 +3749,8 @@ const char* gb_get_rom_name(struct gb_s* gb, char title_str[static 16])
 
 #if ENABLE_LCD
 void gb_init_lcd(struct gb_s *gb,
-		void (*lcd_draw_line)(struct gb_s*,
-			const uint8_t pixels[static 160],
+		void (*lcd_draw_line)(struct gb_s *gb,
+			const uint8_t *pixels,
 			const uint_fast8_t line))
 {
 	gb->display.lcd_draw_line = lcd_draw_line;

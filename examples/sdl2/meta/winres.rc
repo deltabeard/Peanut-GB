@@ -1,0 +1,39 @@
+#define Q(x) #x
+#define QUOTE(x) Q(x)
+
+#define VS_VERSION_INFO                 1
+#define IDI_ICON1                       101
+
+#ifndef ICON_FILE
+#define ICON_FILE icon.ico
+#endif
+
+IDI_ICON1	ICON	QUOTE(ICON_FILE)
+
+#ifndef EXE_VER
+#define EXE_VER 0,0,0,0
+#endif
+
+VS_VERSION_INFO VERSIONINFO
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS 0x40004L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040004b0"
+        BEGIN
+            VALUE "CompanyName", QUOTE(COMPANY)
+            VALUE "FileDescription", QUOTE(DESCRIPTION)
+            VALUE "LegalCopyright", QUOTE(LICENSE)
+            VALUE "ProductName", QUOTE(NAME)
+            VALUE "ProductVersion", QUOTE(GIT_VER)
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x400, 1200
+    END
+END
