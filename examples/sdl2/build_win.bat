@@ -34,7 +34,7 @@ SET CC="cl"
 SET OBJEXT="obj"
 SET RM="del"
 SET EXEOUT="/Fe"
-SET CFLAGS="/nologo /analyze /diagnostics:caret /O2 /MD /GF /Zo- /fp:fast /W1 /I%sdlincdir%"
+SET EXTRA_CFLAGS="/nologo /analyze /diagnostics:caret /O2 /MD /GF /Zo- /fp:fast /W1 /I%sdlincdir%"
 set LDFLAGS="/link /SUBSYSTEM:WINDOWS /OUT:Peanut-SDL-%VSCMD_ARG_TGT_ARCH%.exe /LIBPATH:'%sdllibdir%' /LTCG"
 set LDLIBS="SDL2main.lib SDL2-static.lib winmm.lib msimg32.lib version.lib imm32.lib setupapi.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib comctl32.lib"
 
@@ -51,7 +51,7 @@ set ICON_FILE=icon.ico
 set RES=meta\winres.res
 
 @ECHO ON
-GNUMAKE.EXE CC=%CC% OBJEXT=%OBJEXT% RM=%RM% EXEOUT=%EXEOUT% CFLAGS=%CFLAGS% LDFLAGS=%LDFLAGS% LDLIBS=%LDLIBS% ICON_FILE=%ICON_FILE% RES=%RES% %1
+GNUMAKE.EXE CC=%CC% OBJEXT=%OBJEXT% RM=%RM% EXEOUT=%EXEOUT% EXTRA_CFLAGS=%EXTRA_CFLAGS% LDFLAGS=%LDFLAGS% LDLIBS=%LDLIBS% ICON_FILE=%ICON_FILE% RES=%RES% %1
 @ECHO OFF
 
 ENDLOCAL

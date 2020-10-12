@@ -14,9 +14,9 @@
 
 #include <SDL.h>
 
-#ifdef ENABLE_SOUND_BLARGG
+#if defined(ENABLE_SOUND_BLARGG)
 #	include "blargg_apu/audio.h"
-#elif defined ENABLE_SOUND_MINIGB
+#elif defined(ENABLE_SOUND_MINIGB)
 #	include "minigb_apu/minigb_apu.h"
 #endif
 
@@ -619,6 +619,10 @@ int main(int argc, char **argv)
 	char *save_file_name = NULL;
 	int ret = EXIT_SUCCESS;
 
+#if defined(_WIN32)
+	   SDL_setenv("SDL_AUDIODRIVER", "directsound", SDL_TRUE);
+#endif
+
 	/* Initialise frontend implementation, in this case, SDL2. */
 	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO) < 0)
 	{
@@ -804,9 +808,9 @@ int main(int argc, char **argv)
 	SDL_AudioDeviceID dev;
 #endif
 
-#ifdef ENABLE_SOUND_BLARGG
+#if defined(ENABLE_SOUND_BLARGG)
 	audio_init(&dev);
-#elif defined ENABLE_SOUND_MINIGB
+#elif defined(ENABLE_SOUND_MINIGB)
 	{
 		SDL_AudioSpec want, have;
 

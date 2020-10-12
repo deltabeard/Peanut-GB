@@ -13,7 +13,7 @@ CC	:= cc
 OBJEXT	:= o
 RM	:= rm -f
 EXEOUT	:= -o
-CFLAGS	:= -std=c99 -pedantic -Wall -Wextra -Og -g3 $(EXTRA_CFLAGS)
+EXTRA_CFLAGS := -std=c99 -pedantic -Wall -Wextra -Og -g3
 EXE	:= $(NAME)
 LICENSE := $(COPYRIGHT); Released under the $(LICENSE_SPDX) License.
 GIT_VER := $(shell git describe --dirty --always --tags --long)
@@ -29,16 +29,16 @@ else
 	LDLIBS += $(shell sdl2-config --libs)
 endif
 
-ifeq ($(SOUND),minigb)
-	SRCS += minigb_apu/minigb_apu.c
-	CFLAGS += -D ENABLE_SOUND -D ENABLE_SOUND_MINIGB
-	LDLIBS += -lm
-endif
-
 ifeq ($(LCD),yes)
 	CFLAGS += -D ENABLE_LCD=1
 else
 	CFLAGS += -D ENABLE_LCD=0
+endif
+
+ifeq ($(SOUND),minigb)
+	SRCS += minigb_apu/minigb_apu.c
+	CFLAGS += -D ENABLE_SOUND -D ENABLE_SOUND_MINIGB
+	LDLIBS += -lm
 endif
 
 # File extension ".exe" is automatically appended on MinGW and MSVC builds, even
@@ -50,6 +50,8 @@ endif
 ifeq ($(GIT_VER),)
 	GIT_VER := LOCAL
 endif
+
+CFLAGS += $(EXTRA_CFLAGS)
 
 define help_txt
 $(NAME) - $(DESCRIPTION)
