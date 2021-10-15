@@ -587,7 +587,7 @@ uint8_t __gb_read(struct gb_s *gb, const uint_fast16_t addr)
 				return gb->gb_cart_ram_read(gb, addr - CART_RAM_ADDR);
 		}
 
-		return 0;
+		return 0xFF;
 
 	case 0xC:
 		return gb->wram[addr - WRAM_0_ADDR];

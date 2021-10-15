@@ -115,7 +115,7 @@ void read_cart_ram_file(const char *save_file_name, uint8_t **dest,
 	 * save memory allocated above. The save file will be created on exit. */
 	if(f == NULL)
 	{
-		memset(*dest, 0xFF, len);
+		memset(*dest, 0, len);
 		return;
 	}
 
