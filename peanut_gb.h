@@ -387,7 +387,7 @@ struct gb_s
 	/* Whether the MBC has internal RAM. */
 	uint8_t cart_ram;
 	/* Number of ROM banks in cartridge. */
-	uint16_t num_rom_banks;
+	uint16_t num_rom_banks_mask;
 	/* Number of RAM banks in cartridge. */
 	uint8_t num_ram_banks;
 
@@ -728,7 +728,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 		{
 			gb->selected_rom_bank = (gb->selected_rom_bank & 0x100) | val;
 			gb->selected_rom_bank =
-				gb->selected_rom_bank % gb->num_rom_banks;
+				gb->selected_rom_bank & gb->num_rom_banks_mask;
 			return;
 		}
 
@@ -760,7 +760,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 		else if(gb->mbc == 5)
 			gb->selected_rom_bank = (val & 0x01) << 8 | (gb->selected_rom_bank & 0xFF);
 
-		gb->selected_rom_bank = gb->selected_rom_bank % gb->num_rom_banks;
+		gb->selected_rom_bank = gb->selected_rom_bank & gb->num_rom_banks_mask;
 		return;
 
 	case 0x4:
@@ -769,7 +769,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 		{
 			gb->cart_ram_bank = (val & 3);
 			gb->selected_rom_bank = ((val & 3) << 5) | (gb->selected_rom_bank & 0x1F);
-			gb->selected_rom_bank = gb->selected_rom_bank % gb->num_rom_banks;
+			gb->selected_rom_bank = gb->selected_rom_bank & gb->num_rom_banks_mask;
 		}
 		else if(gb->mbc == 3)
 			gb->cart_ram_bank = val;
@@ -3662,14 +3662,9 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 		0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0,
 		1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0
 	};
-	const uint16_t num_rom_banks[] =
+	const uint16_t num_rom_banks_mask[] =
 	{
-		2, 4, 8, 16, 32, 64, 128, 256, 512, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 72, 80, 96, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+		2, 4, 8, 16, 32, 64, 128, 256, 512
 	};
 	const uint8_t num_ram_banks[] = { 0, 1, 1, 4, 16, 8 };
 
@@ -3701,12 +3696,12 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 		const uint8_t mbc_value = gb->gb_rom_read(gb, mbc_location);
 
 		if(mbc_value > sizeof(cart_mbc) - 1 ||
-				(gb->mbc = cart_mbc[gb->gb_rom_read(gb, mbc_location)]) == 255u)
+				(gb->mbc = cart_mbc[mbc_value]) == 255u)
 			return GB_INIT_CARTRIDGE_UNSUPPORTED;
 	}
 
 	gb->cart_ram = cart_ram[gb->gb_rom_read(gb, mbc_location)];
-	gb->num_rom_banks = num_rom_banks[gb->gb_rom_read(gb, bank_count_location)];
+	gb->num_rom_banks_mask = num_rom_banks_mask[gb->gb_rom_read(gb, bank_count_location)] - 1;
 	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(gb, ram_size_location)];
 
 	gb->display.lcd_draw_line = NULL;
