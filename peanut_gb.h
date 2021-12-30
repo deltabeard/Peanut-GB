@@ -752,7 +752,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 		}
 		else if(gb->mbc == 3)
 		{
-			gb->selected_rom_bank = val;
+			gb->selected_rom_bank = val & 0x7F;
 
 			if(!gb->selected_rom_bank)
 				gb->selected_rom_bank++;
