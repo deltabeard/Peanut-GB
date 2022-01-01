@@ -3626,6 +3626,8 @@ void gb_reset(struct gb_s *gb)
 
 	gb->direct.joypad = 0xFF;
 	gb->gb_reg.P1 = 0xCF;
+
+	memset(gb->vram, 0x00, VRAM_SIZE);
 }
 
 /**
