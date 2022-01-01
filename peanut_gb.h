@@ -379,6 +379,7 @@ struct gb_s
 #		define LCD_SEARCH_OAM	2
 #		define LCD_TRANSFER	3
 		unsigned lcd_mode	: 2;
+		unsigned lcd_blank	: 1;
 	};
 
 	/* Cartridge information:
@@ -901,6 +902,13 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 
 		/* LCD Registers */
 		case 0x40:
+			if(((gb->gb_reg.LCDC & LCDC_ENABLE) == 0) &&
+				(val & LCDC_ENABLE))
+			{
+				gb->counter.lcd_count = 0;
+				gb->lcd_blank = 1;
+			}
+
 			gb->gb_reg.LCDC = val;
 
 			/* LY fixed to 0 when LCD turned off. */
@@ -3457,6 +3465,7 @@ void __gb_step_cpu(struct gb_s *gb)
 			gb->lcd_mode = LCD_VBLANK;
 			gb->gb_frame = 1;
 			gb->gb_reg.IF |= VBLANK_INTR;
+			gb->lcd_blank = 0;
 
 			if(gb->gb_reg.STAT & STAT_MODE_1_INTR)
 				gb->gb_reg.IF |= LCDC_INTR;
@@ -3515,7 +3524,8 @@ void __gb_step_cpu(struct gb_s *gb)
 	{
 		gb->lcd_mode = LCD_TRANSFER;
 #if ENABLE_LCD
-		__gb_draw_line(gb);
+		if(!gb->lcd_blank)
+			__gb_draw_line(gb);
 #endif
 	}
 }
@@ -3706,6 +3716,7 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	gb->num_rom_banks_mask = num_rom_banks_mask[gb->gb_rom_read(gb, bank_count_location)] - 1;
 	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(gb, ram_size_location)];
 
+	gb->lcd_blank = 0;
 	gb->display.lcd_draw_line = NULL;
 
 	gb_reset(gb);
