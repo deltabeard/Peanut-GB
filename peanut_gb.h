@@ -262,18 +262,18 @@ struct gb_registers_s {
 /* Bit mask for the shade of pixel to display */
 #define LCD_COLOUR 0x03
 /**
-	* Bit mask for whether a pixel is OBJ0, OBJ1, or BG. Each may have a different
-	* palette when playing a DMG game on CGB.
-	*/
+    * Bit mask for whether a pixel is OBJ0, OBJ1, or BG. Each may have a different
+    * palette when playing a DMG game on CGB.
+    */
 #define LCD_PALETTE_OBJ 0x10
 #define LCD_PALETTE_BG 0x20
 /**
-	* Bit mask for the two bits listed above.
-	* LCD_PALETTE_ALL == 0b00 --> OBJ0
-	* LCD_PALETTE_ALL == 0b01 --> OBJ1
-	* LCD_PALETTE_ALL == 0b10 --> BG
-	* LCD_PALETTE_ALL == 0b11 --> NOT POSSIBLE
-	*/
+    * Bit mask for the two bits listed above.
+    * LCD_PALETTE_ALL == 0b00 --> OBJ0
+    * LCD_PALETTE_ALL == 0b01 --> OBJ1
+    * LCD_PALETTE_ALL == 0b10 --> BG
+    * LCD_PALETTE_ALL == 0b11 --> NOT POSSIBLE
+    */
 #define LCD_PALETTE_ALL 0x30
 #endif
 
@@ -314,40 +314,40 @@ enum gb_serial_rx_ret_e {
  */
 struct gb_s {
     /**
-	 * Return byte from ROM at given address.
-	 *
-	 * \param gb_s	emulator context
-	 * \param addr	address
-	 * \return		byte at address in ROM
-	 */
+     * Return byte from ROM at given address.
+     *
+     * \param gb_s    emulator context
+     * \param addr    address
+     * \return        byte at address in ROM
+     */
     uint8_t (*gb_rom_read)(struct gb_s *, const uint_fast32_t addr);
 
     /**
-	 * Return byte from cart RAM at given address.
-	 *
-	 * \param gb_s	emulator context
-	 * \param addr	address
-	 * \return		byte at address in RAM
-	 */
+     * Return byte from cart RAM at given address.
+     *
+     * \param gb_s    emulator context
+     * \param addr    address
+     * \return        byte at address in RAM
+     */
     uint8_t (*gb_cart_ram_read)(struct gb_s *, const uint_fast32_t addr);
 
     /**
-	 * Write byte to cart RAM at given address.
-	 *
-	 * \param gb_s	emulator context
-	 * \param addr	address
-	 * \param val	value to write to address in RAM
-	 */
+     * Write byte to cart RAM at given address.
+     *
+     * \param gb_s    emulator context
+     * \param addr    address
+     * \param val    value to write to address in RAM
+     */
     void (*gb_cart_ram_write)(struct gb_s *, const uint_fast32_t addr,
                               const uint8_t val);
 
     /**
-	 * Notify front-end of error.
-	 *
-	 * \param gb_s			emulator context
-	 * \param gb_error_e	error code
-	 * \param val			arbitrary value related to error
-	 */
+     * Notify front-end of error.
+     *
+     * \param gb_s            emulator context
+     * \param gb_error_e    error code
+     * \param val            arbitrary value related to error
+     */
     void (*gb_error)(struct gb_s *, const enum gb_error_e, const uint16_t val);
 
     /* Transmit one byte and return the received byte. */
@@ -370,7 +370,7 @@ struct gb_s {
     };
 
     /* Cartridge information:
-	 * Memory Bank Controller (MBC) type. */
+     * Memory Bank Controller (MBC) type. */
     uint8_t mbc;
     /* Whether the MBC has internal RAM. */
     uint8_t cart_ram;
@@ -410,24 +410,24 @@ struct gb_s {
     struct
     {
         /**
-		 * Draw line on screen.
-		 *
-		 * \param gb_s		emulator context
-		 * \param pixels	The 160 pixels to draw.
-		 * 			Bits 1-0 are the colour to draw.
-		 * 			Bits 5-4 are the palette, where:
-		 * 				OBJ0 = 0b00,
-		 * 				OBJ1 = 0b01,
-		 * 				BG = 0b10
-		 * 			Other bits are undefined.
-		 * 			Bits 5-4 are only required by front-ends
-		 * 			which want to use a different colour for
-		 * 			different object palettes. This is what
-		 * 			the Game Boy Color (CGB) does to DMG
-		 * 			games.
-		 * \param line		Line to draw pixels on. This is
-		 * guaranteed to be between 0-144 inclusive.
-		 */
+         * Draw line on screen.
+         *
+         * \param gb_s        emulator context
+         * \param pixels    The 160 pixels to draw.
+         *             Bits 1-0 are the colour to draw.
+         *             Bits 5-4 are the palette, where:
+         *                 OBJ0 = 0b00,
+         *                 OBJ1 = 0b01,
+         *                 BG = 0b10
+         *             Other bits are undefined.
+         *             Bits 5-4 are only required by front-ends
+         *             which want to use a different colour for
+         *             different object palettes. This is what
+         *             the Game Boy Color (CGB) does to DMG
+         *             games.
+         * \param line        Line to draw pixels on. This is
+         * guaranteed to be between 0-144 inclusive.
+         */
         void (*lcd_draw_line)(struct gb_s *gb,
                               const uint8_t *pixels,
                               const uint_fast8_t line);
@@ -445,17 +445,17 @@ struct gb_s {
     } display;
 
     /**
-	 * Variables that may be modified directly by the front-end.
-	 * This method seems to be easier and possibly less overhead than
-	 * calling a function to modify these variables each time.
-	 *
-	 * None of this is thread-safe.
-	 */
+     * Variables that may be modified directly by the front-end.
+     * This method seems to be easier and possibly less overhead than
+     * calling a function to modify these variables each time.
+     *
+     * None of this is thread-safe.
+     */
     struct
     {
         /* Set to enable interlacing. Interlacing will start immediately
-		 * (at the next line drawing).
-		 */
+         * (at the next line drawing).
+         */
         unsigned interlace : 1;
         unsigned frame_skip : 1;
 
@@ -808,8 +808,8 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val) {
                 /* Joypad */
                 case 0x00:
                     /* Only bits 5 and 4 are R/W.
-			 * The lower bits are overwritten later, and the two most
-			 * significant bits are unused. */
+             * The lower bits are overwritten later, and the two most
+             * significant bits are unused. */
                     gb->gb_reg.P1 = val;
 
                     /* Direction keys selected */
@@ -865,7 +865,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val) {
                     /* LY fixed to 0 when LCD turned off. */
                     if ((gb->gb_reg.LCDC & LCDC_ENABLE) == 0) {
                         /* Do not turn off LCD outside of VBLANK. This may
-				 * happen due to poor timing in this emulator. */
+                 * happen due to poor timing in this emulator. */
                         if (gb->lcd_mode != LCD_VBLANK) {
                             gb->gb_reg.LCDC |= LCDC_ENABLE;
                             return;
@@ -1005,7 +1005,7 @@ uint8_t __gb_execute_cb(struct gb_s *gb) {
             break;
 
         /* Only values 0-7 are possible here, so we make the final case
-	 * default to satisfy -Wmaybe-uninitialized warning. */
+     * default to satisfy -Wmaybe-uninitialized warning. */
         default:
             val = gb->cpu_reg.a;
             break;
@@ -1150,7 +1150,7 @@ void __gb_draw_line(struct gb_s *gb) {
         return;
 
     /* If interlaced mode is activated, check if we need to draw the current
-	 * line. */
+     * line. */
     if (gb->direct.interlace) {
         if ((gb->display.interlace_count == 0 && (gb->gb_reg.LY & 1) == 0) || (gb->display.interlace_count == 1 && (gb->gb_reg.LY & 1) == 1)) {
             /* Compensate for missing window draw if required. */
@@ -1164,19 +1164,19 @@ void __gb_draw_line(struct gb_s *gb) {
     /* If background is enabled, draw it. */
     if (gb->gb_reg.LCDC & LCDC_BG_ENABLE) {
         /* Calculate current background line to draw. Constant because
-		 * this function draws only this one line each time it is
-		 * called. */
+         * this function draws only this one line each time it is
+         * called. */
         const uint8_t bg_y = gb->gb_reg.LY + gb->gb_reg.SCY;
 
         /* Get selected background map address for first tile
-		 * corresponding to current line.
-		 * 0x20 (32) is the width of a background tile, and the bit
-		 * shift is to calculate the address. */
+         * corresponding to current line.
+         * 0x20 (32) is the width of a background tile, and the bit
+         * shift is to calculate the address. */
         const uint16_t bg_map =
             ((gb->gb_reg.LCDC & LCDC_BG_MAP) ? VRAM_BMAP_2 : VRAM_BMAP_1) + (bg_y >> 3) * 0x20;
 
         /* The displays (what the player sees) X coordinate, drawn right
-		 * to left. */
+         * to left. */
         uint8_t disp_x = LCD_WIDTH - 1;
 
         /* The X coordinate to begin drawing the background at. */
@@ -1352,11 +1352,11 @@ void __gb_draw_line(struct gb_s *gb) {
                 // check transparency / sprite overlap / background overlap
 #if 0
 
-				if(c
-						//	&& OX <= fx[disp_x]
-						&& !((OF & OBJ_PRIORITY)
-						     && ((pixels[disp_x] & 0x3)
-							 && fx[disp_x] == 0xFE)))
+                if(c
+                        //    && OX <= fx[disp_x]
+                        && !((OF & OBJ_PRIORITY)
+                             && ((pixels[disp_x] & 0x3)
+                             && fx[disp_x] == 0xFE)))
 #else
                 if (c && !(OF & OBJ_PRIORITY && pixels[disp_x] & 0x3))
 #endif
@@ -1389,7 +1389,7 @@ void __gb_step_cpu(struct gb_s *gb) {
     static const uint8_t op_cycles[0x100] =
         {
             /* *INDENT-OFF* */
-            /*0 1 2  3  4  5  6  7  8  9  A  B  C  D  E  F	*/
+            /*0 1 2  3  4  5  6  7  8  9  A  B  C  D  E  F    */
             4, 12, 8, 8, 4, 4, 8, 4, 20, 8, 8, 8, 4, 4, 8, 4,          /* 0x00 */
             4, 12, 8, 8, 4, 4, 8, 4, 12, 8, 8, 8, 4, 4, 8, 4,          /* 0x10 */
             8, 12, 8, 8, 4, 4, 8, 4, 8, 8, 8, 8, 4, 4, 8, 4,           /* 0x20 */
@@ -3238,7 +3238,7 @@ void __gb_step_cpu(struct gb_s *gb) {
         if (gb->counter.serial_count >= SERIAL_CYCLES) {
             /* If RX can be done, do it. */
             /* If RX failed, do not change SB if using external
-			 * clock, or set to 0xFF if using internal clock. */
+             * clock, or set to 0xFF if using internal clock. */
             uint8_t rx;
 
             if (gb->gb_serial_rx != NULL &&
@@ -3251,8 +3251,8 @@ void __gb_step_cpu(struct gb_s *gb) {
                 gb->gb_reg.IF |= SERIAL_INTR;
             } else if (gb->gb_reg.SC & SERIAL_SC_CLOCK_SRC) {
                 /* If using internal clock, and console is not
-				 * attached to any external peripheral, shifted
-				 * bits are replaced with logic 1. */
+                 * attached to any external peripheral, shifted
+                 * bits are replaced with logic 1. */
                 gb->gb_reg.SB = 0xFF;
 
                 /* Inform game of serial TX/RX completion. */
@@ -3260,8 +3260,8 @@ void __gb_step_cpu(struct gb_s *gb) {
                 gb->gb_reg.IF |= SERIAL_INTR;
             } else {
                 /* If using external clock, and console is not
-				 * attached to any external peripheral, bits are
-				 * not shifted, so SB is not modified. */
+                 * attached to any external peripheral, bits are
+                 * not shifted, so SB is not modified. */
             }
 
             gb->counter.serial_count = 0;
@@ -3323,15 +3323,15 @@ void __gb_step_cpu(struct gb_s *gb) {
 #if ENABLE_LCD
 
             /* If frame skip is activated, check if we need to draw
-			 * the frame or skip it. */
+             * the frame or skip it. */
             if (gb->direct.frame_skip) {
                 gb->display.frame_skip_count =
                     !gb->display.frame_skip_count;
             }
 
             /* If interlaced is activated, change which lines get
-			 * updated. Also, only update lines on frames that are
-			 * actually drawn when frame skip is enabled. */
+             * updated. Also, only update lines on frames that are
+             * actually drawn when frame skip is enabled. */
             if (gb->direct.interlace &&
                 (!gb->direct.frame_skip ||
                  gb->display.frame_skip_count)) {
@@ -3490,15 +3490,15 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
     const uint16_t bank_count_location = 0x0148;
     const uint16_t ram_size_location = 0x0149;
     /**
-	 * Table for cartridge type (MBC). -1 if invalid.
-	 * TODO: MMM01 is untested.
-	 * TODO: MBC6 is untested.
-	 * TODO: MBC7 is unsupported.
-	 * TODO: POCKET CAMERA is unsupported.
-	 * TODO: BANDAI TAMA5 is unsupported.
-	 * TODO: HuC3 is unsupported.
-	 * TODO: HuC1 is unsupported.
-	 **/
+     * Table for cartridge type (MBC). -1 if invalid.
+     * TODO: MMM01 is untested.
+     * TODO: MBC6 is untested.
+     * TODO: MBC7 is unsupported.
+     * TODO: POCKET CAMERA is unsupported.
+     * TODO: BANDAI TAMA5 is unsupported.
+     * TODO: HuC3 is unsupported.
+     * TODO: HuC1 is unsupported.
+     **/
     const uint8_t cart_mbc[] =
         {
             0, 1, 1, 1, -1, 2, 2, -1, 0, 0, -1, 0, 0, 0, -1, 3,
@@ -3519,8 +3519,8 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
     gb->direct.priv = priv;
 
     /* Initialise serial transfer function to NULL. If the front-end does
-	 * not provide serial support, Peanut-GB will emulate no cable connected
-	 * automatically. */
+     * not provide serial support, Peanut-GB will emulate no cable connected
+     * automatically. */
     gb->gb_serial_tx = NULL;
     gb->gb_serial_rx = NULL;
 
@@ -3559,9 +3559,9 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 /**
  * Returns the title of ROM.
  *
- * \param gb		Initialised context.
- * \param title_str	Allocated string at least 16 characters.
- * \returns		Pointer to start of string, null terminated.
+ * \param gb        Initialised context.
+ * \param title_str    Allocated string at least 16 characters.
+ * \returns        Pointer to start of string, null terminated.
  */
 const char *gb_get_rom_name(struct gb_s *gb, char *title_str) {
     uint_fast16_t title_loc = 0x134;
