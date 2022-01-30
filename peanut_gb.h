@@ -57,8 +57,9 @@
 #define ANY_INTR 0x1F
 
 /* Memory section sizes for DMG */
-#define WRAM_SIZE 0x2000
-#define VRAM_SIZE 0x2000
+#define SRAM_SIZE 0x20000
+#define WRAM_SIZE 0x8000
+#define VRAM_SIZE 0x4000
 #define HRAM_SIZE 0x0100
 #define OAM_SIZE 0x00A0
 
@@ -149,6 +150,8 @@
 #define OBJ_FLIP_Y 0x40
 #define OBJ_FLIP_X 0x20
 #define OBJ_PALETTE 0x10
+#define OBJ_BANK 0x08
+#define OBJ_CGB_PALETTE 0x07
 
 #define ROM_HEADER_CHECKSUM_LOC 0x014D
 
@@ -165,11 +168,11 @@ struct cpu_registers_s {
             union {
                 struct
                 {
-                    unsigned unused : 4;
-                    unsigned c : 1; /* Carry flag. */
-                    unsigned h : 1; /* Half carry flag. */
-                    unsigned n : 1; /* Add/sub flag. */
-                    unsigned z : 1; /* Zero flag. */
+                    uint8_t unused : 4;
+                    uint8_t c : 1; /* Carry flag. */
+                    uint8_t h : 1; /* Half carry flag. */
+                    uint8_t n : 1; /* Add/sub flag. */
+                    uint8_t z : 1; /* Zero flag. */
                 } f_bits;
                 uint8_t f;
             };
@@ -223,9 +226,9 @@ struct gb_registers_s {
     union {
         struct
         {
-            unsigned tac_rate : 2;   /* Input clock select */
-            unsigned tac_enable : 1; /* Timer enable */
-            unsigned unused : 5;
+            uint8_t tac_rate : 2;   /* Input clock select */
+            uint8_t tac_enable : 1; /* Timer enable */
+            uint8_t unused : 5;
         };
         uint8_t TAC;
     };
@@ -356,17 +359,17 @@ struct gb_s {
 
     struct
     {
-        unsigned gb_halt : 1;
-        unsigned gb_ime : 1;
-        unsigned gb_bios_enable : 1;
-        unsigned gb_frame : 1; /* New frame drawn. */
+        uint8_t gb_halt : 1;
+        uint8_t gb_ime : 1;
+        uint8_t gb_bios_enable : 1;
+        uint8_t gb_frame : 1; /* New frame drawn. */
 
 #define LCD_HBLANK 0
 #define LCD_VBLANK 1
 #define LCD_SEARCH_OAM 2
 #define LCD_TRANSFER 3
-        unsigned lcd_mode : 2;
-        unsigned lcd_blank : 1;
+        uint8_t lcd_mode : 2;
+        uint8_t lcd_blank : 1;
     };
 
     /* Cartridge information:
@@ -382,6 +385,7 @@ struct gb_s {
     uint16_t selected_rom_bank;
     /* WRAM and VRAM bank selection not available. */
     uint8_t cart_ram_bank;
+    uint16_t cart_ram_bank_offset;  //offset to subtract from the address to point to the right SRAM bank
     uint8_t enable_cart_ram;
     /* Cartridge ROM/RAM mode select. */
     uint8_t cart_mode_select;
@@ -440,10 +444,32 @@ struct gb_s {
         uint8_t WY;
 
         /* Only support 30fps frame skip. */
-        unsigned frame_skip_count : 1;
-        unsigned interlace_count : 1;
+        uint8_t frame_skip_count : 1;
+        uint8_t interlace_count : 1;
     } display;
 
+    /* Game Boy Color Mode*/
+    struct {
+        uint8_t cgbMode;
+        uint8_t doubleSpeed;
+        uint8_t doubleSpeedPrep;
+        uint8_t wramBank;
+        uint16_t wramBankOffset;
+        uint8_t vramBank;
+        uint16_t vramBankOffset;
+        uint16_t fixPalette[0x40];  //BG then OAM palettes fixed for the screen
+        uint8_t OAMPalette[0x40];
+        uint8_t BGPalette[0x40];
+        uint8_t OAMPaletteID;
+        uint8_t BGPaletteID;
+        uint8_t OAMPaletteInc;
+        uint8_t BGPaletteInc;
+        uint8_t dmaActive;
+        uint8_t dmaMode;
+        uint8_t dmaSize;
+        uint16_t dmaSource;
+        uint16_t dmaDest;
+    } cgb;
     /**
      * Variables that may be modified directly by the front-end.
      * This method seems to be easier and possibly less overhead than
@@ -456,20 +482,20 @@ struct gb_s {
         /* Set to enable interlacing. Interlacing will start immediately
          * (at the next line drawing).
          */
-        unsigned interlace : 1;
-        unsigned frame_skip : 1;
+        uint8_t interlace : 1;
+        uint8_t frame_skip : 1;
 
         union {
             struct
             {
-                unsigned a : 1;
-                unsigned b : 1;
-                unsigned select : 1;
-                unsigned start : 1;
-                unsigned right : 1;
-                unsigned left : 1;
-                unsigned up : 1;
-                unsigned down : 1;
+                uint8_t a : 1;
+                uint8_t b : 1;
+                uint8_t select : 1;
+                uint8_t start : 1;
+                uint8_t right : 1;
+                uint8_t left : 1;
+                uint8_t up : 1;
+                uint8_t down : 1;
             } joypad_bits;
             uint8_t joypad;
         };
@@ -546,19 +572,15 @@ uint8_t __gb_read(struct gb_s *gb, const uint_fast16_t addr) {
 
         case 0x8:
         case 0x9:
-            return gb->vram[addr - VRAM_ADDR];
+            return gb->vram[addr - gb->cgb.vramBankOffset];
 
         case 0xA:
         case 0xB:
             if (gb->cart_ram && gb->enable_cart_ram) {
                 if (gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
                     return gb->cart_rtc[gb->cart_ram_bank - 0x08];
-                else if ((gb->cart_mode_select || gb->mbc != 1) &&
-                         gb->cart_ram_bank < gb->num_ram_banks) {
-                    return gb->gb_cart_ram_read(gb, addr - CART_RAM_ADDR +
-                                                        (gb->cart_ram_bank * CRAM_BANK_SIZE));
-                } else
-                    return gb->gb_cart_ram_read(gb, addr - CART_RAM_ADDR);
+                else
+                    return gb->gb_cart_ram_read(gb, addr - gb->cart_ram_bank_offset);
             }
 
             return 0xFF;
@@ -567,14 +589,14 @@ uint8_t __gb_read(struct gb_s *gb, const uint_fast16_t addr) {
             return gb->wram[addr - WRAM_0_ADDR];
 
         case 0xD:
-            return gb->wram[addr - WRAM_1_ADDR + WRAM_BANK_SIZE];
+            return gb->wram[addr - gb->cgb.wramBankOffset];
 
         case 0xE:
             return gb->wram[addr - ECHO_ADDR];
 
         case 0xF:
             if (addr < OAM_ADDR)
-                return gb->wram[addr - ECHO_ADDR];
+                return gb->wram[(addr - 0x2000) - gb->cgb.wramBankOffset];
 
             if (addr < UNUSED_ADDR)
                 return gb->oam[addr - OAM_ADDR];
@@ -585,7 +607,7 @@ uint8_t __gb_read(struct gb_s *gb, const uint_fast16_t addr) {
 
             /* HRAM */
             if (HRAM_ADDR <= addr && addr < INTR_EN_ADDR)
-                return gb->hram[addr - HRAM_ADDR];
+                return gb->hram[addr - IO_ADDR];
 
             if ((addr >= 0xFF10) && (addr <= 0xFF3F)) {
 #if ENABLE_SOUND
@@ -665,6 +687,50 @@ uint8_t __gb_read(struct gb_s *gb, const uint_fast16_t addr) {
                 case 0x4B:
                     return gb->gb_reg.WX;
 
+                /* Speed Switch*/
+                case 0x4D:
+                    return (gb->cgb.doubleSpeed << 7) + gb->cgb.doubleSpeedPrep;
+
+                /* CGB VRAM Bank*/
+                case 0x4F:
+                    return gb->cgb.vramBank | 0xFE;
+
+                /* CGB DMA*/
+                case 0x51:
+                    return (gb->cgb.dmaSource >> 8);
+                case 0x52:
+                    return (gb->cgb.dmaSource & 0xF0);
+                case 0x53:
+                    return (gb->cgb.dmaDest >> 8);
+                case 0x54:
+                    return (gb->cgb.dmaDest & 0xF0);
+                case 0x55:
+                    return (gb->cgb.dmaActive << 7) | (gb->cgb.dmaSize - 1);
+
+                /* IR Register*/
+                case 0x56:
+                    return gb->hram[0x56];
+
+                /* CGB BG Palette Index*/
+                case 0x68:
+                    return (gb->cgb.BGPaletteID & 0x3F) + (gb->cgb.BGPaletteInc << 7);
+
+                /* CGB BG Palette*/
+                case 0x69:
+                    return gb->cgb.BGPalette[(gb->cgb.BGPaletteID & 0x3F)];
+
+                /* CGB OAM Palette Index*/
+                case 0x6A:
+                    return (gb->cgb.OAMPaletteID & 0x3F) + (gb->cgb.OAMPaletteInc << 7);
+
+                /* CGB OAM Palette*/
+                case 0x6B:
+                    return gb->cgb.OAMPalette[(gb->cgb.OAMPaletteID & 0x3F)];
+
+                /* CGB WRAM Bank*/
+                case 0x70:
+                    return gb->cgb.wramBank;
+
                 /* Interrupt Enable Register */
                 case 0xFF:
                     return gb->gb_reg.IE;
@@ -730,13 +796,16 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val) {
         case 0x5:
             if (gb->mbc == 1) {
                 gb->cart_ram_bank = (val & 3);
+                gb->cart_ram_bank_offset = 0xA000 - (gb->cart_ram_bank << 13);
                 gb->selected_rom_bank = ((val & 3) << 5) | (gb->selected_rom_bank & 0x1F);
                 gb->selected_rom_bank = gb->selected_rom_bank & gb->num_rom_banks_mask;
-            } else if (gb->mbc == 3)
+            } else if (gb->mbc == 3) {
                 gb->cart_ram_bank = val;
-            else if (gb->mbc == 5)
+                gb->cart_ram_bank_offset = 0xA000 - ((gb->cart_ram_bank & 3) << 13);
+            } else if (gb->mbc == 5) {
                 gb->cart_ram_bank = (val & 0x0F);
-
+                gb->cart_ram_bank_offset = 0xA000 - (gb->cart_ram_bank << 13);
+            }
             return;
 
         case 0x6:
@@ -746,7 +815,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val) {
 
         case 0x8:
         case 0x9:
-            gb->vram[addr - VRAM_ADDR] = val;
+            gb->vram[addr - gb->cgb.vramBankOffset] = val;
             return;
 
         case 0xA:
@@ -754,12 +823,8 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val) {
             if (gb->cart_ram && gb->enable_cart_ram) {
                 if (gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
                     gb->cart_rtc[gb->cart_ram_bank - 0x08] = val;
-                else if (gb->cart_mode_select &&
-                         gb->cart_ram_bank < gb->num_ram_banks) {
-                    gb->gb_cart_ram_write(gb,
-                                          addr - CART_RAM_ADDR + (gb->cart_ram_bank * CRAM_BANK_SIZE), val);
-                } else if (gb->num_ram_banks)
-                    gb->gb_cart_ram_write(gb, addr - CART_RAM_ADDR, val);
+                else if (gb->num_ram_banks)
+                    gb->gb_cart_ram_write(gb, addr - gb->cart_ram_bank_offset, val);
             }
 
             return;
@@ -769,7 +834,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val) {
             return;
 
         case 0xD:
-            gb->wram[addr - WRAM_1_ADDR + WRAM_BANK_SIZE] = val;
+            gb->wram[addr - gb->cgb.wramBankOffset] = val;
             return;
 
         case 0xE:
@@ -778,7 +843,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val) {
 
         case 0xF:
             if (addr < OAM_ADDR) {
-                gb->wram[addr - ECHO_ADDR] = val;
+                gb->wram[(addr - 0x2000) - gb->cgb.wramBankOffset] = val;
                 return;
             }
 
@@ -792,7 +857,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val) {
                 return;
 
             if (HRAM_ADDR <= addr && addr < INTR_EN_ADDR) {
-                gb->hram[addr - HRAM_ADDR] = val;
+                gb->hram[addr - IO_ADDR] = val;
                 return;
             }
 
@@ -802,7 +867,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val) {
 #endif
                 return;
             }
-
+            uint16_t fixPaletteTemp;
             /* IO and Interrupts. */
             switch (addr & 0xFF) {
                 /* Joypad */
@@ -938,9 +1003,92 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val) {
                     gb->gb_reg.WX = val;
                     return;
 
+                /* Prepare Speed Switch*/
+                case 0x4D:
+                    gb->cgb.doubleSpeedPrep = val & 1;
+                    return;
+
+                /* CGB VRAM Bank*/
+                case 0x4F:
+                    gb->cgb.vramBank = val & 0x01;
+                    if (gb->cgb.cgbMode) gb->cgb.vramBankOffset = VRAM_ADDR - (gb->cgb.vramBank << 13);
+                    return;
+
                 /* Turn off boot ROM */
                 case 0x50:
                     gb->gb_bios_enable = 0;
+                    return;
+
+                /* DMA Register */
+                case 0x51:
+                    gb->cgb.dmaSource = (gb->cgb.dmaSource & 0xFF) + (val << 8);
+                    return;
+                case 0x52:
+                    gb->cgb.dmaSource = (gb->cgb.dmaSource & 0xFF00) + val;
+                    return;
+                case 0x53:
+                    gb->cgb.dmaDest = (gb->cgb.dmaDest & 0xFF) + (val << 8);
+                    return;
+                case 0x54:
+                    gb->cgb.dmaDest = (gb->cgb.dmaDest & 0xFF00) + val;
+                    return;
+
+                /* DMA Register*/
+                case 0x55:
+                    gb->cgb.dmaSize = (val & 0x7F) + 1;
+                    gb->cgb.dmaMode = val >> 7;
+                    //DMA GBC
+                    if (gb->cgb.dmaActive) {  // Only transfer if dma is not active (=1) otherwise treat it as a termination
+                        if (gb->cgb.cgbMode && (!gb->cgb.dmaMode)) {
+                            for (int i = 0; i < (gb->cgb.dmaSize << 4); i++) {
+                                __gb_write(gb, ((gb->cgb.dmaDest & 0x1FF0) | 0x8000) + i, __gb_read(gb, (gb->cgb.dmaSource & 0xFFF0) + i));
+                            }
+                            gb->cgb.dmaSource += (gb->cgb.dmaSize << 4);
+                            gb->cgb.dmaDest += (gb->cgb.dmaSize << 4);
+                            gb->cgb.dmaSize = 0;
+                        }
+                    }
+                    gb->cgb.dmaActive = gb->cgb.dmaMode ^ 1;  // set active if it's an HBlank DMA
+                    return;
+
+                /* IR Register*/
+                case 0x56:
+                    gb->hram[0x56] = val;
+                    return;
+
+                /* CGB BG Palette Index*/
+                case 0x68:
+                    gb->cgb.BGPaletteID = val & 0x3F;
+                    gb->cgb.BGPaletteInc = val >> 7;
+                    return;
+
+                /* CGB BG Palette*/
+                case 0x69:
+                    gb->cgb.BGPalette[(gb->cgb.BGPaletteID & 0x3F)] = val;
+                    fixPaletteTemp = (gb->cgb.BGPalette[(gb->cgb.BGPaletteID & 0x3E) + 1] << 8) + (gb->cgb.BGPalette[(gb->cgb.BGPaletteID & 0x3E)]);
+                    gb->cgb.fixPalette[((gb->cgb.BGPaletteID & 0x3E) >> 1)] = ((fixPaletteTemp & 0x7C00) >> 10) | (fixPaletteTemp & 0x03E0) | ((fixPaletteTemp & 0x001F) << 10);  // swap Red and Blue
+                    if (gb->cgb.BGPaletteInc) gb->cgb.BGPaletteID = (++gb->cgb.BGPaletteID) & 0x3F;
+                    return;
+
+                /* CGB OAM Palette Index*/
+                case 0x6A:
+                    gb->cgb.OAMPaletteID = val & 0x3F;
+                    gb->cgb.OAMPaletteInc = val >> 7;
+                    return;
+
+                /* CGB OAM Palette*/
+                case 0x6B:
+                    gb->cgb.OAMPalette[(gb->cgb.OAMPaletteID & 0x3F)] = val;
+                    fixPaletteTemp = (gb->cgb.OAMPalette[(gb->cgb.OAMPaletteID & 0x3E) + 1] << 8) + (gb->cgb.OAMPalette[(gb->cgb.OAMPaletteID & 0x3E)]);
+                    gb->cgb.fixPalette[0x20 + ((gb->cgb.OAMPaletteID & 0x3E) >> 1)] = ((fixPaletteTemp & 0x7C00) >> 10) | (fixPaletteTemp & 0x03E0) | ((fixPaletteTemp & 0x001F) << 10);  // swap Red and Blue
+                    if (gb->cgb.OAMPaletteInc) gb->cgb.OAMPaletteID = (++gb->cgb.OAMPaletteID) & 0x3F;
+                    return;
+
+                /* CGB WRAM Bank*/
+                case 0x70:
+                    gb->cgb.wramBank = val;
+                    gb->cgb.wramBankOffset = WRAM_1_ADDR - (1 << 12);
+                    if (gb->cgb.cgbMode && (gb->cgb.wramBank & 7) > 0) gb->cgb.wramBankOffset = WRAM_1_ADDR - ((gb->cgb.wramBank & 7) << 12);
                     return;
 
                 /* Interrupt Enable Register */
@@ -1149,8 +1297,9 @@ void __gb_draw_line(struct gb_s *gb) {
     if (gb->direct.frame_skip && !gb->display.frame_skip_count)
         return;
 
+    uint8_t pixelsPrio[160] = {0};  //do these pixels have priority over OAM?
     /* If interlaced mode is activated, check if we need to draw the current
-     * line. */
+    * line. */
     if (gb->direct.interlace) {
         if ((gb->display.interlace_count == 0 && (gb->gb_reg.LY & 1) == 0) || (gb->display.interlace_count == 1 && (gb->gb_reg.LY & 1) == 1)) {
             /* Compensate for missing window draw if required. */
@@ -1164,19 +1313,19 @@ void __gb_draw_line(struct gb_s *gb) {
     /* If background is enabled, draw it. */
     if (gb->gb_reg.LCDC & LCDC_BG_ENABLE) {
         /* Calculate current background line to draw. Constant because
-         * this function draws only this one line each time it is
-         * called. */
+        * this function draws only this one line each time it is
+        * called. */
         const uint8_t bg_y = gb->gb_reg.LY + gb->gb_reg.SCY;
 
         /* Get selected background map address for first tile
-         * corresponding to current line.
-         * 0x20 (32) is the width of a background tile, and the bit
-         * shift is to calculate the address. */
+        * corresponding to current line.
+        * 0x20 (32) is the width of a background tile, and the bit
+        * shift is to calculate the address. */
         const uint16_t bg_map =
             ((gb->gb_reg.LCDC & LCDC_BG_MAP) ? VRAM_BMAP_2 : VRAM_BMAP_1) + (bg_y >> 3) * 0x20;
 
         /* The displays (what the player sees) X coordinate, drawn right
-         * to left. */
+        * to left. */
         uint8_t disp_x = LCD_WIDTH - 1;
 
         /* The X coordinate to begin drawing the background at. */
@@ -1184,6 +1333,7 @@ void __gb_draw_line(struct gb_s *gb) {
 
         /* Get tile index for current background tile. */
         uint8_t idx = gb->vram[bg_map + (bg_x >> 3)];
+        uint8_t idxAtt = gb->vram[bg_map + (bg_x >> 3) + 0x2000];
         /* Y coordinate of tile pixel to draw. */
         const uint8_t py = (bg_y & 0x07);
         /* X coordinate of tile pixel to draw. */
@@ -1197,35 +1347,58 @@ void __gb_draw_line(struct gb_s *gb) {
         else
             tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
 
-        tile += 2 * py;
+        if (gb->cgb.cgbMode && (idxAtt & 0x08)) tile += 0x2000;  //VRAM bank 2
+        if (gb->cgb.cgbMode && (idxAtt & 0x40)) tile += 2 * (7 - py);
+        if (!gb->cgb.cgbMode || !(idxAtt & 0x40)) tile += 2 * py;
 
         /* fetch first tile */
-        uint8_t t1 = gb->vram[tile] >> px;
-        uint8_t t2 = gb->vram[tile + 1] >> px;
-
+        uint8_t t1, t2;
+        if (gb->cgb.cgbMode && (idxAtt & 0x20)) {  //Horizantal Flip
+            t1 = gb->vram[tile] << px;
+            t2 = gb->vram[tile + 1] << px;
+        } else {
+            t1 = gb->vram[tile] >> px;
+            t2 = gb->vram[tile + 1] >> px;
+        }
         for (; disp_x != 0xFF; disp_x--) {
             if (px == 8) {
                 /* fetch next tile */
                 px = 0;
                 bg_x = disp_x + gb->gb_reg.SCX;
                 idx = gb->vram[bg_map + (bg_x >> 3)];
+                idxAtt = gb->vram[bg_map + (bg_x >> 3) + 0x2000];
 
                 if (gb->gb_reg.LCDC & LCDC_TILE_SELECT)
                     tile = VRAM_TILES_1 + idx * 0x10;
                 else
                     tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
 
-                tile += 2 * py;
+                if (gb->cgb.cgbMode && (idxAtt & 0x08)) tile += 0x2000;  //VRAM bank 2
+                if (gb->cgb.cgbMode && (idxAtt & 0x40)) tile += 2 * (7 - py);
+                if (!gb->cgb.cgbMode || !(idxAtt & 0x40)) tile += 2 * py;
                 t1 = gb->vram[tile];
                 t2 = gb->vram[tile + 1];
             }
 
             /* copy background */
-            uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
-            pixels[disp_x] = gb->display.bg_palette[c];
-            pixels[disp_x] |= LCD_PALETTE_BG;
-            t1 = t1 >> 1;
-            t2 = t2 >> 1;
+            if (gb->cgb.cgbMode && (idxAtt & 0x20)) {  //Horizantal Flip
+                uint8_t c = (((t1 & 0x80) >> 1) | (t2 & 0x80)) >> 6;
+                pixels[disp_x] = ((idxAtt & 0x07) << 2) + c;
+                pixelsPrio[disp_x] = (idxAtt >> 7);
+                t1 = t1 << 1;
+                t2 = t2 << 1;
+            } else {
+                uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
+                if (gb->cgb.cgbMode) {
+                    pixels[disp_x] = ((idxAtt & 0x07) << 2) + c;
+                    pixelsPrio[disp_x] = (idxAtt >> 7);
+                } else {
+                    pixels[disp_x] = gb->display.bg_palette[c];
+                    pixels[disp_x] |= LCD_PALETTE_BG;
+                }
+                t1 = t1 >> 1;
+                t2 = t2 >> 1;
+            }
             px++;
         }
     }
@@ -1243,7 +1416,7 @@ void __gb_draw_line(struct gb_s *gb) {
         uint8_t py = gb->display.window_clear & 0x07;
         uint8_t px = 7 - (win_x & 0x07);
         uint8_t idx = gb->vram[win_line + (win_x >> 3)];
-
+        uint8_t idxAtt = gb->vram[win_line + (win_x >> 3) + 0x2000];
         uint16_t tile;
 
         if (gb->gb_reg.LCDC & LCDC_TILE_SELECT)
@@ -1251,12 +1424,19 @@ void __gb_draw_line(struct gb_s *gb) {
         else
             tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
 
-        tile += 2 * py;
+        if (gb->cgb.cgbMode && (idxAtt & 0x08)) tile += 0x2000;  //VRAM bank 2
+        if (gb->cgb.cgbMode && (idxAtt & 0x40)) tile += 2 * (7 - py);
+        if (!gb->cgb.cgbMode || !(idxAtt & 0x40)) tile += 2 * py;
 
         // fetch first tile
-        uint8_t t1 = gb->vram[tile] >> px;
-        uint8_t t2 = gb->vram[tile + 1] >> px;
-
+        uint8_t t1, t2;
+        if (gb->cgb.cgbMode && (idxAtt & 0x20)) {  //Horizantal Flip
+            t1 = gb->vram[tile] << px;
+            t2 = gb->vram[tile + 1] << px;
+        } else {
+            t1 = gb->vram[tile] >> px;
+            t2 = gb->vram[tile + 1] >> px;
+        }
         // loop & copy window
         uint8_t end = (gb->gb_reg.WX < 7 ? 0 : gb->gb_reg.WX - 7) - 1;
 
@@ -1266,23 +1446,39 @@ void __gb_draw_line(struct gb_s *gb) {
                 px = 0;
                 win_x = disp_x - gb->gb_reg.WX + 7;
                 idx = gb->vram[win_line + (win_x >> 3)];
+                idxAtt = gb->vram[win_line + (win_x >> 3) + 0x2000];
 
                 if (gb->gb_reg.LCDC & LCDC_TILE_SELECT)
                     tile = VRAM_TILES_1 + idx * 0x10;
                 else
                     tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
 
-                tile += 2 * py;
+                if (gb->cgb.cgbMode && (idxAtt & 0x08)) tile += 0x2000;  //VRAM bank 2
+                if (gb->cgb.cgbMode && (idxAtt & 0x40)) tile += 2 * (7 - py);
+                if (!gb->cgb.cgbMode || !(idxAtt & 0x40)) tile += 2 * py;
                 t1 = gb->vram[tile];
                 t2 = gb->vram[tile + 1];
             }
 
             // copy window
-            uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
-            pixels[disp_x] = gb->display.bg_palette[c];
-            pixels[disp_x] |= LCD_PALETTE_BG;
-            t1 = t1 >> 1;
-            t2 = t2 >> 1;
+            if (idxAtt & 0x20) {  //Horizantal Flip
+                uint8_t c = (((t1 & 0x80) >> 1) | (t2 & 0x80)) >> 6;
+                pixels[disp_x] = ((idxAtt & 0x07) << 2) + c;
+                pixelsPrio[disp_x] = (idxAtt >> 7);
+                t1 = t1 << 1;
+                t2 = t2 << 1;
+            } else {
+                uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
+                if (gb->cgb.cgbMode) {
+                    pixels[disp_x] = ((idxAtt & 0x07) << 2) + c;
+                    pixelsPrio[disp_x] = (idxAtt >> 7);
+                } else {
+                    pixels[disp_x] = gb->display.bg_palette[c];
+                    pixels[disp_x] |= LCD_PALETTE_BG;
+                }
+                t1 = t1 >> 1;
+                t2 = t2 >> 1;
+            }
             px++;
         }
 
@@ -1325,8 +1521,14 @@ void __gb_draw_line(struct gb_s *gb) {
                 py = (gb->gb_reg.LCDC & LCDC_OBJ_SIZE ? 15 : 7) - py;
 
             // fetch the tile
-            uint8_t t1 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2 * py];
-            uint8_t t2 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2 * py + 1];
+            uint8_t t1, t2;
+            if (gb->cgb.cgbMode) {
+                t1 = gb->vram[((OF & OBJ_BANK) << 10) + VRAM_TILES_1 + OT * 0x10 + 2 * py];
+                t2 = gb->vram[((OF & OBJ_BANK) << 10) + VRAM_TILES_1 + OT * 0x10 + 2 * py + 1];
+            } else {
+                t1 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2 * py];
+                t2 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2 * py + 1];
+            }
 
             // handle x flip
             uint8_t dir, start, end, shift;
@@ -1350,17 +1552,10 @@ void __gb_draw_line(struct gb_s *gb) {
             for (uint8_t disp_x = start; disp_x != end; disp_x += dir) {
                 uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
                 // check transparency / sprite overlap / background overlap
-#if 0
-
-                if(c
-                        //    && OX <= fx[disp_x]
-                        && !((OF & OBJ_PRIORITY)
-                             && ((pixels[disp_x] & 0x3)
-                             && fx[disp_x] == 0xFE)))
-#else
-                if (c && !(OF & OBJ_PRIORITY && pixels[disp_x] & 0x3))
-#endif
-                {
+                if (gb->cgb.cgbMode && (c && !(pixelsPrio[disp_x] && (pixels[disp_x] & 0x3)) && !((OF & OBJ_PRIORITY) && (pixels[disp_x] & 0x3)))) {
+                    /* Set pixel colour. */
+                    pixels[disp_x] = ((OF & OBJ_CGB_PALETTE) << 2) + c + 0x20;  // add 0x20 to differentiate from BG
+                } else if (c && !(OF & OBJ_PRIORITY && pixels[disp_x] & 0x3)) {
                     /* Set pixel colour. */
                     pixels[disp_x] = (OF & OBJ_PALETTE)
                                          ? gb->display.sp_palette[c + 4]
@@ -1546,6 +1741,10 @@ void __gb_step_cpu(struct gb_s *gb) {
 
         case 0x10: /* STOP */
             //gb->gb_halt = 1;
+            if (gb->cgb.cgbMode & gb->cgb.doubleSpeedPrep) {
+                gb->cgb.doubleSpeedPrep = 0;
+                gb->cgb.doubleSpeed ^= 1;
+            }
             break;
 
         case 0x11: /* LD DE, imm */
@@ -1842,7 +2041,7 @@ void __gb_step_cpu(struct gb_s *gb) {
             break;
         }
 
-        case 0x3A: /* LD A, (HL) */
+        case 0x3A: /* LD A, (HL--) */
             gb->cpu_reg.a = __gb_read(gb, gb->cpu_reg.hl--);
             break;
 
@@ -2551,7 +2750,7 @@ void __gb_step_cpu(struct gb_s *gb) {
             gb->cpu_reg.f_bits.c = 0;
             break;
 
-        case 0xA6: /* AND B */
+        case 0xA6: /* AND (HL) */
             gb->cpu_reg.a = gb->cpu_reg.a & __gb_read(gb, gb->cpu_reg.hl);
             gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
             gb->cpu_reg.f_bits.n = 0;
@@ -2760,7 +2959,7 @@ void __gb_step_cpu(struct gb_s *gb) {
         }
 
         /* TODO: Optimsation by combining similar opcode routines. */
-        case 0xBE: /* CP B */
+        case 0xBE: /* CP (HL) */
         {
             uint8_t val = __gb_read(gb, gb->cpu_reg.hl);
             uint16_t temp = gb->cpu_reg.a - val;
@@ -3098,7 +3297,7 @@ void __gb_step_cpu(struct gb_s *gb) {
             break;
         }
 
-        case 0xE9: /* JP (HL) */
+        case 0xE9: /* JP HL */
             gb->cpu_reg.pc = gb->cpu_reg.hl;
             break;
 
@@ -3163,7 +3362,7 @@ void __gb_step_cpu(struct gb_s *gb) {
             gb->cpu_reg.f_bits.c = 0;
             break;
 
-        case 0xF7: /* PUSH AF */
+        case 0xF7: /* RST 0x0030 */
             __gb_write(gb, --gb->cpu_reg.sp, gb->cpu_reg.pc >> 8);
             __gb_write(gb, --gb->cpu_reg.sp, gb->cpu_reg.pc & 0xFF);
             gb->cpu_reg.pc = 0x0030;
@@ -3292,7 +3491,7 @@ void __gb_step_cpu(struct gb_s *gb) {
         return;
 
     /* LCD Timing */
-    gb->counter.lcd_count += inst_cycles;
+    gb->counter.lcd_count += (inst_cycles >> gb->cgb.doubleSpeed);
 
     /* New Scanline */
     if (gb->counter.lcd_count > LCD_LINE_CYCLES) {
@@ -3350,6 +3549,16 @@ void __gb_step_cpu(struct gb_s *gb) {
             }
 
             gb->lcd_mode = LCD_HBLANK;
+
+            //DMA GBC
+            if (gb->cgb.cgbMode && (!gb->cgb.dmaActive) && gb->cgb.dmaMode) {
+                for (uint8_t i = 0; i < 0x10; i++) {
+                    __gb_write(gb, ((gb->cgb.dmaDest & 0x1FF0) | 0x8000) + i, __gb_read(gb, (gb->cgb.dmaSource & 0xFFF0) + i));
+                }
+                gb->cgb.dmaSource += 0x10;
+                gb->cgb.dmaDest += 0x10;
+                if (!(--gb->cgb.dmaSize)) gb->cgb.dmaActive = 1;
+            }
 
             if (gb->gb_reg.STAT & STAT_MODE_0_INTR)
                 gb->gb_reg.IF |= LCDC_INTR;
@@ -3432,11 +3641,15 @@ void gb_reset(struct gb_s *gb) {
     gb->enable_cart_ram = 0;
     gb->cart_mode_select = 0;
 
-    /* Initialise CPU registers as though a DMG. */
+    /* Initialise CPU registers as though a DMG or CGB. */
     gb->cpu_reg.af = 0x01B0;
+    if (gb->cgb.cgbMode) gb->cpu_reg.af = 0x1180;
     gb->cpu_reg.bc = 0x0013;
+    if (gb->cgb.cgbMode) gb->cpu_reg.bc = 0x0000;
     gb->cpu_reg.de = 0x00D8;
+    if (gb->cgb.cgbMode) gb->cpu_reg.de = 0x0008;
     gb->cpu_reg.hl = 0x014D;
+    if (gb->cgb.cgbMode) gb->cpu_reg.hl = 0x007C;
     gb->cpu_reg.sp = 0xFFFE;
     /* TODO: Add BIOS support. */
     gb->cpu_reg.pc = 0x0100;
@@ -3449,7 +3662,8 @@ void gb_reset(struct gb_s *gb) {
     gb->gb_reg.TIMA = 0x00;
     gb->gb_reg.TMA = 0x00;
     gb->gb_reg.TAC = 0xF8;
-    gb->gb_reg.DIV = 0xAC;
+    gb->gb_reg.DIV = 0xAB;
+    if (gb->cgb.cgbMode) gb->gb_reg.DIV = 0xFF;
 
     gb->gb_reg.IF = 0xE1;
 
@@ -3460,8 +3674,30 @@ void gb_reset(struct gb_s *gb) {
 
     /* Appease valgrind for invalid reads and unconditional jumps. */
     gb->gb_reg.SC = 0x7E;
-    gb->gb_reg.STAT = 0;
+    if (gb->cgb.cgbMode) gb->gb_reg.SC = 0x7F;
+    gb->gb_reg.STAT = 0x85;
     gb->gb_reg.LY = 0;
+
+    /* Initialize some CGB registers */
+    gb->cgb.doubleSpeed = 0;
+    gb->cgb.doubleSpeedPrep = 0;
+    gb->cgb.wramBank = 1;
+    gb->cgb.wramBankOffset = WRAM_0_ADDR;
+    gb->cgb.vramBank = 0;
+    gb->cgb.vramBankOffset = VRAM_ADDR;
+    for (int i = 0; i < 0x20; i++) {
+        gb->cgb.OAMPalette[(i << 1)] = gb->cgb.BGPalette[(i << 1)] = 0x7F;
+        gb->cgb.OAMPalette[(i << 1) + 1] = gb->cgb.BGPalette[(i << 1) + 1] = 0xFF;
+    }
+    gb->cgb.OAMPaletteID = 0;
+    gb->cgb.BGPaletteID = 0;
+    gb->cgb.OAMPaletteInc = 0;
+    gb->cgb.BGPaletteInc = 0;
+    gb->cgb.dmaActive = 1;  // Not active
+    gb->cgb.dmaMode = 0;
+    gb->cgb.dmaSize = 0;
+    gb->cgb.dmaSource = 0;
+    gb->cgb.dmaDest = 0;
 
     __gb_write(gb, 0xFF47, 0xFC);  // BGP
     __gb_write(gb, 0xFF48, 0xFF);  // OBJP0
@@ -3486,6 +3722,7 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
                              void (*gb_cart_ram_write)(struct gb_s *, const uint_fast32_t, const uint8_t),
                              void (*gb_error)(struct gb_s *, const enum gb_error_e, const uint16_t),
                              void *priv) {
+    const uint16_t cgb_flag = 0x0143;
     const uint16_t mbc_location = 0x0147;
     const uint16_t bank_count_location = 0x0148;
     const uint16_t ram_size_location = 0x0149;
@@ -3509,7 +3746,12 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
             1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0};
     const uint16_t num_rom_banks_mask[] =
         {
-            2, 4, 8, 16, 32, 64, 128, 256, 512};
+            2, 4, 8, 16, 32, 64, 128, 256, 512, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 72, 80, 96, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     const uint8_t num_ram_banks[] = {0, 1, 1, 4, 16, 8};
 
     gb->gb_rom_read = gb_rom_read;
@@ -3537,6 +3779,7 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 
     /* Check if cartridge type is supported, and set MBC type. */
     {
+        gb->cgb.cgbMode = (gb->gb_rom_read(gb, cgb_flag) & 0x80) >> 7;
         const uint8_t mbc_value = gb->gb_rom_read(gb, mbc_location);
 
         if (mbc_value > sizeof(cart_mbc) - 1 ||

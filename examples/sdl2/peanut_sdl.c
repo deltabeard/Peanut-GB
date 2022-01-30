@@ -103,7 +103,7 @@ void read_cart_ram_file(const char *save_file_name, uint8_t **dest,
     f = fopen(save_file_name, "rb");
 
     /* It doesn't matter if the save file doesn't exist. We initialise the
-     * save memory allocated above. The save file will be created on exit. */
+	 * save memory allocated above. The save file will be created on exit. */
     if (f == NULL) {
         memset(*dest, 0, len);
         return;
@@ -142,7 +142,7 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
     switch (gb_err) {
         case GB_INVALID_OPCODE:
             /* We compensate for the post-increment in the __gb_step_cpu
-         * function. */
+		 * function. */
             fprintf(stdout, "Invalid opcode %#04x at PC: %#06x, SP: %#06x\n",
                     val,
                     gb->cpu_reg.pc - 1,
@@ -492,11 +492,16 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection) {
 void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
                    const uint_least8_t line) {
     struct priv_t *priv = gb->direct.priv;
-
-    for (unsigned int x = 0; x < LCD_WIDTH; x++) {
-        priv->fb[line][x] = priv->selected_palette
-                                [(pixels[x] & LCD_PALETTE_ALL) >> 4]
-                                [pixels[x] & 3];
+    if (gb->cgb.cgbMode) {  // CGB
+        for (unsigned int x = 0; x < LCD_WIDTH; x++) {
+            priv->fb[line][x] = gb->cgb.fixPalette[pixels[x]];
+        }
+    } else {  // DMG
+        for (unsigned int x = 0; x < LCD_WIDTH; x++) {
+            priv->fb[line][x] = priv->selected_palette
+                                    [(pixels[x] & LCD_PALETTE_ALL) >> 4]
+                                    [pixels[x] & 3];
+        }
     }
 }
 #endif
@@ -610,13 +615,13 @@ int main(int argc, char **argv) {
 
         case 2:
             /* Apply file name to rom_file_name
-         * Set save_file_name to NULL. */
+		 * Set save_file_name to NULL. */
             rom_file_name = argv[1];
             break;
 
         case 3:
             /* Apply file name to rom_file_name
-         * Apply save name to save_file_name */
+		 * Apply save name to save_file_name */
             rom_file_name = argv[1];
             save_file_name = argv[2];
             break;
@@ -641,13 +646,13 @@ int main(int argc, char **argv) {
     }
 
     /* If no save file is specified, copy save file (with specific name) to
-     * allocated memory. */
+	 * allocated memory. */
     if (save_file_name == NULL) {
         char *str_replace;
         const char extension[] = ".sav";
 
         /* Allocate enough space for the ROM file name, for the "sav"
-         * extension and for the null terminator. */
+		 * extension and for the null terminator. */
         save_file_name = malloc(strlen(rom_file_name) + strlen(extension) + 1);
 
         if (save_file_name == NULL) {
@@ -660,9 +665,9 @@ int main(int argc, char **argv) {
         strcpy(save_file_name, rom_file_name);
 
         /* If the file name does not have a dot, or the only dot is at
-         * the start of the file name, set the pointer to begin
-         * replacing the string to the end of the file name, otherwise
-         * set it to the dot. */
+		 * the start of the file name, set the pointer to begin
+		 * replacing the string to the end of the file name, otherwise
+		 * set it to the dot. */
         if ((str_replace = strrchr(save_file_name, '.')) == NULL ||
             str_replace == save_file_name)
             str_replace = save_file_name + strlen(save_file_name);
@@ -714,20 +719,20 @@ int main(int argc, char **argv) {
 #endif
 
         /* You could potentially force the game to allow the player to
-         * reset the time by setting the RTC to invalid values.
-         *
-         * Using memset(&gb->cart_rtc, 0xFF, sizeof(gb->cart_rtc)) for
-         * example causes Pokemon Gold/Silver to say "TIME NOT SET",
-         * allowing the player to set the time without having some dumb
-         * password.
-         *
-         * The memset has to be done directly to gb->cart_rtc because
-         * gb_set_rtc() processes the input values, which may cause
-         * games to not detect invalid values.
-         */
+		 * reset the time by setting the RTC to invalid values.
+		 *
+		 * Using memset(&gb->cart_rtc, 0xFF, sizeof(gb->cart_rtc)) for
+		 * example causes Pokemon Gold/Silver to say "TIME NOT SET",
+		 * allowing the player to set the time without having some dumb
+		 * password.
+		 *
+		 * The memset has to be done directly to gb->cart_rtc because
+		 * gb_set_rtc() processes the input values, which may cause
+		 * games to not detect invalid values.
+		 */
 
         /* Set RTC. Only games that specify support for RTC will use
-         * these values. */
+		 * these values. */
 #ifdef _POSIX_C_SOURCE
         gb_set_rtc(&gb, &timeinfo);
 #else
@@ -850,7 +855,7 @@ int main(int argc, char **argv) {
         static unsigned int dump_bmp = 0;
 
         /* Calculate the time taken to draw frame, then later add a
-         * delay to cap at 60 fps. */
+		 * delay to cap at 60 fps. */
         old_ticks = SDL_GetTicks();
 
         /* Get joypad input. */
@@ -1074,7 +1079,7 @@ int main(int argc, char **argv) {
         if (fast_mode_timer > 1) {
             fast_mode_timer--;
             /* We continue here since the rest of the logic in the
-             * loop is for drawing the screen and delaying. */
+			 * loop is for drawing the screen and delaying. */
             continue;
         }
 
@@ -1101,17 +1106,17 @@ int main(int argc, char **argv) {
         new_ticks = SDL_GetTicks();
 
         /* Since we can only delay for a maximum resolution of 1ms, we
-         * can accumulate the error and compensate for the delay
-         * accuracy when the delay compensation surpasses 1ms. */
+		 * can accumulate the error and compensate for the delay
+		 * accuracy when the delay compensation surpasses 1ms. */
         speed_compensation += target_speed_ms - (new_ticks - old_ticks);
 
         /* We cast the delay compensation value to an integer, since it
-         * is the type used by SDL_Delay. This is where delay accuracy
-         * is lost. */
+		 * is the type used by SDL_Delay. This is where delay accuracy
+		 * is lost. */
         delay = (int)(speed_compensation);
 
         /* We then subtract the actual delay value by the requested
-         * delay value. */
+		 * delay value. */
         speed_compensation -= delay;
 
         /* Only run delay logic if required. */
@@ -1127,19 +1132,19 @@ int main(int argc, char **argv) {
                 gb_tick_rtc(&gb);
 
                 /* If 60 seconds has passed, record save file.
-                 * We do this because the external audio library
-                 * used contains asserts that will abort the
-                 * program without save.
-                 * TODO: Remove use of assert in audio library
-                 * in release build. */
+				 * We do this because the external audio library
+				 * used contains asserts that will abort the
+				 * program without save.
+				 * TODO: Remove use of assert in audio library
+				 * in release build. */
                 /* TODO: Remove all workarounds due to faulty
-                 * external libraries. */
+				 * external libraries. */
                 --save_timer;
 
                 if (!save_timer) {
 #if ENABLE_SOUND_BLARGG
                     /* Locking the audio thread to reduce
-                     * possibility of abort during save. */
+					 * possibility of abort during save. */
                     SDL_LockAudioDevice(dev);
 #endif
                     write_cart_ram_file(save_file_name,
@@ -1153,8 +1158,8 @@ int main(int argc, char **argv) {
             }
 
             /* This will delay for at least the number of
-             * milliseconds requested, so we have to compensate for
-             * error here too. */
+			 * milliseconds requested, so we have to compensate for
+			 * error here too. */
             SDL_Delay(delay);
 
             after_delay_ticks = SDL_GetTicks();
@@ -1181,7 +1186,7 @@ out:
     free(priv.cart_ram);
 
     /* If the save file name was automatically generated (which required memory
-     * allocated on the help), then free it here. */
+	 * allocated on the help), then free it here. */
     if (argc == 2)
         free(save_file_name);
 
