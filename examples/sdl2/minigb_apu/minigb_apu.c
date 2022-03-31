@@ -29,43 +29,43 @@
 static uint8_t audio_mem[AUDIO_MEM_SIZE];
 
 struct chan_len_ctr {
-	unsigned load : 6;
-	unsigned enabled : 1;
+	uint8_t load;
+	bool enabled;
 	float counter;
 	float inc;
 };
 
 struct chan_vol_env {
-	unsigned step : 3;
-	unsigned up : 1;
+	uint8_t step;
+	bool up;
 	float counter;
 	float inc;
 };
 
 struct chan_freq_sweep {
 	uint_fast16_t freq;
-	unsigned rate : 3;
-	unsigned up : 1;
-	unsigned shift : 3;
+	uint8_t rate;
+	uint8_t shift;
+	bool up;
 	float counter;
 	float inc;
 };
 
 static struct chan {
-	unsigned enabled : 1;
-	unsigned powered : 1;
-	unsigned on_left : 1;
-	unsigned on_right : 1;
-	unsigned muted : 1;
+	bool enabled;
+	bool powered;
+	bool on_left;
+	bool on_right;
+	bool muted;
 
-	unsigned volume : 4;
-	unsigned volume_init : 4;
+	uint8_t volume;
+	uint8_t volume_init;
 
 	uint16_t freq;
 	float    freq_counter;
 	float    freq_inc;
 
-	int val;
+	int_fast8_t val;
 
 	struct chan_len_ctr    len;
 	struct chan_vol_env    env;
@@ -77,8 +77,8 @@ static struct chan {
 
 	// noise
 	uint16_t lfsr_reg;
-	bool     lfsr_wide;
-	int      lfsr_div;
+	uint8_t     lfsr_wide;
+	uint8_t      lfsr_div;
 
 	// wave
 	uint8_t sample;
