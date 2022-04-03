@@ -101,8 +101,63 @@ static float hipass(struct chan *c, float sample)
 #endif
 }
 
-static void set_note_freq(struct chan *c, const uint_fast16_t freq)
+static void set_note_freq_inc(struct chan *c, uint16_t freq)
 {
+	c->freq_inc = freq / AUDIO_SAMPLE_RATE;
+}
+
+static void set_note_freq(struct chan *c)
+{
+	// val = 4194304.0 / (double)((2048 - f) << 5);
+	// Where f < 1536 and a multiple of 16 (right shift by 3 bits).
+	static const uint_fast16_t low_lut[96] = {
+		64, 64, 65, 65, 66, 66, 67, 67, 68, 68, 69, 70, 70, 71, 71, 72,
+		73, 73, 74, 75, 75, 76, 77, 78, 78, 79, 80, 81, 81, 82, 83, 84,
+		85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99,
+		101, 102, 103, 105, 106, 107, 109, 110, 112, 113, 115, 117,
+		118, 120, 122, 124, 126, 128, 130, 132, 134, 136, 138, 141,
+		143, 146, 148, 151, 154, 157, 160, 163, 167, 170, 174, 178,
+		182, 186, 190, 195, 199, 204, 210, 215, 221, 227, 234, 240,
+		248
+	};
+	// val = 4194304.0 / (double)((2048 - f) << 5);
+	// Where 1536 <= f < 2048 and a multiple of 2 (right shift by 1 bit).
+	static const uint_fast16_t hi_lut[256] = {
+		256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267,
+		268, 269, 270, 271, 273, 274, 275, 276, 277, 278, 280, 281,
+		282, 283, 284, 286, 287, 288, 289, 291, 292, 293, 295, 296,
+		297, 299, 300, 302, 303, 304, 306, 307, 309, 310, 312, 313,
+		315, 316, 318, 319, 321, 322, 324, 326, 327, 329, 330, 332,
+		334, 336, 337, 339, 341, 343, 344, 346, 348, 350, 352, 354,
+		356, 358, 360, 362, 364, 366, 368, 370, 372, 374, 376, 378,
+		381, 383, 385, 387, 390, 392, 394, 397, 399, 402, 404, 407,
+		409, 412, 414, 417, 420, 422, 425, 428, 431, 434, 436, 439,
+		442, 445, 448, 451, 455, 458, 461, 464, 468, 471, 474, 478,
+		481, 485, 489, 492, 496, 500, 504, 508, 512, 516, 520, 524,
+		528, 532, 537, 541, 546, 550, 555, 560, 564, 569, 574, 579,
+		585, 590, 595, 601, 606, 612, 618, 624, 630, 636, 642, 648,
+		655, 661, 668, 675, 682, 689, 697, 704, 712, 720, 728, 736,
+		744, 753, 762, 771, 780, 789, 799, 809, 819, 829, 840, 851,
+		862, 873, 885, 897, 910, 923, 936, 949, 963, 978, 992, 1008,
+		1024, 1040, 1057, 1074, 1092, 1110, 1129, 1149, 1170, 1191,
+		1213, 1236, 1260, 1285, 1310, 1337, 1365, 1394, 1424, 1456,
+		1489, 1524, 1560, 1598, 1638, 1680, 1724, 1771, 1820, 1872,
+		1927, 1985, 2048, 2114, 2184, 2259, 2340, 2427, 2520, 2621,
+		2730, 2849, 2978, 3120, 3276, 3449, 3640, 3855, 4096, 4369,
+		4681, 5041, 5461, 5957, 6553, 7281, 8192, 9362, 10922, 13107,
+		16384, 21845, 32768, 65536
+	};
+	uint_fast16_t freq = c->freq;
+	if(freq < 1536)
+	{
+		freq >>= 4;
+		freq = low_lut[freq];
+	}
+	else
+	{
+		freq >>= 1;
+		freq = hi_lut[freq];
+	}
 	c->freq_inc = freq / AUDIO_SAMPLE_RATE;
 }
 
@@ -173,8 +228,7 @@ static void update_sweep(struct chan *c)
 			if (c->freq > 2047) {
 				c->enabled = 0;
 			} else {
-				set_note_freq(c,
-					4194304 / ((2048 - c->freq)<< 5));
+				set_note_freq(c);
 				c->freq_inc *= 8.0f;
 			}
 		} else if (c->sweep.rate) {
@@ -190,7 +244,7 @@ static void update_square(float *restrict samples, const bool ch2)
 	if (!c->powered)
 		return;
 
-	set_note_freq(c, 4194304.0f / ((2048 - c->freq) << 5));
+	set_note_freq(c);
 	c->freq_inc *= 8.0f;
 
 	for (uint_fast16_t i = 0; i < AUDIO_NSAMPLES; i += 2) {
@@ -246,8 +300,7 @@ static void update_wave(float *restrict samples)
 	if (!c->powered)
 		return;
 
-	uint_fast16_t freq = 4194304.0f / ((2048 - c->freq) << 5);
-	set_note_freq(c, freq);
+	set_note_freq(c);
 
 	c->freq_inc *= 16.0f;
 
@@ -296,7 +349,7 @@ static void update_noise(float *restrict samples)
 	uint_fast16_t freq = 4194304 / ((uint_fast8_t[]){
 			8, 16, 32, 48, 64, 80, 96, 112
 		}[c->lfsr_div] << c->freq);
-	set_note_freq(c, freq);
+	set_note_freq_inc(c, freq);
 
 	if (c->freq >= 14)
 		c->enabled = 0;
