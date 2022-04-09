@@ -1,5 +1,5 @@
 # vim: ts=4:sw=4:expandtab
-CMAKE_MINIMUM_REQUIRED(VERSION 3.19)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.18...3.23)
 
 ## Check user set options.
 IF(NOT CMAKE_BUILD_TYPE)
@@ -14,9 +14,14 @@ ELSE()
     ENDIF()
 ENDIF()
 
+# Obtain version
+INCLUDE(../../version.all)
+
 # Initialise project information.
 PROJECT(peanut-sdl
         LANGUAGES C
+	VERSION
+	${HAIYAJAN_VERSION_MAJOR}.${HAIYAJAN_VERSION_MINOR}.${HAIYAJAN_VERSION_PATCH}
         DESCRIPTION "Peanut-GB example with SDL2"
         HOMEPAGE_URL "https://github.com/deltabeard/peanut-gb")
 
@@ -37,7 +42,12 @@ TARGET_SOURCES(${PROJECT_NAME} PRIVATE peanut_sdl.c
 TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PRIVATE ../../)
 
 # Discover libraries
-SET(LIBRARY_DISCOVER_METHOD "CPM" CACHE STRING
+IF(MSVC)
+	SET(DEFAULT_LIBRARY_DISCOVER_METHOD "CPM")
+ELSE()
+	SET(DEFAULT_LIBRARY_DISCOVER_METHOD "PKG_CONFIG")
+ENDIF()
+SET(LIBRARY_DISCOVER_METHOD DEFAULT_LIBRARY_DISCOVER_METHOD CACHE STRING
         "Tool to use for discovering dependencies; options are: PKG_CONFIG, CPM")
 
 IF(${LIBRARY_DISCOVER_METHOD} STREQUAL "PKG_CONFIG")
@@ -47,7 +57,7 @@ ELSEIF(${LIBRARY_DISCOVER_METHOD} STREQUAL "CPM")
     INCLUDE(CPM.cmake)
     CPMADDPACKAGE(GITHUB_REPOSITORY libsdl-org/SDL
             NAME SDL2
-            GIT_TAG release-2.0.18
+            GIT_TAG release-2.0.20
             OPTIONS
             "SDL_SHARED_ENABLED_BY_DEFAULT OFF"
             "SDL_STATIC_ENABLED_BY_DEFAULT ON")
@@ -91,7 +101,7 @@ SET(CPACK_PACKAGE_ICON meta/icon.ico)
 SET(CPACK_PACKAGE_EXECUTABLES peanut-sdl;Peanut-SDL)
 INCLUDE(CPack)
 
-MESSAGE(STATUS "Peanut-SDL will build with the following options:")
+MESSAGE(STATUS "Peanut-SDL ${peanut-sdl_VERSION} will build with the following options:")
 MESSAGE(STATUS "  CC:      ${CMAKE_C_COMPILER} '${CMAKE_C_COMPILER_ID}' on '${CMAKE_SYSTEM_NAME}'")
 MESSAGE(STATUS "  CFLAGS:  ${CMAKE_C_FLAGS}")
 MESSAGE(STATUS "  LDFLAGS: ${CMAKE_EXE_LINKER_FLAGS}")

@@ -1,7 +1,7 @@
 /**
  * MIT License
  *
- * Copyright (c) 2018 Mahyar Koshkouei
+ * Copyright (c) 2018-2022 Mahyar Koshkouei
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include "version.all"
 #include <stdint.h>	/* Required for int types */
 #include <time.h>	/* Required for tm struct */
 
