@@ -451,13 +451,19 @@ void audio_write(const uint16_t addr, const uint8_t val)
 		/* On APU power off, clear all registers apart from wave
 		 * RAM. */
 		if((val & 0x80) == 0)
+		{
 			memset(audio_mem, 0x00, 0xFF26 - AUDIO_ADDR_COMPENSATION);
+			chans[0].enabled = false;
+			chans[1].enabled = false;
+			chans[2].enabled = false;
+			chans[3].enabled = false;
+		}
 
 		return;
 	}
 
 	/* Ignore register writes if APU powered off. */
-	if((audio_mem[0xFF26 - AUDIO_ADDR_COMPENSATION] & 0x80) == 0x00)
+	if(audio_mem[0xFF26 - AUDIO_ADDR_COMPENSATION] == 0x00)
 		return;
 
 	audio_mem[addr - AUDIO_ADDR_COMPENSATION] = val;
