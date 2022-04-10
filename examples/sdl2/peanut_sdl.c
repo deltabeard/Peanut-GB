@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <SDL.h>
+#include "SDL.h"
 
 #if defined(ENABLE_SOUND_BLARGG)
 #	include "blargg_apu/audio.h"
