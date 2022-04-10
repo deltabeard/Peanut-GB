@@ -33,6 +33,7 @@
 
 #include "version.all"	/* Version information */
 #include <stdint.h>	/* Required for int types */
+#include <string.h>	/* Required for memset */
 #include <time.h>	/* Required for tm struct */
 
 /**
