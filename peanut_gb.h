@@ -31,7 +31,7 @@
 
 #pragma once
 
-#include "version.all"
+#include "version.all"	/* Version information */
 #include <stdint.h>	/* Required for int types */
 #include <time.h>	/* Required for tm struct */
 
