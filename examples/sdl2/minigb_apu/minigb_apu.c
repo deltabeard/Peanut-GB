@@ -456,6 +456,10 @@ void audio_write(const uint16_t addr, const uint8_t val)
 		return;
 	}
 
+	/* Ignore register writes if APU powered off. */
+	if((audio_mem[0xFF26 - AUDIO_ADDR_COMPENSATION] & 0x80) == 0x00)
+		return;
+
 	audio_mem[addr - AUDIO_ADDR_COMPENSATION] = val;
 
 	switch (addr) {
