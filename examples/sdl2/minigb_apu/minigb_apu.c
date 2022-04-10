@@ -444,6 +444,18 @@ void audio_write(const uint16_t addr, const uint8_t val)
 {
 	/* Find sound channel corresponding to register address. */
 	uint_fast8_t i = (addr - AUDIO_ADDR_COMPENSATION) / 5;
+
+	if(addr == 0xFF26)
+	{
+		audio_mem[addr - AUDIO_ADDR_COMPENSATION] = val & 0x80;
+		/* On APU power off, clear all registers apart from wave
+		 * RAM. */
+		if((val & 0x80) == 0)
+			memset(audio_mem, 0x00, 0xFF26 - AUDIO_ADDR_COMPENSATION);
+
+		return;
+	}
+
 	audio_mem[addr - AUDIO_ADDR_COMPENSATION] = val;
 
 	switch (addr) {
