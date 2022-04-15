@@ -203,35 +203,35 @@ static void update_square(int16_t *restrict samples, const bool ch2)
 	for (uint_fast16_t i = 0; i < AUDIO_NSAMPLES; i += 2) {
 		update_len(c);
 
-		if (c->enabled) {
-			update_env(c);
-			if (!ch2)
-				update_sweep(c);
+		if (!c->enabled)
+			continue;
 
-			float pos      = 0.0f;
-			float prev_pos = 0.0f;
-			float sample   = 0.0f;
+		update_env(c);
 
-			while (update_freq(c, &pos)) {
-				c->duty_counter = (c->duty_counter + 1) & 7;
-				sample += ((pos - prev_pos) / c->freq_inc) *
-					  (float)c->val;
-				c->val = (c->duty & (1 << c->duty_counter)) ?
-						 VOL_INIT_MAX :
-						 VOL_INIT_MIN;
-				prev_pos = pos;
-			}
+		if (!ch2)
+			update_sweep(c);
+
+		float pos      = 0.0f;
+		float prev_pos = 0.0f;
+		float sample   = 0.0f;
+
+		while (update_freq(c, &pos)) {
+			c->duty_counter = (c->duty_counter + 1) & 7;
 			sample += ((pos - prev_pos) / c->freq_inc) *
-				  (float)c->val;
-			sample = hipass(c, sample * (c->volume / 15.0f));
-
-			if (!c->muted) {
-				samples[i + 0] +=
-					(sample/4) * c->on_left * vol_l_u;
-				samples[i + 1] +=
-					(sample/4) * c->on_right * vol_r_u;
-			}
+				(float)c->val;
+			c->val = (c->duty & (1 << c->duty_counter)) ?
+				VOL_INIT_MAX :
+				VOL_INIT_MIN;
+			prev_pos = pos;
 		}
+		sample += ((pos - prev_pos) / c->freq_inc) * (float)c->val;
+		sample = hipass(c, sample * (c->volume / 15.0f));
+
+		if (c->muted)
+			continue;
+
+		samples[i + 0] += (sample/4) * c->on_left * vol_l_u;
+		samples[i + 1] += (sample/4) * c->on_right * vol_r_u;
 	}
 }
 
@@ -311,42 +311,41 @@ static void update_noise(int16_t *restrict samples)
 	for (uint_fast16_t i = 0; i < AUDIO_NSAMPLES; i += 2) {
 		update_len(c);
 
-		if (c->enabled) {
-			update_env(c);
+		if (!c->enabled)
+			continue;
 
-			float pos      = 0.0f;
-			float prev_pos = 0.0f;
-			int16_t sample = 0;
+		update_env(c);
 
-			while (update_freq(c, &pos)) {
-				c->lfsr_reg = (c->lfsr_reg << 1) |
-					      (c->val == 1);
+		float pos      = 0.0f;
+		float prev_pos = 0.0f;
+		int16_t sample = 0;
 
-				if (c->lfsr_wide) {
-					c->val = !(((c->lfsr_reg >> 14) & 1) ^
-						   ((c->lfsr_reg >> 13) & 1)) ?
-							 VOL_INIT_MAX :
-							 VOL_INIT_MIN;
-				} else {
-					c->val = !(((c->lfsr_reg >> 6) & 1) ^
-						   ((c->lfsr_reg >> 5) & 1)) ?
-							 VOL_INIT_MAX :
-							 VOL_INIT_MIN;
-				}
-				sample += ((pos - prev_pos) / c->freq_inc) *
-					  c->val;
-				prev_pos = pos;
+		while (update_freq(c, &pos)) {
+			c->lfsr_reg = (c->lfsr_reg << 1) | (c->val == 1);
+
+			if (c->lfsr_wide) {
+				c->val = !(((c->lfsr_reg >> 14) & 1) ^
+						((c->lfsr_reg >> 13) & 1)) ?
+					VOL_INIT_MAX :
+					VOL_INIT_MIN;
+			} else {
+				c->val = !(((c->lfsr_reg >> 6) & 1) ^
+						((c->lfsr_reg >> 5) & 1)) ?
+					VOL_INIT_MAX :
+					VOL_INIT_MIN;
 			}
-			sample += ((pos - prev_pos) / c->freq_inc) * c->val;
-			sample = hipass(c, sample * (c->volume / 15.0f));
-
-			if (!c->muted) {
-				samples[i + 0] +=
-					(sample/4) * c->on_left * vol_l_u;
-				samples[i + 1] +=
-					(sample/4) * c->on_right * vol_r_u;
-			}
+			sample += ((pos - prev_pos) / c->freq_inc) * (float)c->val;
+			prev_pos = pos;
 		}
+
+		sample += ((pos - prev_pos) / c->freq_inc) * (float)c->val;
+		sample = hipass(c, sample * (c->volume / 15.0f));
+
+		if (c->muted)
+			continue;
+
+		samples[i + 0] += (sample/4) * c->on_left * vol_l_u;
+		samples[i + 1] += (sample/4) * c->on_right * vol_r_u;
 	}
 }
 
@@ -410,7 +409,7 @@ static void chan_trigger(uint_fast8_t i)
 		c->val  = 0;
 	} else if (i == 3) { // noise
 		c->lfsr_reg = 0xFFFF;
-		c->val      = -1;
+		c->val      = VOL_INIT_MIN;
 	}
 
 	c->len.inc =
