@@ -261,36 +261,39 @@ static void update_wave(float *restrict samples)
 	for (uint_fast16_t i = 0; i < AUDIO_NSAMPLES; i += 2) {
 		update_len(c);
 
-		if (c->enabled) {
-			float pos      = 0.0f;
-			float prev_pos = 0.0f;
-			int16_t sample   = 0;
+		if (!c->enabled)
+			continue;
 
-			c->sample = wave_sample(c->val, c->volume);
+		float pos      = 0.0f;
+		float prev_pos = 0.0f;
+		int16_t sample   = 0;
 
-			while (update_freq(c, &pos)) {
-				c->val = (c->val + 1) & 31;
-				sample += ((pos - prev_pos) / c->freq_inc) *
-					  (float)c->sample;
-				c->sample = wave_sample(c->val, c->volume);
-				prev_pos  = pos;
-			}
+		c->sample = wave_sample(c->val, c->volume);
+
+		while (update_freq(c, &pos)) {
+			c->val = (c->val + 1) & 31;
 			sample += ((pos - prev_pos) / c->freq_inc) *
-				  (float)c->sample;
-
-			if (c->volume > 0) {
-				float diff = (float[]){ 7.5f, 3.75f,
-							1.5f }[c->volume - 1];
-				sample     = hipass(c, (sample - diff) / 7.5f);
-
-				if (!c->muted) {
-					samples[i + 0] += sample * 0.25f *
-							  c->on_left * vol_l;
-					samples[i + 1] += sample * 0.25f *
-							  c->on_right * vol_r;
-				}
-			}
+				(float)c->sample;
+			c->sample = wave_sample(c->val, c->volume);
+			prev_pos  = pos;
 		}
+		sample += ((pos - prev_pos) / c->freq_inc) *
+			(float)c->sample;
+
+		if (c->volume == 0)
+			continue;
+
+		{
+			float diff = (float[]){ 7.5f, 3.75f, 1.5f }
+				[c->volume - 1];
+			sample     = hipass(c, (sample - diff) / 7.5f);
+		}
+
+		if (c->muted)
+			continue;
+
+		samples[i + 0] += sample * 0.25f * c->on_left * vol_l;
+		samples[i + 1] += sample * 0.25f * c->on_right * vol_r;
 	}
 }
 
