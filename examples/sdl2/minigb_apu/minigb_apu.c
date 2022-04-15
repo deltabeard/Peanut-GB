@@ -237,8 +237,9 @@ static void update_square(int16_t *restrict samples, const bool ch2)
 
 static uint8_t wave_sample(const unsigned int pos, const unsigned int volume)
 {
-	uint8_t sample =
-		audio_mem[(0xFF30 + pos / 2) - AUDIO_ADDR_COMPENSATION];
+	uint8_t sample;
+
+	sample =  audio_mem[(0xFF30 + pos / 2) - AUDIO_ADDR_COMPENSATION];
 	if (pos & 1) {
 		sample &= 0xF;
 	} else {
@@ -247,7 +248,7 @@ static uint8_t wave_sample(const unsigned int pos, const unsigned int volume)
 	return volume ? (sample >> (volume - 1)) : 0;
 }
 
-static void update_wave(float *restrict samples)
+static void update_wave(int16_t *restrict samples)
 {
 	struct chan *c = chans + 2;
 	if (!c->powered)
@@ -273,12 +274,13 @@ static void update_wave(float *restrict samples)
 		while (update_freq(c, &pos)) {
 			c->val = (c->val + 1) & 31;
 			sample += ((pos - prev_pos) / c->freq_inc) *
-				(float)c->sample;
+				c->sample * (VOL_INIT_MIN);
 			c->sample = wave_sample(c->val, c->volume);
 			prev_pos  = pos;
 		}
-		sample += ((pos - prev_pos) / c->freq_inc) *
-			(float)c->sample;
+
+		sample += ((pos - prev_pos) / c->freq_inc) * c->sample *
+			(VOL_INIT_MAX);
 
 		if (c->volume == 0)
 			continue;
@@ -292,8 +294,8 @@ static void update_wave(float *restrict samples)
 		if (c->muted)
 			continue;
 
-		samples[i + 0] += sample * 0.25f * c->on_left * vol_l;
-		samples[i + 1] += sample * 0.25f * c->on_right * vol_r;
+		samples[i + 0] += (sample/4) * c->on_left * vol_l_u;
+		samples[i + 1] += (sample/4) * c->on_right * vol_r_u;
 	}
 }
 
@@ -364,10 +366,10 @@ void audio_callback(void *userdata, uint8_t *restrict stream, int len)
 
 	memset(stream, 0, len);
 
-	update_square(samples, 0);
-	update_square(samples, 1);
-	//update_wave(samples);
-	update_noise(samples);
+	//update_square(samples, 0);
+	//update_square(samples, 1);
+	update_wave(samples);
+	//update_noise(samples);
 }
 
 static void chan_trigger(uint_fast8_t i)
