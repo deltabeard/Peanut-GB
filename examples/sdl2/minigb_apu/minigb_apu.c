@@ -326,19 +326,19 @@ static void update_noise(int16_t *restrict samples)
 			if (c->lfsr_wide) {
 				c->val = !(((c->lfsr_reg >> 14) & 1) ^
 						((c->lfsr_reg >> 13) & 1)) ?
-					VOL_INIT_MAX :
-					VOL_INIT_MIN;
+					1 :
+					-1;
 			} else {
 				c->val = !(((c->lfsr_reg >> 6) & 1) ^
 						((c->lfsr_reg >> 5) & 1)) ?
-					VOL_INIT_MAX :
-					VOL_INIT_MIN;
+					1 :
+					-1;
 			}
-			sample += ((pos - prev_pos) / c->freq_inc) * (float)c->val;
+			sample += ((pos - prev_pos) / c->freq_inc) * c->val * VOL_INIT_MAX;
 			prev_pos = pos;
 		}
 
-		sample += ((pos - prev_pos) / c->freq_inc) * (float)c->val;
+		sample += ((pos - prev_pos) / c->freq_inc) * c->val * VOL_INIT_MAX;
 		sample = hipass(c, sample * (c->volume / 15.0f));
 
 		if (c->muted)
