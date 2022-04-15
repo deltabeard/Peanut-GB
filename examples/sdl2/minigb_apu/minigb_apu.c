@@ -213,18 +213,17 @@ static void update_square(int16_t *restrict samples, const bool ch2)
 
 		float pos      = 0.0f;
 		float prev_pos = 0.0f;
-		float sample   = 0.0f;
+		int16_t sample = 0;
 
 		while (update_freq(c, &pos)) {
 			c->duty_counter = (c->duty_counter + 1) & 7;
-			sample += ((pos - prev_pos) / c->freq_inc) *
-				(float)c->val;
+			sample += ((pos - prev_pos) / c->freq_inc) * c->val;
 			c->val = (c->duty & (1 << c->duty_counter)) ?
 				VOL_INIT_MAX :
 				VOL_INIT_MIN;
 			prev_pos = pos;
 		}
-		sample += ((pos - prev_pos) / c->freq_inc) * (float)c->val;
+		sample += ((pos - prev_pos) / c->freq_inc) * c->val;
 		sample = hipass(c, sample * (c->volume / 15.0f));
 
 		if (c->muted)
@@ -247,7 +246,7 @@ static uint8_t wave_sample(const unsigned int pos, const unsigned int volume)
 	return volume ? (sample >> (volume - 1)) : 0;
 }
 
-static void update_wave(float *restrict samples)
+static void update_wave(int16_t *restrict samples)
 {
 	struct chan *c = chans + 2;
 	if (!c->powered)
@@ -261,36 +260,35 @@ static void update_wave(float *restrict samples)
 	for (uint_fast16_t i = 0; i < AUDIO_NSAMPLES; i += 2) {
 		update_len(c);
 
-		if (c->enabled) {
-			float pos      = 0.0f;
-			float prev_pos = 0.0f;
-			int16_t sample   = 0;
+		if (!c->enabled)
+			continue;
 
+		float pos      = 0.0f;
+		float prev_pos = 0.0f;
+		int16_t sample   = 0;
+
+		c->sample = wave_sample(c->val, c->volume);
+
+		while (update_freq(c, &pos)) {
+			c->val = (c->val + 1) & 31;
+			sample += ((pos - prev_pos) / c->freq_inc) * c->sample;
 			c->sample = wave_sample(c->val, c->volume);
-
-			while (update_freq(c, &pos)) {
-				c->val = (c->val + 1) & 31;
-				sample += ((pos - prev_pos) / c->freq_inc) *
-					  (float)c->sample;
-				c->sample = wave_sample(c->val, c->volume);
-				prev_pos  = pos;
-			}
-			sample += ((pos - prev_pos) / c->freq_inc) *
-				  (float)c->sample;
-
-			if (c->volume > 0) {
-				float diff = (float[]){ 7.5f, 3.75f,
-							1.5f }[c->volume - 1];
-				sample     = hipass(c, (sample - diff) / 7.5f);
-
-				if (!c->muted) {
-					samples[i + 0] += sample * 0.25f *
-							  c->on_left * vol_l;
-					samples[i + 1] += sample * 0.25f *
-							  c->on_right * vol_r;
-				}
-			}
+			prev_pos  = pos;
 		}
+
+		sample += ((pos - prev_pos) / c->freq_inc) * c->sample;
+
+		if (c->volume == 0)
+			continue;
+
+		float diff = (float[]){ 7.5f, 3.75f, 1.5f }[c->volume - 1];
+		sample     = hipass(c, (sample - diff) / 7.5f);
+
+		if (c->muted)
+			continue;
+
+		samples[i + 0] += (sample/4) * c->on_left * vol_l_u;
+		samples[i + 1] += (sample/4) * c->on_right * vol_r_u;
 	}
 }
 
@@ -363,7 +361,7 @@ void audio_callback(void *userdata, uint8_t *restrict stream, int len)
 
 	update_square(samples, 0);
 	update_square(samples, 1);
-	//update_wave(samples);
+	update_wave(samples);
 	update_noise(samples);
 }
 
