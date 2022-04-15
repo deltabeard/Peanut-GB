@@ -13,7 +13,7 @@
 
 #include "minigb_apu.h"
 
-#define ENABLE_HIPASS 1
+#define ENABLE_HIPASS 0
 
 #define AUDIO_NSAMPLES ((unsigned)(AUDIO_SAMPLE_RATE / VERTICAL_SYNC) * 2)
 
@@ -22,6 +22,9 @@
 
 #define MAX(a, b) ( a > b ? a : b )
 #define MIN(a, b) ( a <= b ? a : b )
+
+#define VOL_INIT_MAX (INT16_MAX/7)
+#define VOL_INIT_MIN (INT16_MIN/7)
 
 /**
  * Memory holding audio registers between 0xFF10 and 0xFF3F inclusive.
@@ -65,7 +68,7 @@ static struct chan {
 	float    freq_counter;
 	float    freq_inc;
 
-	int_fast8_t val;
+	int_fast16_t val;
 
 	struct chan_len_ctr    len;
 	struct chan_vol_env    env;
@@ -89,6 +92,7 @@ static struct chan {
 } chans[4];
 
 static float vol_l, vol_r;
+static unsigned vol_l_u, vol_r_u;
 
 static float hipass(struct chan *c, float sample)
 {
@@ -108,13 +112,15 @@ static void set_note_freq(struct chan *c, const uint_fast16_t freq)
 
 static void chan_enable(const uint_fast8_t i, const bool enable)
 {
-	chans[i].enabled = enable;
+	uint8_t val;
 
-	uint8_t val = (audio_mem[0xFF26 - AUDIO_ADDR_COMPENSATION] & 0x80) |
-		      (chans[3].enabled << 3) | (chans[2].enabled << 2) |
-		      (chans[1].enabled << 1) | (chans[0].enabled << 0);
+	chans[i].enabled = enable;
+	val = (audio_mem[0xFF26 - AUDIO_ADDR_COMPENSATION] & 0x80) |
+		(chans[3].enabled << 3) | (chans[2].enabled << 2) |
+		(chans[1].enabled << 1) | (chans[0].enabled << 0);
 
 	audio_mem[0xFF26 - AUDIO_ADDR_COMPENSATION] = val;
+	//audio_mem[0xFF26 - AUDIO_ADDR_COMPENSATION] |= 0x80 | ((uint8_t)enable) << i;
 }
 
 static void update_env(struct chan *c)
@@ -135,12 +141,13 @@ static void update_env(struct chan *c)
 
 static void update_len(struct chan *c)
 {
-	if (c->len.enabled) {
-		c->len.counter += c->len.inc;
-		if (c->len.counter > 1.0f) {
-			chan_enable(c - chans, 0);
-			c->len.counter = 0.0f;
-		}
+	if (!c->len.enabled)
+		return;
+
+	c->len.counter += c->len.inc;
+	if (c->len.counter > 1.0f) {
+		chan_enable(c - chans, 0);
+		c->len.counter = 0.0f;
 	}
 }
 
@@ -184,7 +191,7 @@ static void update_sweep(struct chan *c)
 	}
 }
 
-static void update_square(float *restrict samples, const bool ch2)
+static void update_square(int16_t *restrict samples, const bool ch2)
 {
 	struct chan *c = chans + ch2;
 	if (!c->powered)
@@ -210,8 +217,8 @@ static void update_square(float *restrict samples, const bool ch2)
 				sample += ((pos - prev_pos) / c->freq_inc) *
 					  (float)c->val;
 				c->val = (c->duty & (1 << c->duty_counter)) ?
-						 1 :
-						 -1;
+						 VOL_INIT_MAX :
+						 VOL_INIT_MIN;
 				prev_pos = pos;
 			}
 			sample += ((pos - prev_pos) / c->freq_inc) *
@@ -220,9 +227,9 @@ static void update_square(float *restrict samples, const bool ch2)
 
 			if (!c->muted) {
 				samples[i + 0] +=
-					sample * 0.25f * c->on_left * vol_l;
+					(sample/4) * c->on_left * vol_l_u;
 				samples[i + 1] +=
-					sample * 0.25f * c->on_right * vol_r;
+					(sample/4) * c->on_right * vol_r_u;
 			}
 		}
 	}
@@ -257,7 +264,7 @@ static void update_wave(float *restrict samples)
 		if (c->enabled) {
 			float pos      = 0.0f;
 			float prev_pos = 0.0f;
-			float sample   = 0.0f;
+			int16_t sample   = 0;
 
 			c->sample = wave_sample(c->val, c->volume);
 
@@ -287,7 +294,7 @@ static void update_wave(float *restrict samples)
 	}
 }
 
-static void update_noise(float *restrict samples)
+static void update_noise(int16_t *restrict samples)
 {
 	struct chan *c = chans + 3;
 	if (!c->powered)
@@ -309,7 +316,7 @@ static void update_noise(float *restrict samples)
 
 			float pos      = 0.0f;
 			float prev_pos = 0.0f;
-			float sample   = 0.0f;
+			int16_t sample = 0;
 
 			while (update_freq(c, &pos)) {
 				c->lfsr_reg = (c->lfsr_reg << 1) |
@@ -318,13 +325,13 @@ static void update_noise(float *restrict samples)
 				if (c->lfsr_wide) {
 					c->val = !(((c->lfsr_reg >> 14) & 1) ^
 						   ((c->lfsr_reg >> 13) & 1)) ?
-							 1 :
-							 -1;
+							 VOL_INIT_MAX :
+							 VOL_INIT_MIN;
 				} else {
 					c->val = !(((c->lfsr_reg >> 6) & 1) ^
 						   ((c->lfsr_reg >> 5) & 1)) ?
-							 1 :
-							 -1;
+							 VOL_INIT_MAX :
+							 VOL_INIT_MIN;
 				}
 				sample += ((pos - prev_pos) / c->freq_inc) *
 					  c->val;
@@ -335,9 +342,9 @@ static void update_noise(float *restrict samples)
 
 			if (!c->muted) {
 				samples[i + 0] +=
-					sample * 0.25f * c->on_left * vol_l;
+					(sample/4) * c->on_left * vol_l_u;
 				samples[i + 1] +=
-					sample * 0.25f * c->on_right * vol_r;
+					(sample/4) * c->on_right * vol_r_u;
 			}
 		}
 	}
@@ -348,7 +355,7 @@ static void update_noise(float *restrict samples)
  */
 void audio_callback(void *userdata, uint8_t *restrict stream, int len)
 {
-	float *samples = (float *)stream;
+	int16_t *samples = (int16_t *)stream;
 
 	/* Appease unused variable warning. */
 	(void)userdata;
@@ -357,7 +364,7 @@ void audio_callback(void *userdata, uint8_t *restrict stream, int len)
 
 	update_square(samples, 0);
 	update_square(samples, 1);
-	update_wave(samples);
+	//update_wave(samples);
 	update_noise(samples);
 }
 
@@ -443,7 +450,7 @@ uint8_t audio_read(const uint16_t addr)
 void audio_write(const uint16_t addr, const uint8_t val)
 {
 	/* Find sound channel corresponding to register address. */
-	uint_fast8_t i = (addr - AUDIO_ADDR_COMPENSATION) / 5;
+	uint_fast8_t i;
 
 	if(addr == 0xFF26)
 	{
@@ -467,6 +474,7 @@ void audio_write(const uint16_t addr, const uint8_t val)
 		return;
 
 	audio_mem[addr - AUDIO_ADDR_COMPENSATION] = val;
+	i = (addr - AUDIO_ADDR_COMPENSATION) / 5;
 
 	switch (addr) {
 	case 0xFF12:
@@ -542,9 +550,13 @@ void audio_write(const uint16_t addr, const uint8_t val)
 		break;
 
 	case 0xFF24:
+	{
 		vol_l = ((val >> 4) & 0x07) / 7.0f;
+		vol_l_u = ((val >> 4) & 0x07);
 		vol_r = (val & 0x07) / 7.0f;
+		vol_r_u = (val & 0x07);
 		break;
+	}
 
 	case 0xFF25:
 		for (uint_fast8_t i = 0; i < 4; ++i) {
