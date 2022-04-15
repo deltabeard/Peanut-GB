@@ -15,7 +15,8 @@
 
 #define ENABLE_HIPASS 0
 
-#define AUDIO_NSAMPLES ((unsigned)(AUDIO_SAMPLE_RATE / VERTICAL_SYNC) * 2)
+#define DMG_CLOCK_FREQ_U	((unsigned)DMG_CLOCK_FREQ)
+#define AUDIO_NSAMPLES		(AUDIO_SAMPLES * 2u)
 
 #define AUDIO_MEM_SIZE (0xFF3F - 0xFF10 + 1)
 #define AUDIO_ADDR_COMPENSATION 0xFF10
@@ -181,7 +182,7 @@ static void update_sweep(struct chan *c)
 				c->enabled = 0;
 			} else {
 				set_note_freq(c,
-					4194304 / ((2048 - c->freq)<< 5));
+					DMG_CLOCK_FREQ_U / ((2048 - c->freq)<< 5));
 				c->freq_inc *= 8.0f;
 			}
 		} else if (c->sweep.rate) {
@@ -197,7 +198,7 @@ static void update_square(int16_t *restrict samples, const bool ch2)
 	if (!c->powered)
 		return;
 
-	set_note_freq(c, 4194304.0f / ((2048 - c->freq) << 5));
+	set_note_freq(c, DMG_CLOCK_FREQ_U / ((2048 - c->freq) << 5));
 	c->freq_inc *= 8.0f;
 
 	for (uint_fast16_t i = 0; i < AUDIO_NSAMPLES; i += 2) {
@@ -254,7 +255,7 @@ static void update_wave(int16_t *restrict samples)
 	if (!c->powered)
 		return;
 
-	uint_fast16_t freq = 4194304.0f / ((2048 - c->freq) << 5);
+	uint_fast16_t freq = DMG_CLOCK_FREQ_U / ((2048 - c->freq) << 5);
 	set_note_freq(c, freq);
 
 	c->freq_inc *= 16.0f;
@@ -366,10 +367,10 @@ void audio_callback(void *userdata, uint8_t *restrict stream, int len)
 
 	memset(stream, 0, len);
 
-	//update_square(samples, 0);
-	//update_square(samples, 1);
+	update_square(samples, 0);
+	update_square(samples, 1);
 	update_wave(samples);
-	//update_noise(samples);
+	update_noise(samples);
 }
 
 static void chan_trigger(uint_fast8_t i)
