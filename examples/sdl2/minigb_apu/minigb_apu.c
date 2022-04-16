@@ -274,13 +274,12 @@ static void update_wave(int16_t *restrict samples)
 		while (update_freq(c, &pos)) {
 			c->val = (c->val + 1) & 31;
 			sample += ((pos - prev_pos) / c->freq_inc) *
-				c->sample * (VOL_INIT_MIN);
+				c->sample * (INT16_MAX/16);
 			c->sample = wave_sample(c->val, c->volume);
 			prev_pos  = pos;
 		}
 
-		sample += ((pos - prev_pos) / c->freq_inc) * c->sample *
-			(VOL_INIT_MAX);
+		sample += ((pos - prev_pos) / c->freq_inc) * c->sample * (INT16_MAX/16);
 
 		if (c->volume == 0)
 			continue;
