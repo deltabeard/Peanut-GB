@@ -194,11 +194,14 @@ static void update_sweep(struct chan *c)
 
 static void update_square(int16_t *restrict samples, const bool ch2)
 {
+	uint_fast16_t freq;
 	struct chan *c = chans + ch2;
-	if (!c->powered)
+
+	if (!c->powered || !c->enabled)
 		return;
 
-	set_note_freq(c, DMG_CLOCK_FREQ_U / ((2048 - c->freq) << 5));
+	freq = DMG_CLOCK_FREQ_U / ((2048 - c->freq) << 5);
+	set_note_freq(c, freq);
 	c->freq_inc *= 8.0f;
 
 	for (uint_fast16_t i = 0; i < AUDIO_NSAMPLES; i += 2) {
@@ -250,11 +253,13 @@ static uint8_t wave_sample(const unsigned int pos, const unsigned int volume)
 
 static void update_wave(int16_t *restrict samples)
 {
+	uint_fast16_t freq;
 	struct chan *c = chans + 2;
-	if (!c->powered)
+
+	if (!c->powered || !c->enabled)
 		return;
 
-	uint_fast16_t freq = DMG_CLOCK_FREQ_U / ((2048 - c->freq) << 5);
+	freq = DMG_CLOCK_FREQ_U / ((2048 - c->freq) << 5);
 	set_note_freq(c, freq);
 
 	c->freq_inc *= 16.0f;
