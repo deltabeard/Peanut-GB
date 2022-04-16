@@ -340,11 +340,11 @@ static void update_noise(int16_t *restrict samples)
 					1 :
 					-1;
 			}
-			sample += ((pos - prev_pos) / c->freq_inc) * c->val * VOL_INIT_MAX;
+			sample += ((pos - prev_pos) / c->freq_inc) * c->val * (VOL_INIT_MAX / 2);
 			prev_pos = pos;
 		}
 
-		sample += ((pos - prev_pos) / c->freq_inc) * c->val * VOL_INIT_MAX;
+		sample += ((pos - prev_pos) / c->freq_inc) * c->val * (VOL_INIT_MAX / 2);
 		sample = hipass(c, sample * (c->volume / 15.0f));
 
 		if (c->muted)
