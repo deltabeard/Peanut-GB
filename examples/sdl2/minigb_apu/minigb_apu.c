@@ -208,7 +208,6 @@ static void update_square(int16_t *restrict samples, const bool ch2)
 			continue;
 
 		update_env(c);
-
 		if (!ch2)
 			update_sweep(c);
 
