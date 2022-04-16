@@ -24,8 +24,8 @@
 #define MAX(a, b) ( a > b ? a : b )
 #define MIN(a, b) ( a <= b ? a : b )
 
-#define VOL_INIT_MAX (INT16_MAX/7)
-#define VOL_INIT_MIN (INT16_MIN/7)
+#define VOL_INIT_MAX (INT16_MAX/8)
+#define VOL_INIT_MIN (INT16_MIN/8)
 
 /**
  * Memory holding audio registers between 0xFF10 and 0xFF3F inclusive.
@@ -338,11 +338,11 @@ static void update_noise(int16_t *restrict samples)
 					1 :
 					-1;
 			}
-			sample += ((pos - prev_pos) / c->freq_inc) * c->val * (VOL_INIT_MAX / 2);
+			sample += ((pos - prev_pos) / c->freq_inc) * c->val * (VOL_INIT_MAX);
 			prev_pos = pos;
 		}
 
-		sample += ((pos - prev_pos) / c->freq_inc) * c->val * (VOL_INIT_MAX / 2);
+		sample += ((pos - prev_pos) / c->freq_inc) * c->val * (VOL_INIT_MAX);
 		sample = hipass(c, sample * (c->volume / 15.0f));
 
 		if (c->muted)
