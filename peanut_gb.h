@@ -614,14 +614,25 @@ uint8_t __gb_read(struct gb_s *gb, const uint_fast16_t addr)
 
 		/* HRAM */
 		if(HRAM_ADDR <= addr && addr < INTR_EN_ADDR)
-			return gb->hram[addr - HRAM_ADDR];
+			return gb->hram[addr - IO_ADDR];
 
+		/* APU registers. */
 		if((addr >= 0xFF10) && (addr <= 0xFF3F))
 		{
 #if ENABLE_SOUND
 			return audio_read(addr);
 #else
-			return 1;
+			static const uint8_t ortab[] = {
+				0x80, 0x3f, 0x00, 0xff, 0xbf,
+				0xff, 0x3f, 0x00, 0xff, 0xbf,
+				0x7f, 0xff, 0x9f, 0xff, 0xbf,
+				0xff, 0xff, 0x00, 0x00, 0xbf,
+				0x00, 0x00, 0x70,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+			};
+			return gb->hram[addr - IO_ADDR] | ortab[addr - IO_ADDR];
 #endif
 		}
 
@@ -840,7 +851,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 
 		if(HRAM_ADDR <= addr && addr < INTR_EN_ADDR)
 		{
-			gb->hram[addr - HRAM_ADDR] = val;
+			gb->hram[addr - IO_ADDR] = val;
 			return;
 		}
 
@@ -848,6 +859,8 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 		{
 #if ENABLE_SOUND
 			audio_write(addr, val);
+#else
+			gb->hram[addr - IO_ADDR] = val;
 #endif
 			return;
 		}
