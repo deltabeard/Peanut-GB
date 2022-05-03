@@ -50,6 +50,11 @@
 #	define ENABLE_LCD 1
 #endif
 
+/* Adds more code to improve LCD rendering accuracy. */
+#ifndef PEANUT_GB_HIGH_LCD_ACCURACY
+	#define PEANUT_GB_HIGH_LCD_ACCURACY 1
+#endif
+
 /* Interrupt masks */
 #define VBLANK_INTR	0x01
 #define LCDC_INTR	0x02
@@ -157,6 +162,8 @@
 #ifndef MIN
 	#define MIN(a, b)   ((a) < (b) ? (a) : (b))
 #endif
+
+#define PEANUT_GB_ARRAYSIZE(array)    (sizeof(array)/sizeof(array[0]))
 
 struct cpu_registers_s
 {
@@ -1215,6 +1222,22 @@ uint8_t __gb_execute_cb(struct gb_s *gb)
 }
 
 #if ENABLE_LCD
+struct sprite_data {
+	uint8_t sprite_number;
+	uint8_t x;
+};
+
+#if PEANUT_GB_HIGH_LCD_ACCURACY
+static int compare_sprites(const struct sprite_data *in1, const struct sprite_data *in2)
+{
+	int x_res = (int)in1->x - (int)in2->x;
+	if(x_res != 0)
+		return x_res;
+
+	return (int)in1->sprite_number - (int)in2->sprite_number;
+}
+#endif
+
 void __gb_draw_line(struct gb_s *gb)
 {
 	uint8_t pixels[160] = {0};
@@ -1387,15 +1410,21 @@ void __gb_draw_line(struct gb_s *gb)
 	// draw sprites
 	if(gb->gb_reg.LCDC & LCDC_OBJ_ENABLE)
 	{
+#if PEANUT_GB_HIGH_LCD_ACCURACY
 		uint8_t number_of_sprites = 0;
-		uint8_t sprites_to_render[MAX_SPRITES_LINE];
+		struct sprite_data sprites_to_render[NUM_SPRITES];
 
+		/* Record number of sprites on the line being rendered, limited
+		 * to the maximum number sprites that the Game Boy is able to
+		 * render on each line (10 sprites). */
 		for(uint8_t sprite_number = 0;
-				number_of_sprites < MAX_SPRITES_LINE && sprite_number < NUM_SPRITES;
+				sprite_number < PEANUT_GB_ARRAYSIZE(sprites_to_render);
 				sprite_number++)
 		{
 			/* Sprite Y position. */
 			uint8_t OY = gb->oam[4 * sprite_number + 0];
+			/* Sprite X position. */
+			uint8_t OX = gb->oam[4 * sprite_number + 1];
 
 			/* If sprite isn't on this line, continue. */
 			if (gb->gb_reg.LY +
@@ -1403,15 +1432,35 @@ void __gb_draw_line(struct gb_s *gb)
 					|| gb->gb_reg.LY + 16 < OY)
 				continue;
 
-			sprites_to_render[number_of_sprites] = sprite_number;
+
+			sprites_to_render[number_of_sprites].sprite_number = sprite_number;
+			sprites_to_render[number_of_sprites].x = OX;
 			number_of_sprites++;
 		}
 
+		/* If maximum number of sprites reached, prioritise X
+		 * coordinate and object location in OAM. */
+		qsort(&sprites_to_render[0], number_of_sprites,
+				sizeof(sprites_to_render[0]), compare_sprites);
+		if(number_of_sprites > MAX_SPRITES_LINE)
+			number_of_sprites = MAX_SPRITES_LINE;
+#endif
+
+		/* Render each sprite, from low priority to high priority. */
+#if PEANUT_GB_HIGH_LCD_ACCURACY
+		/* Render the top ten prioritised sprites on this scanline. */
 		for(uint8_t sprite_number = number_of_sprites - 1;
 				sprite_number != 0xFF;
 				sprite_number--)
 		{
-			uint8_t s = sprites_to_render[sprite_number];
+			uint8_t s = sprites_to_render[sprite_number].sprite_number;
+#else
+		for (uint8_t sprite_number = NUM_SPRITES - 1;
+			sprite_number != 0xFF;
+			sprite_number--)
+		{
+			uint8_t s = sprite_number;
+#endif
 			/* Sprite Y position. */
 			uint8_t OY = gb->oam[4 * s + 0];
 			/* Sprite X position. */
@@ -1422,12 +1471,14 @@ void __gb_draw_line(struct gb_s *gb)
 			/* Additional attributes. */
 			uint8_t OF = gb->oam[4 * s + 3];
 
+#if !PEANUT_GB_HIGH_LCD_ACCURACY
 			/* If sprite isn't on this line, continue. */
 			if(gb->gb_reg.LY +
 					(gb->gb_reg.LCDC & LCDC_OBJ_SIZE ?
 					 0 : 8) >= OY
 					|| gb->gb_reg.LY + 16 < OY)
 				continue;
+#endif
 
 			/* Continue if sprite not visible. */
 			if(OX == 0 || OX >= 168)
