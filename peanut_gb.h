@@ -1387,12 +1387,31 @@ void __gb_draw_line(struct gb_s *gb)
 	// draw sprites
 	if(gb->gb_reg.LCDC & LCDC_OBJ_ENABLE)
 	{
-		uint8_t count = 0;
+		uint8_t number_of_sprites = 0;
+		uint8_t sprites_to_render[MAX_SPRITES_LINE];
 
-		for(uint8_t s = NUM_SPRITES - 1;
-				s != 0xFF /* && count < MAX_SPRITES_LINE */ ;
-				s--)
+		for(uint8_t sprite_number = 0;
+				number_of_sprites < MAX_SPRITES_LINE && sprite_number < NUM_SPRITES;
+				sprite_number++)
 		{
+			/* Sprite Y position. */
+			uint8_t OY = gb->oam[4 * sprite_number + 0];
+
+			/* If sprite isn't on this line, continue. */
+			if (gb->gb_reg.LY +
+				(gb->gb_reg.LCDC & LCDC_OBJ_SIZE ? 0 : 8) >= OY
+					|| gb->gb_reg.LY + 16 < OY)
+				continue;
+
+			sprites_to_render[number_of_sprites] = sprite_number;
+			number_of_sprites++;
+		}
+
+		for(uint8_t sprite_number = number_of_sprites - 1;
+				sprite_number != 0xFF;
+				sprite_number--)
+		{
+			uint8_t s = sprites_to_render[sprite_number];
 			/* Sprite Y position. */
 			uint8_t OY = gb->oam[4 * s + 0];
 			/* Sprite X position. */
@@ -1409,8 +1428,6 @@ void __gb_draw_line(struct gb_s *gb)
 					 0 : 8) >= OY
 					|| gb->gb_reg.LY + 16 < OY)
 				continue;
-
-			count++;
 
 			/* Continue if sprite not visible. */
 			if(OX == 0 || OX >= 168)
