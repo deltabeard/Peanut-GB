@@ -25,6 +25,12 @@
 #define VOL_INIT_MAX		(INT16_MAX/8)
 #define VOL_INIT_MIN		(INT16_MIN/8)
 
+/* Handles time keeping for sound generation.
+ * FREQ_INC_REF must be equal to, or larger than AUDIO_SAMPLE_RATE in order
+ * to avoid a division by zero error.
+ * Using a square of 2 simplifies calculations. */
+#define FREQ_INC_REF		(AUDIO_SAMPLE_RATE * 4)
+
 /**
  * Memory holding audio registers between 0xFF10 and 0xFF3F inclusive.
  */
@@ -33,15 +39,15 @@ static uint8_t audio_mem[AUDIO_MEM_SIZE];
 struct chan_len_ctr {
 	uint8_t load;
 	bool enabled;
-	float counter;
-	float inc;
+	uint32_t counter;
+	uint32_t inc;
 };
 
 struct chan_vol_env {
 	uint8_t step;
 	bool up;
-	float counter;
-	float inc;
+	uint32_t counter;
+	uint32_t inc;
 };
 
 struct chan_freq_sweep {
@@ -49,8 +55,8 @@ struct chan_freq_sweep {
 	uint8_t rate;
 	uint8_t shift;
 	bool up;
-	float counter;
-	float inc;
+	uint32_t counter;
+	uint32_t inc;
 };
 
 static struct chan {
@@ -64,8 +70,8 @@ static struct chan {
 	uint8_t volume_init;
 
 	uint16_t freq;
-	float    freq_counter;
-	float    freq_inc;
+	uint32_t freq_counter;
+	uint32_t freq_inc;
 
 	int_fast16_t val;
 
@@ -79,8 +85,8 @@ static struct chan {
 
 	// noise
 	uint16_t lfsr_reg;
-	uint8_t     lfsr_wide;
-	uint8_t      lfsr_div;
+	uint8_t  lfsr_wide;
+	uint8_t  lfsr_div;
 
 	// wave
 	uint8_t sample;
@@ -88,9 +94,10 @@ static struct chan {
 
 static unsigned vol_l, vol_r;
 
-static void set_note_freq(struct chan *c, const uint_fast16_t freq)
+static void set_note_freq(struct chan *c, const uint32_t freq)
 {
-	c->freq_inc = freq / AUDIO_SAMPLE_RATE;
+	/* Lowest expected value of freq is 64. */
+	c->freq_inc = freq * (uint32_t)(FREQ_INC_REF / AUDIO_SAMPLE_RATE);
 }
 
 static void chan_enable(const uint_fast8_t i, const bool enable)
@@ -110,7 +117,7 @@ static void update_env(struct chan *c)
 {
 	c->env.counter += c->env.inc;
 
-	while (c->env.counter > 1.0f) {
+	while (c->env.counter > FREQ_INC_REF) {
 		if (c->env.step) {
 			c->volume += c->env.up ? 1 : -1;
 			if (c->volume == 0 || c->volume == 15) {
@@ -118,7 +125,7 @@ static void update_env(struct chan *c)
 			}
 			c->volume = MAX(0, MIN(15, c->volume));
 		}
-		c->env.counter -= 1.0f;
+		c->env.counter -= FREQ_INC_REF;
 	}
 }
 
@@ -128,20 +135,20 @@ static void update_len(struct chan *c)
 		return;
 
 	c->len.counter += c->len.inc;
-	if (c->len.counter > 1.0f) {
+	if (c->len.counter > FREQ_INC_REF) {
 		chan_enable(c - chans, 0);
-		c->len.counter = 0.0f;
+		c->len.counter = 0;
 	}
 }
 
-static bool update_freq(struct chan *c, float *pos)
+static bool update_freq(struct chan *c, uint32_t *pos)
 {
-	float inc = c->freq_inc - *pos;
+	uint32_t inc = c->freq_inc - *pos;
 	c->freq_counter += inc;
 
-	if (c->freq_counter > 1.0f) {
-		*pos		= c->freq_inc - (c->freq_counter - 1.0f);
-		c->freq_counter = 0.0f;
+	if (c->freq_counter > FREQ_INC_REF) {
+		*pos		= c->freq_inc - (c->freq_counter - FREQ_INC_REF);
+		c->freq_counter = 0;
 		return true;
 	} else {
 		*pos = c->freq_inc;
@@ -153,7 +160,7 @@ static void update_sweep(struct chan *c)
 {
 	c->sweep.counter += c->sweep.inc;
 
-	while (c->sweep.counter > 1.0f) {
+	while (c->sweep.counter > FREQ_INC_REF) {
 		if (c->sweep.shift) {
 			uint16_t inc = (c->sweep.freq >> c->sweep.shift);
 			if (!c->sweep.up)
@@ -165,26 +172,26 @@ static void update_sweep(struct chan *c)
 			} else {
 				set_note_freq(c,
 					DMG_CLOCK_FREQ_U / ((2048 - c->freq)<< 5));
-				c->freq_inc *= 8.0f;
+				c->freq_inc *= 8;
 			}
 		} else if (c->sweep.rate) {
 			c->enabled = 0;
 		}
-		c->sweep.counter -= 1.0f;
+		c->sweep.counter -= FREQ_INC_REF;
 	}
 }
 
-static void update_square(int16_t *samples, const bool ch2)
+static void update_square(int16_t* samples, const bool ch2)
 {
-	uint_fast16_t freq;
-	struct chan *c = chans + ch2;
+	uint32_t freq;
+	struct chan* c = chans + ch2;
 
 	if (!c->powered || !c->enabled)
 		return;
 
 	freq = DMG_CLOCK_FREQ_U / ((2048 - c->freq) << 5);
 	set_note_freq(c, freq);
-	c->freq_inc *= 8.0f;
+	c->freq_inc *= 8;
 
 	for (uint_fast16_t i = 0; i < AUDIO_NSAMPLES; i += 2) {
 		update_len(c);
@@ -196,27 +203,25 @@ static void update_square(int16_t *samples, const bool ch2)
 		if (!ch2)
 			update_sweep(c);
 
-		float pos      = 0.0f;
-		float prev_pos = 0.0f;
-		float sample   = 0.0f;
+		uint32_t pos = 0;
+		uint32_t prev_pos = 0;
+		int32_t sample = 0;
 
 		while (update_freq(c, &pos)) {
 			c->duty_counter = (c->duty_counter + 1) & 7;
-			sample += ((pos - prev_pos) / c->freq_inc) *
-				(float)c->val;
+			sample += ((pos - prev_pos) / c->freq_inc) * c->val;
 			c->val = (c->duty & (1 << c->duty_counter)) ?
-				VOL_INIT_MAX :
-				VOL_INIT_MIN;
+				VOL_INIT_MAX : VOL_INIT_MIN;
 			prev_pos = pos;
 		}
-		sample += ((pos - prev_pos) / c->freq_inc) * (float)c->val;
+		sample += ((pos - prev_pos) / c->freq_inc) * c->val;
 		sample *= (c->volume / 15.0f);
 
 		if (c->muted)
 			continue;
 
-		samples[i + 0] += (sample/4) * c->on_left * vol_l;
-		samples[i + 1] += (sample/4) * c->on_right * vol_r;
+		samples[i + 0] += (sample / 4) * c->on_left * vol_l;
+		samples[i + 1] += (sample / 4) * c->on_right * vol_r;
 	}
 }
 
@@ -235,16 +240,16 @@ static uint8_t wave_sample(const unsigned int pos, const unsigned int volume)
 
 static void update_wave(int16_t *samples)
 {
-	uint_fast16_t freq;
+	uint32_t freq;
 	struct chan *c = chans + 2;
 
 	if (!c->powered || !c->enabled)
 		return;
 
-	freq = DMG_CLOCK_FREQ_U / ((2048 - c->freq) << 5);
+	freq = (DMG_CLOCK_FREQ_U / 64) / (2048 - c->freq);
 	set_note_freq(c, freq);
 
-	c->freq_inc *= 16.0f;
+	c->freq_inc *= 64;
 
 	for (uint_fast16_t i = 0; i < AUDIO_NSAMPLES; i += 2) {
 		update_len(c);
@@ -252,9 +257,9 @@ static void update_wave(int16_t *samples)
 		if (!c->enabled)
 			continue;
 
-		float pos      = 0.0f;
-		float prev_pos = 0.0f;
-		int16_t sample   = 0;
+		uint32_t pos      = 0;
+		uint32_t prev_pos = 0;
+		int32_t sample   = 0;
 
 		c->sample = wave_sample(c->val, c->volume);
 
@@ -272,9 +277,11 @@ static void update_wave(int16_t *samples)
 			continue;
 
 		{
-			float diff = (float[]){ 7.5f, 3.75f, 1.5f }
-				[c->volume - 1];
-			sample     = (sample - diff) / 7.5f;
+			//float diff[] = { 7.5f, 3.75f, 1.5f};
+			//sample     = (sample - (diff[c->volume - 1])) / 7.5f;
+			/* First element is unused. */
+			int16_t div[] = { INT16_MAX, 1, 2, 4 };
+			sample = sample / (div[c->volume] * 64);
 		}
 
 		if (c->muted)
@@ -307,9 +314,9 @@ static void update_noise(int16_t *samples)
 
 		update_env(c);
 
-		float pos      = 0.0f;
-		float prev_pos = 0.0f;
-		int16_t sample = 0;
+		uint32_t pos      = 0;
+		uint32_t prev_pos = 0;
+		int32_t sample    = 0;
 
 		while (update_freq(c, &pos)) {
 			c->lfsr_reg = (c->lfsr_reg << 1) | (c->val == 1);
@@ -352,10 +359,10 @@ void audio_callback(void *userdata, uint8_t *stream, int len)
 
 	memset(stream, 0, len);
 
-	update_square(samples, 0);
-	update_square(samples, 1);
+	//update_square(samples, 0);
+	//update_square(samples, 1);
 	update_wave(samples);
-	update_noise(samples);
+	//update_noise(samples);
 }
 
 static void chan_trigger(uint_fast8_t i)
@@ -372,10 +379,10 @@ static void chan_trigger(uint_fast8_t i)
 
 		c->env.step = val & 0x07;
 		c->env.up   = val & 0x08 ? 1 : 0;
-		c->env.inc  = c->env.step ? (64.0f / (float)c->env.step) /
+		c->env.inc  = (c->env.step ? (64.0f / (float)c->env.step) /
 						   AUDIO_SAMPLE_RATE :
-					   8.0f / AUDIO_SAMPLE_RATE;
-		c->env.counter = 0.0f;
+					   8.0f / AUDIO_SAMPLE_RATE) * FREQ_INC_REF;
+		c->env.counter = 0;
 	}
 
 	// freq sweep
@@ -386,11 +393,10 @@ static void chan_trigger(uint_fast8_t i)
 		c->sweep.rate  = (val >> 4) & 0x07;
 		c->sweep.up    = !(val & 0x08);
 		c->sweep.shift = (val & 0x07);
-		c->sweep.inc   = c->sweep.rate ?
+		c->sweep.inc   = (c->sweep.rate ?
 				       (128.0f / (float)(c->sweep.rate)) /
-					       AUDIO_SAMPLE_RATE :
-				       0;
-		c->sweep.counter = nexttowardf(1.0f, 1.1f);
+					       AUDIO_SAMPLE_RATE : 0) * FREQ_INC_REF;
+		c->sweep.counter = FREQ_INC_REF;
 	}
 
 	int len_max = 64;
@@ -404,8 +410,8 @@ static void chan_trigger(uint_fast8_t i)
 	}
 
 	c->len.inc =
-		(256.0f / (float)(len_max - c->len.load)) / AUDIO_SAMPLE_RATE;
-	c->len.counter = 0.0f;
+		((256.0f / (float)(len_max - c->len.load)) * FREQ_INC_REF) / AUDIO_SAMPLE_RATE;
+	c->len.counter = 0;
 }
 
 /**
