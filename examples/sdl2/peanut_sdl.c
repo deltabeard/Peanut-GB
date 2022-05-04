@@ -619,10 +619,6 @@ int main(int argc, char **argv)
 	char *save_file_name = NULL;
 	int ret = EXIT_SUCCESS;
 
-#if defined(_WIN32)
-	   SDL_setenv("SDL_AUDIODRIVER", "directsound", SDL_TRUE);
-#endif
-
 	/* Initialise frontend implementation, in this case, SDL2. */
 	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO) < 0)
 	{
