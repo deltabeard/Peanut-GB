@@ -249,7 +249,7 @@ static void update_wave(int16_t *samples)
 	freq = (DMG_CLOCK_FREQ_U / 64) / (2048 - c->freq);
 	set_note_freq(c, freq);
 
-	c->freq_inc *= 64;
+	c->freq_inc *= 32;
 
 	for (uint_fast16_t i = 0; i < AUDIO_NSAMPLES; i += 2) {
 		update_len(c);
@@ -266,22 +266,20 @@ static void update_wave(int16_t *samples)
 		while (update_freq(c, &pos)) {
 			c->val = (c->val + 1) & 31;
 			sample += ((pos - prev_pos) / c->freq_inc) *
-				c->sample * (INT16_MAX/16);
+				((int)c->sample - 8) * (INT16_MAX/64);
 			c->sample = wave_sample(c->val, c->volume);
 			prev_pos  = pos;
 		}
 
-		sample += ((pos - prev_pos) / c->freq_inc) * c->sample * (INT16_MAX/16);
+		sample += ((int)c->sample - 8) * (int)(INT16_MAX/64);
 
 		if (c->volume == 0)
 			continue;
 
 		{
-			//float diff[] = { 7.5f, 3.75f, 1.5f};
-			//sample     = (sample - (diff[c->volume - 1])) / 7.5f;
 			/* First element is unused. */
 			int16_t div[] = { INT16_MAX, 1, 2, 4 };
-			sample = sample / (div[c->volume] * 64);
+			sample = sample / (div[c->volume]);
 		}
 
 		if (c->muted)
@@ -359,10 +357,10 @@ void audio_callback(void *userdata, uint8_t *stream, int len)
 
 	memset(stream, 0, len);
 
-	//update_square(samples, 0);
-	//update_square(samples, 1);
+	update_square(samples, 0);
+	update_square(samples, 1);
 	update_wave(samples);
-	//update_noise(samples);
+	update_noise(samples);
 }
 
 static void chan_trigger(uint_fast8_t i)
