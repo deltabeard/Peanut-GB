@@ -1474,9 +1474,8 @@ void __gb_draw_line(struct gb_s *gb)
 #if !PEANUT_GB_HIGH_LCD_ACCURACY
 			/* If sprite isn't on this line, continue. */
 			if(gb->gb_reg.LY +
-					(gb->gb_reg.LCDC & LCDC_OBJ_SIZE ?
-					 0 : 8) >= OY
-					|| gb->gb_reg.LY + 16 < OY)
+					(gb->gb_reg.LCDC & LCDC_OBJ_SIZE ? 0 : 8) >= OY ||
+					gb->gb_reg.LY + 16 < OY)
 				continue;
 #endif
 
