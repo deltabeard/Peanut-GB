@@ -13,8 +13,6 @@
 
 #include "minigb_apu.h"
 
-#define ENABLE_HIPASS 0
-
 #define DMG_CLOCK_FREQ_U	((unsigned)DMG_CLOCK_FREQ)
 #define AUDIO_NSAMPLES		(AUDIO_SAMPLES * 2u)
 
@@ -86,25 +84,9 @@ static struct chan {
 
 	// wave
 	uint8_t sample;
-
-#if ENABLE_HIPASS
-	float capacitor;
-#endif
 } chans[4];
 
-static float vol_l, vol_r;
-static unsigned vol_l_u, vol_r_u;
-
-static float hipass(struct chan *c, float sample)
-{
-#if ENABLE_HIPASS
-	float out    = sample - c->capacitor;
-	c->capacitor = sample - out * 0.996f;
-	return out;
-#else
-	return sample;
-#endif
-}
+static unsigned vol_l, vol_r;
 
 static void set_note_freq(struct chan *c, const uint_fast16_t freq)
 {
@@ -228,13 +210,13 @@ static void update_square(int16_t *restrict samples, const bool ch2)
 			prev_pos = pos;
 		}
 		sample += ((pos - prev_pos) / c->freq_inc) * (float)c->val;
-		sample = hipass(c, sample * (c->volume / 15.0f));
+		sample *= (c->volume / 15.0f);
 
 		if (c->muted)
 			continue;
 
-		samples[i + 0] += (sample/4) * c->on_left * vol_l_u;
-		samples[i + 1] += (sample/4) * c->on_right * vol_r_u;
+		samples[i + 0] += (sample/4) * c->on_left * vol_l;
+		samples[i + 1] += (sample/4) * c->on_right * vol_r;
 	}
 }
 
@@ -292,14 +274,14 @@ static void update_wave(int16_t *restrict samples)
 		{
 			float diff = (float[]){ 7.5f, 3.75f, 1.5f }
 				[c->volume - 1];
-			sample     = hipass(c, (sample - diff) / 7.5f);
+			sample     = (sample - diff) / 7.5f;
 		}
 
 		if (c->muted)
 			continue;
 
-		samples[i + 0] += (sample/4) * c->on_left * vol_l_u;
-		samples[i + 1] += (sample/4) * c->on_right * vol_r_u;
+		samples[i + 0] += (sample/4) * c->on_left * vol_l;
+		samples[i + 1] += (sample/4) * c->on_right * vol_r;
 	}
 }
 
@@ -348,13 +330,13 @@ static void update_noise(int16_t *restrict samples)
 		}
 
 		sample += ((pos - prev_pos) / c->freq_inc) * c->val * (VOL_INIT_MAX);
-		sample = hipass(c, sample * (c->volume / 15.0f));
+		sample *= (c->volume / 15.0f);
 
 		if (c->muted)
 			continue;
 
-		samples[i + 0] += (sample/4) * c->on_left * vol_l_u;
-		samples[i + 1] += (sample/4) * c->on_right * vol_r_u;
+		samples[i + 0] += (sample/4) * c->on_left * vol_l;
+		samples[i + 1] += (sample/4) * c->on_right * vol_r;
 	}
 }
 
@@ -559,10 +541,8 @@ void audio_write(const uint16_t addr, const uint8_t val)
 
 	case 0xFF24:
 	{
-		vol_l = ((val >> 4) & 0x07) / 7.0f;
-		vol_l_u = ((val >> 4) & 0x07);
-		vol_r = (val & 0x07) / 7.0f;
-		vol_r_u = (val & 0x07);
+		vol_l = ((val >> 4) & 0x07);
+		vol_r = (val & 0x07);
 		break;
 	}
 
