@@ -16,14 +16,14 @@
 #define DMG_CLOCK_FREQ_U	((unsigned)DMG_CLOCK_FREQ)
 #define AUDIO_NSAMPLES		(AUDIO_SAMPLES * 2u)
 
-#define AUDIO_MEM_SIZE (0xFF3F - 0xFF10 + 1)
-#define AUDIO_ADDR_COMPENSATION 0xFF10
+#define AUDIO_MEM_SIZE		(0xFF3F - 0xFF10 + 1)
+#define AUDIO_ADDR_COMPENSATION	0xFF10
 
-#define MAX(a, b) ( a > b ? a : b )
-#define MIN(a, b) ( a <= b ? a : b )
+#define MAX(a, b)		( a > b ? a : b )
+#define MIN(a, b)		( a <= b ? a : b )
 
-#define VOL_INIT_MAX (INT16_MAX/8)
-#define VOL_INIT_MIN (INT16_MIN/8)
+#define VOL_INIT_MAX		(INT16_MAX/8)
+#define VOL_INIT_MIN		(INT16_MIN/8)
 
 /**
  * Memory holding audio registers between 0xFF10 and 0xFF3F inclusive.
@@ -174,7 +174,7 @@ static void update_sweep(struct chan *c)
 	}
 }
 
-static void update_square(int16_t *restrict samples, const bool ch2)
+static void update_square(int16_t *samples, const bool ch2)
 {
 	uint_fast16_t freq;
 	struct chan *c = chans + ch2;
@@ -233,7 +233,7 @@ static uint8_t wave_sample(const unsigned int pos, const unsigned int volume)
 	return volume ? (sample >> (volume - 1)) : 0;
 }
 
-static void update_wave(int16_t *restrict samples)
+static void update_wave(int16_t *samples)
 {
 	uint_fast16_t freq;
 	struct chan *c = chans + 2;
@@ -285,7 +285,7 @@ static void update_wave(int16_t *restrict samples)
 	}
 }
 
-static void update_noise(int16_t *restrict samples)
+static void update_noise(int16_t *samples)
 {
 	struct chan *c = chans + 3;
 	if (!c->powered)
@@ -343,7 +343,7 @@ static void update_noise(int16_t *restrict samples)
 /**
  * SDL2 style audio callback function.
  */
-void audio_callback(void *userdata, uint8_t *restrict stream, int len)
+void audio_callback(void *userdata, uint8_t *stream, int len)
 {
 	int16_t *samples = (int16_t *)stream;
 
