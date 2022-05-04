@@ -214,7 +214,7 @@ static void update_square(int16_t* samples, const bool ch2)
 				VOL_INIT_MAX : VOL_INIT_MIN;
 			prev_pos = pos;
 		}
-		sample += ((pos - prev_pos) / c->freq_inc) * c->val;
+		sample += c->val;
 		sample *= (c->volume / 15.0f);
 
 		if (c->muted)
@@ -334,7 +334,7 @@ static void update_noise(int16_t *samples)
 			prev_pos = pos;
 		}
 
-		sample += ((pos - prev_pos) / c->freq_inc) * c->val * (VOL_INIT_MAX);
+		sample += c->val * (VOL_INIT_MAX);
 		sample *= (c->volume / 15.0f);
 
 		if (c->muted)
