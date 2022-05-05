@@ -217,14 +217,16 @@ static void update_square(int16_t* samples, const bool ch2)
 				VOL_INIT_MIN / MAX_CHAN_VOLUME;
 			prev_pos = pos;
 		}
-		sample += c->val;
-		sample *= c->volume;
 
 		if (c->muted)
 			continue;
 
-		samples[i + 0] += (sample / 4) * c->on_left * vol_l;
-		samples[i + 1] += (sample / 4) * c->on_right * vol_r;
+		sample += c->val;
+		sample *= c->volume;
+		sample /= 4;
+
+		samples[i + 0] += sample * c->on_left * vol_l;
+		samples[i + 1] += sample * c->on_right * vol_r;
 	}
 }
 
@@ -288,21 +290,29 @@ static void update_wave(int16_t *samples)
 		if (c->muted)
 			continue;
 
-		samples[i + 0] += (sample/4) * c->on_left * vol_l;
-		samples[i + 1] += (sample/4) * c->on_right * vol_r;
+		sample /= 4;
+
+		samples[i + 0] += sample * c->on_left * vol_l;
+		samples[i + 1] += sample * c->on_right * vol_r;
 	}
 }
 
 static void update_noise(int16_t *samples)
 {
 	struct chan *c = chans + 3;
+
 	if (!c->powered)
 		return;
 
-	uint_fast16_t freq = 4194304 / ((uint_fast8_t[]){
+	{
+		const uint_fast8_t lfsr_div_lut[] = {
 			8, 16, 32, 48, 64, 80, 96, 112
-		}[c->lfsr_div] << c->freq);
-	set_note_freq(c, freq);
+		};
+		uint32_t freq;
+
+		freq = DMG_CLOCK_FREQ_U / (lfsr_div_lut[c->lfsr_div] << c->freq);
+		set_note_freq(c, freq);
+	}
 
 	if (c->freq >= 14)
 		c->enabled = 0;
@@ -320,7 +330,7 @@ static void update_noise(int16_t *samples)
 		int32_t sample    = 0;
 
 		while (update_freq(c, &pos)) {
-			c->lfsr_reg = (c->lfsr_reg << 1) | (c->val == VOL_INIT_MAX/MAX_CHAN_VOLUME);
+			c->lfsr_reg = (c->lfsr_reg << 1) | (c->val >= VOL_INIT_MAX/MAX_CHAN_VOLUME);
 
 			if (c->lfsr_wide) {
 				c->val = !(((c->lfsr_reg >> 14) & 1) ^
@@ -337,14 +347,15 @@ static void update_noise(int16_t *samples)
 			prev_pos = pos;
 		}
 
-		sample += c->val;
-		sample *= c->volume;
-
 		if (c->muted)
 			continue;
 
-		samples[i + 0] += (sample/4) * c->on_left * vol_l;
-		samples[i + 1] += (sample/4) * c->on_right * vol_r;
+		sample += c->val;
+		sample *= c->volume;
+		sample /= 4;
+
+		samples[i + 0] += sample * c->on_left * vol_l;
+		samples[i + 1] += sample * c->on_right * vol_r;
 	}
 }
 
