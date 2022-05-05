@@ -31,6 +31,8 @@
  * Using a square of 2 simplifies calculations. */
 #define FREQ_INC_REF		(AUDIO_SAMPLE_RATE * 4)
 
+#define MAX_CHAN_VOLUME		15
+
 /**
  * Memory holding audio registers between 0xFF10 and 0xFF3F inclusive.
  */
@@ -120,10 +122,10 @@ static void update_env(struct chan *c)
 	while (c->env.counter > FREQ_INC_REF) {
 		if (c->env.step) {
 			c->volume += c->env.up ? 1 : -1;
-			if (c->volume == 0 || c->volume == 15) {
+			if (c->volume == 0 || c->volume == MAX_CHAN_VOLUME) {
 				c->env.inc = 0;
 			}
-			c->volume = MAX(0, MIN(15, c->volume));
+			c->volume = MAX(0, MIN(MAX_CHAN_VOLUME, c->volume));
 		}
 		c->env.counter -= FREQ_INC_REF;
 	}
@@ -211,11 +213,12 @@ static void update_square(int16_t* samples, const bool ch2)
 			c->duty_counter = (c->duty_counter + 1) & 7;
 			sample += ((pos - prev_pos) / c->freq_inc) * c->val;
 			c->val = (c->duty & (1 << c->duty_counter)) ?
-				VOL_INIT_MAX : VOL_INIT_MIN;
+				VOL_INIT_MAX / MAX_CHAN_VOLUME :
+				VOL_INIT_MIN / MAX_CHAN_VOLUME;
 			prev_pos = pos;
 		}
 		sample += c->val;
-		sample *= (c->volume / 15.0f);
+		sample *= c->volume;
 
 		if (c->muted)
 			continue;
@@ -317,25 +320,25 @@ static void update_noise(int16_t *samples)
 		int32_t sample    = 0;
 
 		while (update_freq(c, &pos)) {
-			c->lfsr_reg = (c->lfsr_reg << 1) | (c->val == VOL_INIT_MAX);
+			c->lfsr_reg = (c->lfsr_reg << 1) | (c->val == VOL_INIT_MAX/MAX_CHAN_VOLUME);
 
 			if (c->lfsr_wide) {
 				c->val = !(((c->lfsr_reg >> 14) & 1) ^
 						((c->lfsr_reg >> 13) & 1)) ?
-					VOL_INIT_MAX :
-					-VOL_INIT_MAX;
+					VOL_INIT_MAX / MAX_CHAN_VOLUME :
+					VOL_INIT_MIN / MAX_CHAN_VOLUME;
 			} else {
 				c->val = !(((c->lfsr_reg >> 6) & 1) ^
 						((c->lfsr_reg >> 5) & 1)) ?
-					VOL_INIT_MAX :
-					-VOL_INIT_MAX;
+					VOL_INIT_MAX / MAX_CHAN_VOLUME :
+					VOL_INIT_MIN / MAX_CHAN_VOLUME;
 			}
 			sample += ((pos - prev_pos) / c->freq_inc) * c->val;
 			prev_pos = pos;
 		}
 
 		sample += c->val;
-		sample *= (c->volume / 15.0f);
+		sample *= c->volume;
 
 		if (c->muted)
 			continue;
@@ -377,9 +380,9 @@ static void chan_trigger(uint_fast8_t i)
 
 		c->env.step = val & 0x07;
 		c->env.up   = val & 0x08 ? 1 : 0;
-		c->env.inc  = (c->env.step ? (64.0f / (float)c->env.step) /
-						   AUDIO_SAMPLE_RATE :
-					   8.0f / AUDIO_SAMPLE_RATE) * FREQ_INC_REF;
+		c->env.inc  = c->env.step ?
+			(FREQ_INC_REF * 64ul) / ((uint32_t)c->env.step * AUDIO_SAMPLE_RATE) :
+			(8ul * FREQ_INC_REF) / AUDIO_SAMPLE_RATE ;
 		c->env.counter = 0;
 	}
 
@@ -391,9 +394,8 @@ static void chan_trigger(uint_fast8_t i)
 		c->sweep.rate  = (val >> 4) & 0x07;
 		c->sweep.up    = !(val & 0x08);
 		c->sweep.shift = (val & 0x07);
-		c->sweep.inc   = (c->sweep.rate ?
-				       (128.0f / (float)(c->sweep.rate)) /
-					       AUDIO_SAMPLE_RATE : 0) * FREQ_INC_REF;
+		c->sweep.inc   = c->sweep.rate ?
+			((128 * FREQ_INC_REF) / (c->sweep.rate * AUDIO_SAMPLE_RATE)) : 0;
 		c->sweep.counter = FREQ_INC_REF;
 	}
 
@@ -407,8 +409,7 @@ static void chan_trigger(uint_fast8_t i)
 		c->val      = VOL_INIT_MIN;
 	}
 
-	c->len.inc =
-		((256.0f / (float)(len_max - c->len.load)) * FREQ_INC_REF) / AUDIO_SAMPLE_RATE;
+	c->len.inc = (256 * FREQ_INC_REF) / (AUDIO_SAMPLE_RATE * (len_max - c->len.load));
 	c->len.counter = 0;
 }
 
