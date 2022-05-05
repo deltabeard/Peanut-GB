@@ -317,24 +317,24 @@ static void update_noise(int16_t *samples)
 		int32_t sample    = 0;
 
 		while (update_freq(c, &pos)) {
-			c->lfsr_reg = (c->lfsr_reg << 1) | (c->val == 1);
+			c->lfsr_reg = (c->lfsr_reg << 1) | (c->val == VOL_INIT_MAX);
 
 			if (c->lfsr_wide) {
 				c->val = !(((c->lfsr_reg >> 14) & 1) ^
 						((c->lfsr_reg >> 13) & 1)) ?
-					1 :
-					-1;
+					VOL_INIT_MAX :
+					-VOL_INIT_MAX;
 			} else {
 				c->val = !(((c->lfsr_reg >> 6) & 1) ^
 						((c->lfsr_reg >> 5) & 1)) ?
-					1 :
-					-1;
+					VOL_INIT_MAX :
+					-VOL_INIT_MAX;
 			}
-			sample += ((pos - prev_pos) / c->freq_inc) * c->val * (VOL_INIT_MAX);
+			sample += ((pos - prev_pos) / c->freq_inc) * c->val;
 			prev_pos = pos;
 		}
 
-		sample += c->val * (VOL_INIT_MAX);
+		sample += c->val;
 		sample *= (c->volume / 15.0f);
 
 		if (c->muted)
