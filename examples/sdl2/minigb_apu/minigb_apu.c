@@ -5,7 +5,6 @@
  * project is based on MiniGBS by Alex Baines: https://github.com/baines/MiniGBS
  */
 
-#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
