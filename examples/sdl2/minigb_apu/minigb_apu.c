@@ -28,7 +28,7 @@
  * FREQ_INC_REF must be equal to, or larger than AUDIO_SAMPLE_RATE in order
  * to avoid a division by zero error.
  * Using a square of 2 simplifies calculations. */
-#define FREQ_INC_REF		(AUDIO_SAMPLE_RATE * 4)
+#define FREQ_INC_REF		(AUDIO_SAMPLE_RATE * 16)
 
 #define MAX_CHAN_VOLUME		15
 
