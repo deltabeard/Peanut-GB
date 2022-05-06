@@ -305,7 +305,7 @@ static void update_noise(int16_t *samples)
 		return;
 
 	{
-		const uint_fast8_t lfsr_div_lut[] = {
+		const uint32_t lfsr_div_lut[] = {
 			8, 16, 32, 48, 64, 80, 96, 112
 		};
 		uint32_t freq;
@@ -343,6 +343,7 @@ static void update_noise(int16_t *samples)
 					VOL_INIT_MAX / MAX_CHAN_VOLUME :
 					VOL_INIT_MIN / MAX_CHAN_VOLUME;
 			}
+
 			sample += ((pos - prev_pos) / c->freq_inc) * c->val;
 			prev_pos = pos;
 		}
@@ -417,7 +418,7 @@ static void chan_trigger(uint_fast8_t i)
 		c->val  = 0;
 	} else if (i == 3) { // noise
 		c->lfsr_reg = 0xFFFF;
-		c->val      = VOL_INIT_MIN;
+		c->val      = VOL_INIT_MIN / MAX_CHAN_VOLUME;
 	}
 
 	c->len.inc = (256 * FREQ_INC_REF) / (AUDIO_SAMPLE_RATE * (len_max - c->len.load));
