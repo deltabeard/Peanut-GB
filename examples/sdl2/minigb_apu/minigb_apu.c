@@ -7,7 +7,6 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "minigb_apu.h"
@@ -39,33 +38,33 @@ static uint8_t audio_mem[AUDIO_MEM_SIZE];
 
 struct chan_len_ctr {
 	uint8_t load;
-	bool enabled;
+	unsigned enabled : 1;
 	uint32_t counter;
 	uint32_t inc;
 };
 
 struct chan_vol_env {
 	uint8_t step;
-	bool up;
+	unsigned up : 1;
 	uint32_t counter;
 	uint32_t inc;
 };
 
 struct chan_freq_sweep {
-	uint_fast16_t freq;
+	uint16_t freq;
 	uint8_t rate;
 	uint8_t shift;
-	bool up;
+	unsigned up : 1;
 	uint32_t counter;
 	uint32_t inc;
 };
 
 static struct chan {
-	bool enabled;
-	bool powered;
-	bool on_left;
-	bool on_right;
-	bool muted;
+	unsigned enabled : 1;
+	unsigned powered : 1;
+	unsigned on_left : 1;
+	unsigned on_right : 1;
+	unsigned muted : 1;
 
 	uint8_t volume;
 	uint8_t volume_init;
@@ -80,20 +79,23 @@ static struct chan {
 	struct chan_vol_env    env;
 	struct chan_freq_sweep sweep;
 
-	// square
-	uint8_t duty;
-	uint8_t duty_counter;
-
-	// noise
-	uint16_t lfsr_reg;
-	uint8_t  lfsr_wide;
-	uint8_t  lfsr_div;
-
-	// wave
-	uint8_t sample;
+	union {
+		struct {
+			uint8_t duty;
+			uint8_t duty_counter;
+		} square;
+		struct {
+			uint16_t lfsr_reg;
+			uint8_t  lfsr_wide;
+			uint8_t  lfsr_div;
+		} noise;
+		struct {
+			uint8_t sample;
+		} wave;
+	};
 } chans[4];
 
-static unsigned vol_l, vol_r;
+static int32_t vol_l, vol_r;
 
 static void set_note_freq(struct chan *c, const uint32_t freq)
 {
@@ -209,9 +211,9 @@ static void update_square(int16_t* samples, const bool ch2)
 		int32_t sample = 0;
 
 		while (update_freq(c, &pos)) {
-			c->duty_counter = (c->duty_counter + 1) & 7;
+			c->square.duty_counter = (c->square.duty_counter + 1) & 7;
 			sample += ((pos - prev_pos) / c->freq_inc) * c->val;
-			c->val = (c->duty & (1 << c->duty_counter)) ?
+			c->val = (c->square.duty & (1 << c->square.duty_counter)) ?
 				VOL_INIT_MAX / MAX_CHAN_VOLUME :
 				VOL_INIT_MIN / MAX_CHAN_VOLUME;
 			prev_pos = pos;
@@ -265,17 +267,17 @@ static void update_wave(int16_t *samples)
 		uint32_t prev_pos = 0;
 		int32_t sample   = 0;
 
-		c->sample = wave_sample(c->val, c->volume);
+		c->wave.sample = wave_sample(c->val, c->volume);
 
 		while (update_freq(c, &pos)) {
 			c->val = (c->val + 1) & 31;
 			sample += ((pos - prev_pos) / c->freq_inc) *
-				((int)c->sample - 8) * (INT16_MAX/64);
-			c->sample = wave_sample(c->val, c->volume);
+				((int)c->wave.sample - 8) * (INT16_MAX/64);
+			c->wave.sample = wave_sample(c->val, c->volume);
 			prev_pos  = pos;
 		}
 
-		sample += ((int)c->sample - 8) * (int)(INT16_MAX/64);
+		sample += ((int)c->wave.sample - 8) * (int)(INT16_MAX/64);
 
 		if (c->volume == 0)
 			continue;
@@ -309,7 +311,7 @@ static void update_noise(int16_t *samples)
 		};
 		uint32_t freq;
 
-		freq = DMG_CLOCK_FREQ_U / (lfsr_div_lut[c->lfsr_div] << c->freq);
+		freq = DMG_CLOCK_FREQ_U / (lfsr_div_lut[c->noise.lfsr_div] << c->freq);
 		set_note_freq(c, freq);
 	}
 
@@ -329,16 +331,17 @@ static void update_noise(int16_t *samples)
 		int32_t sample    = 0;
 
 		while (update_freq(c, &pos)) {
-			c->lfsr_reg = (c->lfsr_reg << 1) | (c->val >= VOL_INIT_MAX/MAX_CHAN_VOLUME);
+			c->noise.lfsr_reg = (c->noise.lfsr_reg << 1) |
+				(c->val >= VOL_INIT_MAX/MAX_CHAN_VOLUME);
 
-			if (c->lfsr_wide) {
-				c->val = !(((c->lfsr_reg >> 14) & 1) ^
-						((c->lfsr_reg >> 13) & 1)) ?
+			if (c->noise.lfsr_wide) {
+				c->val = !(((c->noise.lfsr_reg >> 14) & 1) ^
+						((c->noise.lfsr_reg >> 13) & 1)) ?
 					VOL_INIT_MAX / MAX_CHAN_VOLUME :
 					VOL_INIT_MIN / MAX_CHAN_VOLUME;
 			} else {
-				c->val = !(((c->lfsr_reg >> 6) & 1) ^
-						((c->lfsr_reg >> 5) & 1)) ?
+				c->val = !(((c->noise.lfsr_reg >> 6) & 1) ^
+						((c->noise.lfsr_reg >> 5) & 1)) ?
 					VOL_INIT_MAX / MAX_CHAN_VOLUME :
 					VOL_INIT_MIN / MAX_CHAN_VOLUME;
 			}
@@ -414,10 +417,10 @@ static void chan_trigger(uint_fast8_t i)
 
 	if (i == 2) { // wave
 		len_max = 256;
-		c->val  = 0;
+		c->val = 0;
 	} else if (i == 3) { // noise
-		c->lfsr_reg = 0xFFFF;
-		c->val      = VOL_INIT_MIN / MAX_CHAN_VOLUME;
+		c->noise.lfsr_reg = 0xFFFF;
+		c->val = VOL_INIT_MIN / MAX_CHAN_VOLUME;
 	}
 
 	c->len.inc = (256 * FREQ_INC_REF) / (AUDIO_SAMPLE_RATE * (len_max - c->len.load));
@@ -428,7 +431,7 @@ static void chan_trigger(uint_fast8_t i)
  * Read audio register.
  * \param addr	Address of audio register. Must be 0xFF10 <= addr <= 0xFF3F.
  *				This is not checked in this function.
- * \return		Byte at address.
+ * \return	Byte at address.
  */
 uint8_t audio_read(const uint16_t addr)
 {
@@ -515,8 +518,8 @@ void audio_write(const uint16_t addr, const uint8_t val)
 	case 0xFF16:
 	case 0xFF20: {
 		const uint8_t duty_lookup[] = { 0x10, 0x30, 0x3C, 0xCF };
-		chans[i].len.load	   = val & 0x3f;
-		chans[i].duty		    = duty_lookup[val >> 6];
+		chans[i].len.load = val & 0x3f;
+		chans[i].square.duty = duty_lookup[val >> 6];
 		break;
 	}
 
@@ -550,9 +553,9 @@ void audio_write(const uint16_t addr, const uint8_t val)
 		break;
 
 	case 0xFF22:
-		chans[3].freq      = val >> 4;
-		chans[3].lfsr_wide = !(val & 0x08);
-		chans[3].lfsr_div  = val & 0x07;
+		chans[3].freq = val >> 4;
+		chans[3].noise.lfsr_wide = !(val & 0x08);
+		chans[3].noise.lfsr_div = val & 0x07;
 		break;
 
 	case 0xFF24:
@@ -563,9 +566,9 @@ void audio_write(const uint16_t addr, const uint8_t val)
 	}
 
 	case 0xFF25:
-		for (uint_fast8_t i = 0; i < 4; ++i) {
-			chans[i].on_left  = (val >> (4 + i)) & 1;
-			chans[i].on_right = (val >> i) & 1;
+		for (uint_fast8_t j = 0; j < 4; j++) {
+			chans[j].on_left  = (val >> (4 + j)) & 1;
+			chans[j].on_right = (val >> j) & 1;
 		}
 		break;
 	}
