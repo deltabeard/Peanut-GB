@@ -29,9 +29,11 @@
  * is Copyright (c) 2015-2019 Lior Halphon.
  */
 
-#pragma once
+#ifndef PEANUT_GB_H
+#define PEANUT_GB_H
 
 #include "version.all"	/* Version information */
+#include <stdlib.h>	/* Required for qsort */
 #include <stdint.h>	/* Required for int types */
 #include <string.h>	/* Required for memset */
 #include <time.h>	/* Required for tm struct */
@@ -1228,13 +1230,14 @@ struct sprite_data {
 };
 
 #if PEANUT_GB_HIGH_LCD_ACCURACY
-static int compare_sprites(const struct sprite_data *in1, const struct sprite_data *in2)
+static int compare_sprites(const void *in1, const void *in2)
 {
-	int x_res = (int)in1->x - (int)in2->x;
+	const struct sprite_data *sd1 = in1, *sd2 = in2;
+	int x_res = (int)sd1->x - (int)sd2->x;
 	if(x_res != 0)
 		return x_res;
 
-	return (int)in1->sprite_number - (int)in2->sprite_number;
+	return (int)sd1->sprite_number - (int)sd2->sprite_number;
 }
 #endif
 
@@ -3856,3 +3859,5 @@ void gb_init_lcd(struct gb_s *gb,
 	return;
 }
 #endif
+
+#endif //PEANUT_GB_H
