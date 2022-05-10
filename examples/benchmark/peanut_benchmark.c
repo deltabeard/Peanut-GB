@@ -111,11 +111,11 @@ int main(int argc, char **argv)
 	{
 		/* Start benchmark. */
 		struct gb_s gb;
-		const uint_fast64_t start_time = (uint_fast64_t)clock();
-		uint_fast64_t bench_ticks;
-		uint_fast64_t bench_fps;
-		uint_fast64_t frames_to_run = 60 * 60 * 2; // 2 Minutes worth of frames
-		const uint_fast64_t frames = frames_to_run;
+		const uint64_t start_time = (uint64_t)clock();
+		uint64_t bench_ticks;
+		uint64_t bench_fps;
+		uint64_t frames_to_run = 60 * 60 * 2; // 2 Minutes worth of frames
+		const uint64_t frames = frames_to_run;
 		int ret;
 
 		/* Initialise context. */
@@ -135,16 +135,16 @@ int main(int argc, char **argv)
 		} while(--frames_to_run);
 
 		/* End benchmark. */
-		bench_ticks = (uint_fast64_t)clock() - start_time;
+		bench_ticks = (uint64_t)clock() - start_time;
 		benchmark_ticks_total += bench_ticks;
 
 		bench_fps = frames / ((double)bench_ticks / CLOCKS_PER_SEC);
 		benchmark_fps_total += bench_fps;
 
-		printf("Benchmark %i: %ld\tFPS: %ld\n", i, bench_ticks, bench_fps);
+		printf("Benchmark %i: %llu\tFPS: %llu\n", i, bench_ticks, bench_fps);
 	}
 
-	printf("Average    : %ld\tFPS: %ld\n",
+	printf("Average    : %d\tFPS: %d\n",
 			benchmark_ticks_total / 5, benchmark_fps_total / 5);
 
 	return 0;
