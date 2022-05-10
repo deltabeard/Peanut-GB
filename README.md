@@ -45,6 +45,10 @@ create a *drop zone* window that you can drag and drop a ROM file to.
 ![Shantae](/screencaps/SHANTAE.png) 
 ![Dragon Ball Z](/screencaps/DRAGONBALL_BBZP.png) 
 
+Note: Animated GIFs shown here are limited to 50fps, whilst the emulation was
+running at the native ~60fps. This is because popular GIF decoders limit the
+maximum FPS to 50.
+
 ### Controls
 
 | Action            | Keyboard   | Joypad |
