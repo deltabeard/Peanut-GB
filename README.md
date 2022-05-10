@@ -34,7 +34,7 @@ screen and take input. Run `make` in the ./examples/sdl2/ folder to compile it.
 Execute in command line with `peanut-sdl game.gb` which will automatically
 create the save file `game.sav` for the game if one isn't found. Or run with
 `peanut-sdl game.gb save.sav` to specify a save file. Or even `peanut-sdl` to
-use a file picker native to your running operating system to select the ROM.
+create a *drop zone* window that you can drag and drop a ROM file to.
 
 ### Screenshot
 
