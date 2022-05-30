@@ -619,10 +619,6 @@ int main(int argc, char **argv)
 	char *save_file_name = NULL;
 	int ret = EXIT_SUCCESS;
 
-#if defined(_WIN32)
-	   SDL_setenv("SDL_AUDIODRIVER", "directsound", SDL_TRUE);
-#endif
-
 	/* Initialise frontend implementation, in this case, SDL2. */
 	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO) < 0)
 	{
@@ -808,14 +804,16 @@ int main(int argc, char **argv)
 	SDL_AudioDeviceID dev;
 #endif
 
-#if defined(ENABLE_SOUND_BLARGG)
+#if ENABLE_SOUND == 0
+	// Sound is disabled, so do nothing.
+#elif defined(ENABLE_SOUND_BLARGG)
 	audio_init(&dev);
 #elif defined(ENABLE_SOUND_MINIGB)
 	{
 		SDL_AudioSpec want, have;
 
 		want.freq = AUDIO_SAMPLE_RATE;
-		want.format   = AUDIO_F32SYS,
+		want.format   = AUDIO_S16,
 		want.channels = 2;
 		want.samples = AUDIO_SAMPLES;
 		want.callback = audio_callback;
