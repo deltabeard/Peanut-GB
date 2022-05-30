@@ -804,7 +804,9 @@ int main(int argc, char **argv)
 	SDL_AudioDeviceID dev;
 #endif
 
-#if defined(ENABLE_SOUND_BLARGG)
+#if ENABLE_SOUND == 0
+	// Sound is disabled, so do nothing.
+#elif defined(ENABLE_SOUND_BLARGG)
 	audio_init(&dev);
 #elif defined(ENABLE_SOUND_MINIGB)
 	{
