@@ -5,7 +5,7 @@
 # MIT License
 # -----------
 #[[
-  Copyright (c) 2021 Lars Melchior and additional contributors
+  Copyright (c) 2019-2022 Lars Melchior and contributors
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -28,7 +28,7 @@
 
 cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 
-set(CURRENT_CPM_VERSION 0.34.3)
+set(CURRENT_CPM_VERSION 0.35.1)
 
 if(CPM_DIRECTORY)
   if(NOT CPM_DIRECTORY STREQUAL CMAKE_CURRENT_LIST_DIR)
@@ -251,7 +251,13 @@ function(CPMFindPackage)
     endif()
   endif()
 
-  if(CPM_DOWNLOAD_ALL)
+  set(downloadPackage ${CPM_DOWNLOAD_ALL})
+  if(DEFINED CPM_DOWNLOAD_${CPM_ARGS_NAME})
+    set(downloadPackage ${CPM_DOWNLOAD_${CPM_ARGS_NAME}})
+  elseif(DEFINED ENV{CPM_DOWNLOAD_${CPM_ARGS_NAME}})
+    set(downloadPackage $ENV{CPM_DOWNLOAD_${CPM_ARGS_NAME}})
+  endif()
+  if(downloadPackage)
     CPMAddPackage(${ARGN})
     cpm_export_variables(${CPM_ARGS_NAME})
     return()
@@ -340,7 +346,7 @@ function(cpm_parse_add_package_single_arg arg outArgs)
     endif()
   endif()
 
-  # For all packages we interpret @... as version. Only replace the last occurence. Thus URIs
+  # For all packages we interpret @... as version. Only replace the last occurrence. Thus URIs
   # containing '@' can be used
   string(REGEX REPLACE "@([^@]+)$" ";VERSION;\\1" out "${out}")
 
@@ -379,7 +385,7 @@ function(cpm_check_git_working_dir_is_clean repoPath gitTag isClean)
     return()
   endif()
 
-  # check for uncommited changes
+  # check for uncommitted changes
   execute_process(
     COMMAND ${GIT_EXECUTABLE} status --porcelain
     RESULT_VARIABLE resultGitStatus
@@ -405,7 +411,7 @@ function(cpm_check_git_working_dir_is_clean repoPath gitTag isClean)
     return()
   endif()
 
-  # check for commited changes
+  # check for committed changes
   execute_process(
     COMMAND ${GIT_EXECUTABLE} diff -s --exit-code ${gitTag}
     RESULT_VARIABLE resultGitDiff
@@ -425,6 +431,47 @@ function(cpm_check_git_working_dir_is_clean repoPath gitTag isClean)
     )
   endif()
 
+endfunction()
+
+# method to overwrite internal FetchContent properties, to allow using CPM.cmake to overload
+# FetchContent calls. As these are internal cmake properties, this method should be used carefully
+# and may need modification in future CMake versions. Source:
+# https://github.com/Kitware/CMake/blob/dc3d0b5a0a7d26d43d6cfeb511e224533b5d188f/Modules/FetchContent.cmake#L1152
+function(cpm_override_fetchcontent contentName)
+  cmake_parse_arguments(PARSE_ARGV 1 arg "" "SOURCE_DIR;BINARY_DIR" "")
+  if(NOT "${arg_UNPARSED_ARGUMENTS}" STREQUAL "")
+    message(FATAL_ERROR "Unsupported arguments: ${arg_UNPARSED_ARGUMENTS}")
+  endif()
+
+  string(TOLOWER ${contentName} contentNameLower)
+  set(prefix "_FetchContent_${contentNameLower}")
+
+  set(propertyName "${prefix}_sourceDir")
+  define_property(
+    GLOBAL
+    PROPERTY ${propertyName}
+    BRIEF_DOCS "Internal implementation detail of FetchContent_Populate()"
+    FULL_DOCS "Details used by FetchContent_Populate() for ${contentName}"
+  )
+  set_property(GLOBAL PROPERTY ${propertyName} "${arg_SOURCE_DIR}")
+
+  set(propertyName "${prefix}_binaryDir")
+  define_property(
+    GLOBAL
+    PROPERTY ${propertyName}
+    BRIEF_DOCS "Internal implementation detail of FetchContent_Populate()"
+    FULL_DOCS "Details used by FetchContent_Populate() for ${contentName}"
+  )
+  set_property(GLOBAL PROPERTY ${propertyName} "${arg_BINARY_DIR}")
+
+  set(propertyName "${prefix}_populated")
+  define_property(
+    GLOBAL
+    PROPERTY ${propertyName}
+    BRIEF_DOCS "Internal implementation detail of FetchContent_Populate()"
+    FULL_DOCS "Details used by FetchContent_Populate() for ${contentName}"
+  )
+  set_property(GLOBAL PROPERTY ${propertyName} TRUE)
 endfunction()
 
 # Download and add a package from source
@@ -638,8 +685,15 @@ function(CPMAddPackage)
         "${${CPM_ARGS_NAME}_SOURCE_DIR}/${CPM_ARGS_SOURCE_SUBDIR}" "${${CPM_ARGS_NAME}_BINARY_DIR}"
         "${CPM_ARGS_EXCLUDE_FROM_ALL}" "${CPM_ARGS_OPTIONS}"
       )
-      set(CPM_SKIP_FETCH TRUE)
       set(PACKAGE_INFO "${PACKAGE_INFO} at ${download_directory}")
+
+      # As the source dir is already cached/populated, we override the call to FetchContent.
+      set(CPM_SKIP_FETCH TRUE)
+      cpm_override_fetchcontent(
+        "${lower_case_name}" SOURCE_DIR "${${CPM_ARGS_NAME}_SOURCE_DIR}/${CPM_ARGS_SOURCE_SUBDIR}"
+        BINARY_DIR "${${CPM_ARGS_NAME}_BINARY_DIR}"
+      )
+
     else()
       # Enable shallow clone when GIT_TAG is not a commit hash. Our guess may not be accurate, but
       # it should guarantee no commit hash get mis-detected.
@@ -717,7 +771,7 @@ macro(cpm_export_variables name)
 endmacro()
 
 # declares a package, so that any call to CPMAddPackage for the package name will use these
-# arguments instead. Previous declarations will not be overriden.
+# arguments instead. Previous declarations will not be overridden.
 macro(CPMDeclarePackage Name)
   if(NOT DEFINED "CPM_DECLARATION_${Name}")
     set("CPM_DECLARATION_${Name}" "${ARGN}")
@@ -740,7 +794,7 @@ function(cpm_add_comment_to_package_lock Name)
   endif()
 endfunction()
 
-# includes the package lock file if it exists and creates a target `cpm-write-package-lock` to
+# includes the package lock file if it exists and creates a target `cpm-update-package-lock` to
 # update it
 macro(CPMUsePackageLock file)
   if(NOT CPM_DONT_CREATE_PACKAGE_LOCK)
@@ -841,6 +895,12 @@ function(
       cmake_policy(SET CMP0077 NEW)
       set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
+      # the policy allows us to change set(CACHE) without caching
+      if(POLICY CMP0126)
+        cmake_policy(SET CMP0126 NEW)
+        set(CMAKE_POLICY_DEFAULT_CMP0126 NEW)
+      endif()
+
       foreach(OPTION ${OPTIONS})
         cpm_parse_option("${OPTION}")
         set(${OPTION_KEY} "${OPTION_VALUE}")
@@ -931,7 +991,7 @@ function(cpm_get_version_from_git_tag GIT_TAG RESULT)
   endif()
 endfunction()
 
-# guesses if the git tag is a commit hash or an actual tag or a branch nane.
+# guesses if the git tag is a commit hash or an actual tag or a branch name.
 function(cpm_is_git_tag_commit_hash GIT_TAG RESULT)
   string(LENGTH "${GIT_TAG}" length)
   # full hash has 40 characters, and short hash has at least 7 characters.
