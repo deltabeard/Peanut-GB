@@ -78,14 +78,17 @@ uint8_t *read_rom_to_ram(const char *file_name)
 	rom_size = ftell(rom_file);
 	rewind(rom_file);
 	rom = malloc(rom_size);
+	if(rom == NULL)
+		goto out;
 
 	if(fread(rom, sizeof(uint8_t), rom_size, rom_file) != rom_size)
 	{
 		free(rom);
-		fclose(rom_file);
-		return NULL;
+		rom = NULL;
+		goto out;
 	}
 
+out:
 	fclose(rom_file);
 	return rom;
 }
