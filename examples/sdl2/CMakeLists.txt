@@ -21,7 +21,7 @@ INCLUDE(../../version.all)
 PROJECT(peanut-sdl
         LANGUAGES C
 	VERSION
-	${HAIYAJAN_VERSION_MAJOR}.${HAIYAJAN_VERSION_MINOR}.${HAIYAJAN_VERSION_PATCH}
+	${PEANUTGB_VERSION_MAJOR}.${PEANUTGB_VERSION_MINOR}.${PEANUTGB_VERSION_PATCH}
         DESCRIPTION "Peanut-GB example with SDL2"
         HOMEPAGE_URL "https://github.com/deltabeard/peanut-gb")
 
