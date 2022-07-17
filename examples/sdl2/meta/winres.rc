@@ -20,6 +20,7 @@ VS_VERSION_INFO VERSIONINFO
  FILEOS 0x40004L
  FILETYPE 0x1L
  FILESUBTYPE 0x0L
+ FILEVERSION EXE_VER
 BEGIN
     BLOCK "StringFileInfo"
     BEGIN
@@ -27,7 +28,10 @@ BEGIN
         BEGIN
             VALUE "CompanyName", QUOTE(COMPANY)
             VALUE "FileDescription", QUOTE(DESCRIPTION)
+            VALUE "FileVersion", QUOTE(EXE_VER)
+            VALUE "InternalName", QUOTE(NAME)
             VALUE "LegalCopyright", QUOTE(LICENSE)
+            VALUE "OriginalFilename", QUOTE(NAME)
             VALUE "ProductName", QUOTE(NAME)
             VALUE "ProductVersion", QUOTE(GIT_VER)
         END
