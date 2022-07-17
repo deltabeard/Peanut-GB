@@ -28,7 +28,6 @@ BEGIN
         BEGIN
             VALUE "CompanyName", QUOTE(COMPANY)
             VALUE "FileDescription", QUOTE(DESCRIPTION)
-            VALUE "FileVersion", QUOTE(EXE_VER)
             VALUE "InternalName", QUOTE(NAME)
             VALUE "LegalCopyright", QUOTE(LICENSE)
             VALUE "OriginalFilename", QUOTE(NAME)

@@ -29,7 +29,8 @@ These are:
 ## SDL2 Example
 
 An example implementation is given in peanut_sdl.c, which uses SDL2 to draw the
-screen and take input. Run `make` in the ./examples/sdl2/ folder to compile it.
+screen and take input. Run `cmake` or `make` in the ./examples/sdl2/ folder to
+compile it.
 
 Execute in command line with `peanut-sdl game.gb` which will automatically
 create the save file `game.sav` for the game if one isn't found. Or run with
@@ -39,11 +40,11 @@ create a *drop zone* window that you can drag and drop a ROM file to.
 ### Screenshot
 
 ![Pokemon Blue - Main screen animation](/screencaps/PKMN_BLUE.gif)
-![Legend of Zelda: Links Awakening - animation](/screencaps/ZELDA.gif) 
-![Megaman V](/screencaps/MEGAMANV.png) 
+![Legend of Zelda: Links Awakening - animation](/screencaps/ZELDA.gif)
+![Megaman V](/screencaps/MEGAMANV.png)
 
-![Shantae](/screencaps/SHANTAE.png) 
-![Dragon Ball Z](/screencaps/DRAGONBALL_BBZP.png) 
+![Shantae](/screencaps/SHANTAE.png)
+![Dragon Ball Z](/screencaps/DRAGONBALL_BBZP.png)
 
 Note: Animated GIFs shown here are limited to 50fps, whilst the emulation was
 running at the native ~60fps. This is because popular GIF decoders limit the
