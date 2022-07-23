@@ -17,14 +17,81 @@ Please seek an alternative emulator if accuracy is important.
 
 ## Getting Started
 
+### Required Functions
+
 The front-end implementation must provide a number of functions to the library.
-These are:
+These functions are set when calling gb_init.
 
 - gb_rom_read
 - gb_cart_ram_read
 - gb_cart_ram_write
 - gb_serial_transfer
 - gb_error
+
+### Optional Functions
+
+The following optional functions may be defined for further functionality.
+
+#### lcd_draw_line
+
+This function is required for LCD drawing. Set this function using gb_init_lcd
+and enable LCD functionality within Peanut-GB by defining ENABLE_LCD to 1 before
+including peanut_gb.h. ENABLE_LCD is set to 1 by default if it was not
+previously defined. If gb_init_lcd is not called or lcd_draw_line is set to
+NULL, then LCD drawing is disabled.
+
+The pixel data sent to lcd_draw_line comes with both shade and layer data. The
+first two least significant bits are the shade data (black, dark, light, white).
+Bits 4 and 5 are layer data (OBJ0, OBJ1, BG), which can be used to add more
+colours to the game in the same way that the Game Boy Color does to older Game
+Boy games.
+
+#### audio_read and audio_write
+
+These functions are required for audio emulation and output. Peanut-GB does not
+include audio emulation, so an external library must be used. These functions
+must be defined and audio output must be enabled by defining ENABLE_SOUND to 1
+before including peanut_gb.h. 
+
+#### gb_serial_tx and gb_serial_rx
+
+These functions are required for serial communication. Set these functions using
+gb_init_serial. If these functions are not set, then the emulation will act as
+though no link cable is connected.
+
+### Useful Functions
+
+#### gb_reset
+
+This function resets the game being played, as though the console had been
+powered off and on. gb_reset is called by gb_init to initialise the CPU
+registers.
+
+#### gb_get_save_size
+
+This function returns the save size of the game being played. This function
+returns 0 if the game does not use any save data.
+
+#### gb_run_frame
+
+This function runs the CPU until a full frame is rendered to the LCD.
+
+#### gb_color_hash
+
+This function calculates a hash of the game title. This hash is calculated in
+the same way as the Game Boy Color to add colour to Game Boy games.
+
+#### gb_get_rom_name
+
+This function returns the name of the game.
+
+#### gb_set_rtc
+
+Set the time of the real time clock (RTC). Some games use this RTC data.
+
+#### gb_tick_rtc
+
+Increment the real time clock by one second.
 
 ## SDL2 Example
 
