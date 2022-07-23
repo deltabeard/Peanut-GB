@@ -15,6 +15,58 @@ incorrectly or not run at all. High speed is important; changes that cause a
 significant loss of emulation speed but increase in accuracy, will be rejected.
 Please seek an alternative emulator if accuracy is important.
 
+## SDL2 Example
+
+An example implementation is given in peanut_sdl.c, which uses SDL2 to draw the
+screen and take input. Run `cmake` or `make` in the ./examples/sdl2/ folder to
+compile it.
+
+Execute in command line with `peanut-sdl game.gb` which will automatically
+create the save file `game.sav` for the game if one isn't found. Or run with
+`peanut-sdl game.gb save.sav` to specify a save file. Or even `peanut-sdl` to
+create a *drop zone* window that you can drag and drop a ROM file to.
+
+### Screenshot
+
+![Pokemon Blue - Main screen animation](/screencaps/PKMN_BLUE.gif)
+![Legend of Zelda: Links Awakening - animation](/screencaps/ZELDA.gif)
+![Megaman V](/screencaps/MEGAMANV.png)
+
+![Shantae](/screencaps/SHANTAE.png)
+![Dragon Ball Z](/screencaps/DRAGONBALL_BBZP.png)
+
+Note: Animated GIFs shown here are limited to 50fps, whilst the emulation was
+running at the native ~60fps. This is because popular GIF decoders limit the
+maximum FPS to 50.
+
+### Controls
+
+| Action            | Keyboard   | Joypad |
+|-------------------|------------|--------|
+| A                 | z          | A      |
+| B                 | x          | B      |
+| Start             | Return     | START  |
+| Select            | Backspace  | BACK   |
+| D-Pad             | Arrow Keys | DPAD   |
+| Normal Speed      | 1          |        |
+| Turbo x2 (Hold)   | Space      |        |
+| Turbo X2 (Toggle) | 2          |        |
+| Turbo X3 (Toggle) | 3          |        |
+| Turbo X4 (Toggle) | 4          |        |
+| Reset             | r          |        |
+| Change Palette    | p          |        |
+| Reset Palette     | Shift + p  |        |
+| Fullscreen        | F11 / f    |        |
+| Frameskip (Toggle)| o          |        |
+| Interlace (Toggle)| i          |        |
+| Dump BMP (Toggle) | b          |        |
+
+Frameskip and Interlaced modes are both off by default. The Frameskip toggles
+between 60 FPS and 30 FPS.
+
+Pressing 'b' will dump each frame as a 24-bit bitmap file in the current
+folder. See /screencaps/README.md for more information.
+
 ## Getting Started
 
 ### Required Functions
@@ -92,58 +144,6 @@ Set the time of the real time clock (RTC). Some games use this RTC data.
 #### gb_tick_rtc
 
 Increment the real time clock by one second.
-
-## SDL2 Example
-
-An example implementation is given in peanut_sdl.c, which uses SDL2 to draw the
-screen and take input. Run `cmake` or `make` in the ./examples/sdl2/ folder to
-compile it.
-
-Execute in command line with `peanut-sdl game.gb` which will automatically
-create the save file `game.sav` for the game if one isn't found. Or run with
-`peanut-sdl game.gb save.sav` to specify a save file. Or even `peanut-sdl` to
-create a *drop zone* window that you can drag and drop a ROM file to.
-
-### Screenshot
-
-![Pokemon Blue - Main screen animation](/screencaps/PKMN_BLUE.gif)
-![Legend of Zelda: Links Awakening - animation](/screencaps/ZELDA.gif)
-![Megaman V](/screencaps/MEGAMANV.png)
-
-![Shantae](/screencaps/SHANTAE.png)
-![Dragon Ball Z](/screencaps/DRAGONBALL_BBZP.png)
-
-Note: Animated GIFs shown here are limited to 50fps, whilst the emulation was
-running at the native ~60fps. This is because popular GIF decoders limit the
-maximum FPS to 50.
-
-### Controls
-
-| Action            | Keyboard   | Joypad |
-|-------------------|------------|--------|
-| A                 | z          | A      |
-| B                 | x          | B      |
-| Start             | Return     | START  |
-| Select            | Backspace  | BACK   |
-| D-Pad             | Arrow Keys | DPAD   |
-| Normal Speed      | 1          |        |
-| Turbo x2 (Hold)   | Space      |        |
-| Turbo X2 (Toggle) | 2          |        |
-| Turbo X3 (Toggle) | 3          |        |
-| Turbo X4 (Toggle) | 4          |        |
-| Reset             | r          |        |
-| Change Palette    | p          |        |
-| Reset Palette     | Shift + p  |        |
-| Fullscreen        | F11 / f    |        |
-| Frameskip (Toggle)| o          |        |
-| Interlace (Toggle)| i          |        |
-| Dump BMP (Toggle) | b          |        |
-
-Frameskip and Interlaced modes are both off by default. The Frameskip toggles
-between 60 FPS and 30 FPS.
-
-Pressing 'b' will dump each frame as a 24-bit bitmap file in the current
-folder. See /screencaps/README.md for more information.
 
 ## License
 
