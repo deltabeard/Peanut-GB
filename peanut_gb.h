@@ -1559,7 +1559,8 @@ void __gb_draw_line(struct gb_s *gb)
  */
 void __gb_step_cpu(struct gb_s *gb)
 {
-	uint8_t opcode, inst_cycles;
+	uint8_t opcode;
+	uint_fast16_t inst_cycles;
 	static const uint8_t op_cycles[0x100] =
 	{
 		/* *INDENT-OFF* */
@@ -3645,10 +3646,8 @@ void __gb_step_cpu(struct gb_s *gb)
 				if(gb->gb_reg.STAT & STAT_MODE_0_INTR)
 					gb->gb_reg.IF |= LCDC_INTR;
 
-				/* If halted immediately jump to next LCD
-				 * mode. */
-				inst_cycles = LCD_MODE_2_CYCLES -
-						gb->counter.lcd_count;
+				/* If halted immediately jump to next LCD mode. */
+				inst_cycles = (LCD_MODE_2_CYCLES - gb->counter.lcd_count) + 4;
 			}
 		}
 			/* OAM access */
@@ -3661,7 +3660,7 @@ void __gb_step_cpu(struct gb_s *gb)
 				gb->gb_reg.IF |= LCDC_INTR;
 
 			/* If halted immediately jump to next LCD mode. */
-			inst_cycles = LCD_MODE_3_CYCLES - gb->counter.lcd_count;
+			inst_cycles = (LCD_MODE_3_CYCLES - gb->counter.lcd_count) + 4;
 		}
 			/* Update LCD */
 		else if(gb->lcd_mode == LCD_SEARCH_OAM &&
@@ -3673,7 +3672,7 @@ void __gb_step_cpu(struct gb_s *gb)
 				__gb_draw_line(gb);
 #endif
 			/* If halted immediately jump to next LCD mode. */
-			inst_cycles = LCD_LINE_CYCLES - gb->counter.lcd_count;
+			inst_cycles = (LCD_LINE_CYCLES - gb->counter.lcd_count) + 4;
 		}
 	} while(gb->gb_halt && (gb->gb_reg.IF & gb->gb_reg.IE) == 0);
 	/* If halted, loop until an interrupt occurs. */
