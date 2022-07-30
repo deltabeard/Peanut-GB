@@ -963,7 +963,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 					return;
 				}
 
-				gb->gb_reg.STAT = (gb->gb_reg.STAT & ~0x03) | LCD_VBLANK;
+				gb->gb_reg.STAT = (gb->gb_reg.STAT & ~0x03) | 1;
 				gb->gb_reg.LY = 0;
 				gb->counter.lcd_count = 0;
 			}
@@ -2355,6 +2355,7 @@ void __gb_step_cpu(struct gb_s *gb)
 				halt_cycles = lcd_cycles;
 		}
 
+		SDL_assert_always(halt_cycles >= 4);
 		inst_cycles = (uint_fast16_t)halt_cycles;
 		break;
 	}
@@ -3669,7 +3670,8 @@ void __gb_step_cpu(struct gb_s *gb)
 					gb->gb_reg.IF |= LCDC_INTR;
 
 				/* If halted immediately jump to next LCD mode. */
-				inst_cycles = LCD_MODE_2_CYCLES;
+				if(gb->counter.lcd_count < LCD_MODE_2_CYCLES)
+					inst_cycles = LCD_MODE_2_CYCLES - gb->counter.lcd_count;
 			}
 		}
 			/* OAM access */
@@ -3682,7 +3684,8 @@ void __gb_step_cpu(struct gb_s *gb)
 				gb->gb_reg.IF |= LCDC_INTR;
 
 			/* If halted immediately jump to next LCD mode. */
-			inst_cycles = LCD_MODE_3_CYCLES;
+			if (gb->counter.lcd_count < LCD_MODE_3_CYCLES)
+				inst_cycles = LCD_MODE_3_CYCLES - gb->counter.lcd_count;
 		}
 			/* Update LCD */
 		else if(gb->lcd_mode == LCD_SEARCH_OAM &&
@@ -3694,8 +3697,11 @@ void __gb_step_cpu(struct gb_s *gb)
 				__gb_draw_line(gb);
 #endif
 			/* If halted immediately jump to next LCD mode. */
-			inst_cycles = LCD_LINE_CYCLES;
+			if (gb->counter.lcd_count < LCD_LINE_CYCLES)
+				inst_cycles = LCD_LINE_CYCLES - gb->counter.lcd_count;
 		}
+
+		SDL_assert_always(inst_cycles >= 4);
 	} while(gb->gb_halt && (gb->gb_reg.IF & gb->gb_reg.IE) == 0);
 	/* If halted, loop until an interrupt occurs. */
 }
