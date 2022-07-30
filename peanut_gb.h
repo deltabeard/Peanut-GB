@@ -386,11 +386,12 @@ struct gb_s
 		unsigned gb_bios_enable : 1;
 		unsigned gb_frame	: 1; /* New frame drawn. */
 
-#		define LCD_HBLANK	0x1
-#		define LCD_VBLANK	0x2
-#		define LCD_SEARCH_OAM	0x4
-#		define LCD_TRANSFER	0x8
-		unsigned lcd_mode	: 4;
+#		define LCD_HBLANK	0
+#		define LCD_VBLANK	1
+#		define LCD_SEARCH_OAM	2
+#		define LCD_TRANSFER	3
+#		define LCD_VBLANK_OR_TRANSFER_MASK 1
+		unsigned lcd_mode	: 2;
 		unsigned lcd_blank	: 1;
 	};
 
@@ -682,8 +683,10 @@ uint8_t __gb_read(struct gb_s *gb, const uint_fast16_t addr)
 
 		case 0x41:
 		{
+			return (gb->gb_reg.STAT & STAT_USER_BITS) |
+				(gb->gb_reg.LCDC & LCDC_ENABLE) ? gb->lcd_mode : 0;
+#if 0
 			uint8_t ret;
-
 			ret = gb->gb_reg.STAT & STAT_USER_BITS;
 			if(gb->gb_reg.LCDC & LCDC_ENABLE)
 			{
@@ -698,6 +701,7 @@ uint8_t __gb_read(struct gb_s *gb, const uint_fast16_t addr)
 			}
 
 			return ret;
+#endif
 		}
 
 		case 0x42:
@@ -2319,6 +2323,8 @@ void __gb_step_cpu(struct gb_s *gb)
 		{
 			int serial_cycles = SERIAL_CYCLES -
 				gb->counter.serial_count;
+
+			//SDL_assert_always(serial_cycles >= 4);
 			if(serial_cycles < halt_cycles)
 				halt_cycles = serial_cycles;
 		}
@@ -2327,6 +2333,8 @@ void __gb_step_cpu(struct gb_s *gb)
 		{
 			int tac_cycles = TAC_CYCLES[gb->gb_reg.tac_rate] -
 				gb->counter.tima_count;
+
+			//SDL_assert_always(tac_cycles >= 4);
 			if(tac_cycles < halt_cycles)
 				halt_cycles = tac_cycles;
 		}
@@ -2351,11 +2359,17 @@ void __gb_step_cpu(struct gb_s *gb)
 					LCD_LINE_CYCLES - gb->counter.lcd_count;
 			}
 
+			//SDL_assert_always(lcd_cycles >= 4);
 			if(lcd_cycles < halt_cycles)
 				halt_cycles = lcd_cycles;
 		}
 
-		SDL_assert_always(halt_cycles >= 4);
+		//SDL_assert_always(halt_cycles >= 4);
+		/* Some halt cycles may already be very high, so make sure we
+		 * don't underflow here. */
+		if(halt_cycles <= 0)
+			halt_cycles = 4;
+
 		inst_cycles = (uint_fast16_t)halt_cycles;
 		break;
 	}
@@ -3603,7 +3617,8 @@ void __gb_step_cpu(struct gb_s *gb)
 		gb->counter.lcd_count += inst_cycles;
 
 		/* New Scanline */
-		if(gb->lcd_mode & (LCD_VBLANK | LCD_TRANSFER) && gb->counter.lcd_count >= LCD_LINE_CYCLES)
+		if(gb->lcd_mode & LCD_VBLANK_OR_TRANSFER_MASK &&
+				gb->counter.lcd_count >= LCD_LINE_CYCLES)
 		{
 			gb->counter.lcd_count -= LCD_LINE_CYCLES;
 
