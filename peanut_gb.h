@@ -2305,7 +2305,7 @@ void __gb_step_cpu(struct gb_s *gb)
 
 	case 0x76: /* HALT */
 	{
-		int halt_cycles = 4;
+		int_fast16_t halt_cycles = INT_FAST16_MAX;
 
 		/* TODO: Emulate HALT bug? */
 		gb->gb_halt = 1;
@@ -2319,7 +2319,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		{
 			int serial_cycles = SERIAL_CYCLES -
 				gb->counter.serial_count;
-			if(serial_cycles > halt_cycles)
+			if(serial_cycles < halt_cycles)
 				halt_cycles = serial_cycles;
 		}
 
@@ -2327,7 +2327,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		{
 			int tac_cycles = TAC_CYCLES[gb->gb_reg.tac_rate] -
 				gb->counter.tima_count;
-			if(tac_cycles > halt_cycles)
+			if(tac_cycles < halt_cycles)
 				halt_cycles = tac_cycles;
 		}
 
@@ -2351,11 +2351,11 @@ void __gb_step_cpu(struct gb_s *gb)
 					LCD_LINE_CYCLES - gb->counter.lcd_count;
 			}
 
-			if(lcd_cycles > halt_cycles)
+			if(lcd_cycles < halt_cycles)
 				halt_cycles = lcd_cycles;
 		}
 
-		inst_cycles = (unsigned)halt_cycles;
+		inst_cycles = (uint_fast16_t)halt_cycles;
 		break;
 	}
 
