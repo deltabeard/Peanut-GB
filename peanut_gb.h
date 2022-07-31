@@ -1335,7 +1335,10 @@ void __gb_draw_line(struct gb_s *gb)
 
 		/* fetch first tile */
 		uint8_t t1 = gb->vram[tile] >> px;
-		uint8_t t2 = gb->vram[tile + 1] >> px;
+		uint_fast16_t t2 = gb->vram[tile + 1] >> px;
+		uint8_t c;
+
+		t2 <<= 1;
 
 		for(; disp_x != 0xFF; disp_x--)
 		{
@@ -1354,10 +1357,11 @@ void __gb_draw_line(struct gb_s *gb)
 				tile += 2 * py;
 				t1 = gb->vram[tile];
 				t2 = gb->vram[tile + 1];
+				t2 <<= 1;
 			}
 
 			/* copy background */
-			uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
+			c = (t1 & 0x1) | (t2 & 0x2);
 			pixels[disp_x] = gb->display.bg_palette[c];
 			pixels[disp_x] |= LCD_PALETTE_BG;
 			t1 = t1 >> 1;
@@ -1395,7 +1399,8 @@ void __gb_draw_line(struct gb_s *gb)
 
 		// fetch first tile
 		uint8_t t1 = gb->vram[tile] >> px;
-		uint8_t t2 = gb->vram[tile + 1] >> px;
+		uint_fast16_t t2 = gb->vram[tile + 1] >> px;
+		t2 <<= 1;
 
 		// loop & copy window
 		uint8_t end = (gb->gb_reg.WX < 7 ? 0 : gb->gb_reg.WX - 7) - 1;
@@ -1417,10 +1422,11 @@ void __gb_draw_line(struct gb_s *gb)
 				tile += 2 * py;
 				t1 = gb->vram[tile];
 				t2 = gb->vram[tile + 1];
+				t2 <<= 1;
 			}
 
 			// copy window
-			uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
+			uint8_t c = (t1 & 0x1) | (t2 & 0x2);
 			pixels[disp_x] = gb->display.bg_palette[c];
 			pixels[disp_x] |= LCD_PALETTE_BG;
 			t1 = t1 >> 1;
@@ -1515,7 +1521,8 @@ void __gb_draw_line(struct gb_s *gb)
 
 			// fetch the tile
 			uint8_t t1 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2 * py];
-			uint8_t t2 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2 * py + 1];
+			uint_fast16_t t2 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2 * py + 1];
+			t2 <<= 1;
 
 			// handle x flip
 			uint8_t dir, start, end, shift;
@@ -1541,7 +1548,7 @@ void __gb_draw_line(struct gb_s *gb)
 
 			for(uint8_t disp_x = start; disp_x != end; disp_x += dir)
 			{
-				uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
+				uint8_t c = (t1 & 0x1) | (t2 & 0x2);
 				// check transparency / sprite overlap / background overlap
 #if 0
 
