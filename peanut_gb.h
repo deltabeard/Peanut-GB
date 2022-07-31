@@ -3716,7 +3716,7 @@ void __gb_step_cpu(struct gb_s *gb)
 				inst_cycles = LCD_LINE_CYCLES - gb->counter.lcd_count;
 		}
 
-		SDL_assert_always(inst_cycles >= 4);
+		//SDL_assert_always(inst_cycles >= 4);
 	} while(gb->gb_halt && (gb->gb_reg.IF & gb->gb_reg.IE) == 0);
 	/* If halted, loop until an interrupt occurs. */
 }
