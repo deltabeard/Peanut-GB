@@ -2324,7 +2324,6 @@ void __gb_step_cpu(struct gb_s *gb)
 			int serial_cycles = SERIAL_CYCLES -
 				gb->counter.serial_count;
 
-			//SDL_assert_always(serial_cycles >= 4);
 			if(serial_cycles < halt_cycles)
 				halt_cycles = serial_cycles;
 		}
@@ -2334,7 +2333,6 @@ void __gb_step_cpu(struct gb_s *gb)
 			int tac_cycles = TAC_CYCLES[gb->gb_reg.tac_rate] -
 				gb->counter.tima_count;
 
-			//SDL_assert_always(tac_cycles >= 4);
 			if(tac_cycles < halt_cycles)
 				halt_cycles = tac_cycles;
 		}
@@ -2359,12 +2357,10 @@ void __gb_step_cpu(struct gb_s *gb)
 					LCD_LINE_CYCLES - gb->counter.lcd_count;
 			}
 
-			//SDL_assert_always(lcd_cycles >= 4);
 			if(lcd_cycles < halt_cycles)
 				halt_cycles = lcd_cycles;
 		}
 
-		//SDL_assert_always(halt_cycles >= 4);
 		/* Some halt cycles may already be very high, so make sure we
 		 * don't underflow here. */
 		if(halt_cycles <= 0)
@@ -3715,8 +3711,6 @@ void __gb_step_cpu(struct gb_s *gb)
 			if (gb->counter.lcd_count < LCD_LINE_CYCLES)
 				inst_cycles = LCD_LINE_CYCLES - gb->counter.lcd_count;
 		}
-
-		//SDL_assert_always(inst_cycles >= 4);
 	} while(gb->gb_halt && (gb->gb_reg.IF & gb->gb_reg.IE) == 0);
 	/* If halted, loop until an interrupt occurs. */
 }
