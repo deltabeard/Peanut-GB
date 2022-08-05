@@ -33,6 +33,7 @@
 #define PEANUT_GB_H
 
 #include "version.all"	/* Version information */
+#include <stdio.h>
 #include <stdlib.h>	/* Required for qsort */
 #include <stdint.h>	/* Required for int types */
 #include <string.h>	/* Required for memset */
@@ -1834,9 +1835,56 @@ void __gb_step_cpu(struct gb_s *gb)
 	case 0x20: /* JR NZ, imm */
 		if(!gb->cpu_reg.f_bits.z)
 		{
-			int8_t temp = (int8_t) __gb_read(gb, gb->cpu_reg.pc++);
+			int8_t temp = (int8_t) __gb_read(gb, gb->cpu_reg.pc);
+
+			while(temp >= -4 && temp < 0)
+			{
+				static uint16_t last = 0;
+				static unsigned times = 0;
+				if(gb->cpu_reg.pc == last)
+				{
+					times++;
+					break;
+				}
+
+				if(times != 0)
+					printf(" %u times", times);
+
+				printf("\nPotential idle loop at %04x",
+						gb->cpu_reg.pc);
+				last = gb->cpu_reg.pc;
+				times = 1;
+				break;
+			}
+
+			gb->cpu_reg.pc++;
 			gb->cpu_reg.pc += temp;
 			inst_cycles += 4;
+
+			while(gb->cpu_reg.pc >= HRAM_ADDR && temp == -3)
+			{
+				static int once = 0;
+				uint8_t instr;
+
+				if(once)
+					break;
+
+				instr = __gb_read(gb, gb->cpu_reg.pc);
+				{
+					uint8_t x, y, z;
+					const char dec_lut[8] = "BCDEHL/A";
+					x = instr & 0b11000000;
+					y = instr & 0b00111000;
+					z = instr & 0b00000111;
+
+					if(x != 0 || z != 5)
+						break;
+
+					printf(" DEC %c", dec_lut[y>>3]);
+				}
+				printf(" (OAM DMA routine)");
+				once = 1;
+			}
 		}
 		else
 			gb->cpu_reg.pc++;
