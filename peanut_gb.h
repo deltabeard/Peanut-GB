@@ -1832,7 +1832,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 	}
 
-	case 0x20: /* JP NZ, imm */
+	case 0x20: /* JR NZ, imm */
 		if(!PGB_GET_ZERO())
 		{
 			int8_t temp = (int8_t) __gb_read(gb, gb->cpu_reg.pc++);
@@ -1907,7 +1907,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 	}
 
-	case 0x28: /* JP Z, imm */
+	case 0x28: /* JR Z, imm */
 		if(PGB_GET_ZERO())
 		{
 			int8_t temp = (int8_t) __gb_read(gb, gb->cpu_reg.pc++);
@@ -1961,7 +1961,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		PGB_SET_HALFC(1);
 		break;
 
-	case 0x30: /* JP NC, imm */
+	case 0x30: /* JR NC, imm */
 		if(!PGB_GET_CARRY())
 		{
 			int8_t temp = (int8_t) __gb_read(gb, gb->cpu_reg.pc++);
@@ -2017,7 +2017,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		PGB_SET_CARRY(1);
 		break;
 
-	case 0x38: /* JP C, imm */
+	case 0x38: /* JR C, imm */
 		if(PGB_GET_CARRY())
 		{
 			int8_t temp = (int8_t) __gb_read(gb, gb->cpu_reg.pc++);
