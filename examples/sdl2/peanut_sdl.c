@@ -171,6 +171,10 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
 	case GB_INVALID_READ:
 		return;
 
+	case GB_HALT_FOREVER:
+		fprintf(stdout, "Game Boy halted forever at PC: %#06x\n", val);
+		break;
+
 	default:
 		printf("Unknown error");
 		break;
