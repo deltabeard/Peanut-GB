@@ -69,6 +69,8 @@ folder. See /screencaps/README.md for more information.
 
 ## Getting Started
 
+Documentation of function prototypes can be found at the bottom of [peanut_gb.h](peanut_gb.h#L3960).
+
 ### Required Functions
 
 The front-end implementation must provide a number of functions to the library.
@@ -77,7 +79,6 @@ These functions are set when calling gb_init.
 - gb_rom_read
 - gb_cart_ram_read
 - gb_cart_ram_write
-- gb_serial_transfer
 - gb_error
 
 ### Optional Functions
@@ -112,6 +113,8 @@ gb_init_serial. If these functions are not set, then the emulation will act as
 though no link cable is connected.
 
 ### Useful Functions
+
+These functions are provided by Peanut-GB.
 
 #### gb_reset
 
