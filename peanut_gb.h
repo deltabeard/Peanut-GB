@@ -57,6 +57,12 @@
 	#define PEANUT_GB_HIGH_LCD_ACCURACY 1
 #endif
 
+/* Play BIOS before playing cartridge.
+ * This setting is currently not implemented. */
+#ifdef PEANUT_GB_USE_BIOS
+	#define PEANUT_GB_USE_BIOS 0
+#endif
+
 /* Interrupt masks */
 #define VBLANK_INTR	0x01
 #define LCDC_INTR	0x02
@@ -383,7 +389,9 @@ struct gb_s
 	{
 		unsigned gb_halt	: 1;
 		unsigned gb_ime		: 1;
+#if PEANUT_GB_USE_BIOS
 		unsigned gb_bios_enable : 1;
+#endif
 		unsigned gb_frame	: 1; /* New frame drawn. */
 
 #		define LCD_HBLANK	0
@@ -1041,7 +1049,9 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 
 		/* Turn off boot ROM */
 		case 0x50:
+#if PEANUT_GB_USE_BIOS
 			gb->gb_bios_enable = 0;
+#endif
 			return;
 
 		/* Interrupt Enable Register */
@@ -3777,7 +3787,9 @@ void gb_reset(struct gb_s *gb)
 {
 	gb->gb_halt = 0;
 	gb->gb_ime = 1;
+#if PEANUT_GB_USE_BIOS
 	gb->gb_bios_enable = 0;
+#endif
 	gb->lcd_mode = LCD_HBLANK;
 
 	/* Initialise MBC values. */
