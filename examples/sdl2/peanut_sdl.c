@@ -20,6 +20,7 @@
 #	include "minigb_apu/minigb_apu.h"
 #endif
 
+#define PEANUT_GB_USE_BIOS 1
 #include "../../peanut_gb.h"
 
 struct priv_t
