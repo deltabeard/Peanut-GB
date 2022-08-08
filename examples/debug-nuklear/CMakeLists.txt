@@ -1,8 +1,10 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.12...3.24 FATAL_ERROR)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.16...3.24 FATAL_ERROR)
 
 PROJECT(peanutgb-debugger)
 ADD_EXECUTABLE(peanutgb-debugger src/main.c)
 TARGET_INCLUDE_DIRECTORIES(peanutgb-debugger PRIVATE inc)
+
+set_property(TARGET peanutgb-debugger PROPERTY VS_DPI_AWARE "PerMonitor")
 
 #sdl2
 INCLUDE(CPM.cmake)

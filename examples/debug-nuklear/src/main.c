@@ -73,6 +73,29 @@
   #include "../../demo/common/node_editor.c"
 #endif
 
+#ifdef _WIN32
+# define WIN32_LEAN_AND_MEAN
+# include <Windows.h>
+
+# if (_WIN32_WINNT >= 0x0603)
+#  include <shellscalingapi.h>
+# endif
+
+void set_dpi_awareness(void)
+{
+# if (_WIN32_WINNT >= 0x0605)
+	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+# elif (_WIN32_WINNT >= 0x0603)
+	SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
+# elif (_WIN32_WINNT >= 0x0600)
+	SetProcessDPIAware();
+# elif defined(__MINGW64__)
+	SetProcessDPIAware();
+# endif
+	return;
+}
+#endif
+
 /* ===============================================================
  *
  *                          DEMO
@@ -85,12 +108,13 @@ main(int argc, char *argv[])
     SDL_Window *win;
     SDL_Renderer *renderer;
     int running = 1;
-    int flags = 0;
     float font_scale = 1;
 
     /* GUI */
     struct nk_context *ctx;
     struct nk_colorf bg;
+
+    set_dpi_awareness();
 
     /* SDL setup */
     SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "0");
@@ -105,9 +129,6 @@ main(int argc, char *argv[])
         exit(-1);
     }
 
-    flags |= SDL_RENDERER_ACCELERATED;
-    flags |= SDL_RENDERER_PRESENTVSYNC;
-
 #if 0
     SDL_SetHint(SDL_HINT_RENDER_BATCHING, "1");
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
@@ -116,8 +137,8 @@ main(int argc, char *argv[])
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2");
 #endif
 
-    renderer = SDL_CreateRenderer(win, -1, flags);
-
+    renderer = SDL_CreateRenderer(win, -1,
+		    SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (renderer == NULL) {
         SDL_Log("Error SDL_CreateRenderer %s", SDL_GetError());
         exit(-1);
@@ -222,7 +243,7 @@ main(int argc, char *argv[])
           calculator(ctx);
         #endif
         #ifdef INCLUDE_CANVAS
-        canvas(ctx);
+	  canvas(ctx);
         #endif
         #ifdef INCLUDE_OVERVIEW
           overview(ctx);
