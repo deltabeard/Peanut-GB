@@ -40,8 +40,6 @@ NK_API void                 nk_sdl_shutdown(void);
  */
 #ifdef NK_SDL_RENDERER_IMPLEMENTATION
 
-#include <strings.h>
-
 struct nk_sdl_device {
     struct nk_buffer cmds;
     struct nk_draw_null_texture null;
@@ -205,12 +203,12 @@ nk_sdl_clipboard_copy(nk_handle usr, const char *text, int len)
     char *str = 0;
     (void)usr;
     if (!len) return;
-    str = (char*)malloc((size_t)len+1);
+    str = SDL_malloc((size_t)len+1);
     if (!str) return;
-    memcpy(str, text, (size_t)len);
+    NK_MEMCPY(str, text, (size_t)len);
     str[len] = '\0';
     SDL_SetClipboardText(str);
-    free(str);
+    SDL_free(str);
 }
 
 NK_API struct nk_context*
@@ -352,7 +350,7 @@ nk_sdl_handle_event(SDL_Event *evt)
         case SDL_TEXTINPUT:
             {
                 nk_glyph glyph;
-                memcpy(glyph, evt->text.text, NK_UTF_SIZE);
+                NK_MEMCPY(glyph, evt->text.text, NK_UTF_SIZE);
                 nk_input_glyph(ctx, glyph);
             }
             return 1;
@@ -373,7 +371,7 @@ void nk_sdl_shutdown(void)
     SDL_DestroyTexture(dev->font_tex);
     /* glDeleteTextures(1, &dev->font_tex); */
     nk_buffer_free(&dev->cmds);
-    memset(&sdl, 0, sizeof(sdl));
+    NK_MEMSET(&sdl, 0, sizeof(sdl));
 }
 
 #endif /* NK_SDL_RENDERER_IMPLEMENTATION */
