@@ -1,4 +1,8 @@
+#include <SDL.h>
+#include <stdio.h>
+#include <math.h>
 #include <time.h>
+#include "nuklear_proj.h"
 
 static int
 overview(struct nk_context *ctx)
@@ -173,10 +177,10 @@ overview(struct nk_context *ctx)
                 /* Buttons Widgets */
                 nk_layout_row_static(ctx, 30, 100, 3);
                 if (nk_button_label(ctx, "Button"))
-                    fprintf(stdout, "Button pressed!\n");
+                    SDL_Log("Button pressed!");
                 nk_button_set_behavior(ctx, NK_BUTTON_REPEATER);
                 if (nk_button_label(ctx, "Repeater"))
-                    fprintf(stdout, "Repeater is being pressed!\n");
+                    SDL_Log("Repeater is being pressed!");
                 nk_button_set_behavior(ctx, NK_BUTTON_DEFAULT);
                 nk_button_color(ctx, nk_rgb(0,0,255));
 
@@ -274,7 +278,7 @@ overview(struct nk_context *ctx)
                     nk_button_label(ctx, "button");
                     ctx->style.button = button;
                 } else if (nk_button_label(ctx, "button"))
-                    fprintf(stdout, "button pressed\n");
+                    SDL_Log("button pressed");
                 nk_tree_pop(ctx);
             }
 

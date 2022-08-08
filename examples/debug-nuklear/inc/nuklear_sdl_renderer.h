@@ -12,6 +12,7 @@
 #define NK_SDL_RENDERER_H_
 
 #include <SDL.h>
+#include "nuklear_proj.h"
 NK_API struct nk_context*   nk_sdl_init(SDL_Window *win, SDL_Renderer *renderer);
 NK_API void                 nk_sdl_font_stash_begin(struct nk_font_atlas **atlas);
 NK_API void                 nk_sdl_font_stash_end(void);
@@ -221,7 +222,7 @@ nk_sdl_init(SDL_Window *win, SDL_Renderer *renderer)
     /* warn for cases where NK_SDL_CLAMP_CLIP_RECT should have been set but isn't */
     SDL_GetRendererInfo(renderer, &info);
     SDL_GetVersion(&runtimeVer);
-    if (strncmp("metal", info.name, 5) == 0 &&
+    if (SDL_strncmp("metal", info.name, 5) == 0 &&
         SDL_VERSIONNUM(runtimeVer.major, runtimeVer.minor, runtimeVer.patch) < SDL_VERSIONNUM(2, 0, 22))
     {
         SDL_LogWarn(
