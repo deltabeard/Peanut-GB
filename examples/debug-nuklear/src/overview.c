@@ -1,3 +1,5 @@
+#include <time.h>
+
 static int
 overview(struct nk_context *ctx)
 {
@@ -460,9 +462,9 @@ overview(struct nk_context *ctx)
                         time_t cur_time = time(0);
                         struct tm *n = localtime(&cur_time);
                         if (!time_selected)
-                            memcpy(&sel_time, n, sizeof(struct tm));
+                            NK_MEMCPY(&sel_time, n, sizeof(struct tm));
                         if (!date_selected)
-                            memcpy(&sel_date, n, sizeof(struct tm));
+                            NK_MEMCPY(&sel_date, n, sizeof(struct tm));
                     }
 
                     /* time combobox */
@@ -578,7 +580,7 @@ overview(struct nk_context *ctx)
                     for (i = 0; i < text_len[8]; ++i) buffer[i] = '*';
                     nk_edit_string(ctx, NK_EDIT_FIELD, buffer, &text_len[8], 64, nk_filter_default);
                     if (old_len < text_len[8])
-                        memcpy(&text[8][old_len], &buffer[old_len], (nk_size)(text_len[8] - old_len));
+                        NK_MEMCPY(&text[8][old_len], &buffer[old_len], (nk_size)(text_len[8] - old_len));
                 }
 
                 nk_label(ctx, "Field:", NK_TEXT_LEFT);
@@ -595,7 +597,7 @@ overview(struct nk_context *ctx)
                 {
                     text[7][text_len[7]] = '\n';
                     text_len[7]++;
-                    memcpy(&box_buffer[box_len], &text[7], (nk_size)text_len[7]);
+                    NK_MEMCPY(&box_buffer[box_len], &text[7], (nk_size)text_len[7]);
                     box_len += text_len[7];
                     text_len[7] = 0;
                 }

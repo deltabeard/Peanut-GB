@@ -1,14 +1,4 @@
 /* nuklear - 1.32.0 - public domain */
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <stdarg.h>
-#include <string.h>
-#include <math.h>
-#include <assert.h>
-#include <limits.h>
-#include <time.h>
-
 #include <SDL.h>
 
 #define NK_PRIVATE
@@ -215,7 +205,7 @@ main(int argc, char *argv[])
 
             nk_layout_row_static(ctx, 30, 80, 1);
             if (nk_button_label(ctx, "button"))
-                fprintf(stdout, "button pressed\n");
+                SDL_Log("button pressed");
             nk_layout_row_dynamic(ctx, 30, 2);
             if (nk_option_label(ctx, "easy", op == EASY)) op = EASY;
             if (nk_option_label(ctx, "hard", op == HARD)) op = HARD;
