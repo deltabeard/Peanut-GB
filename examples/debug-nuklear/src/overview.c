@@ -4,7 +4,7 @@
 #include <time.h>
 #include "nuklear_proj.h"
 
-static int
+int
 overview(struct nk_context *ctx)
 {
     /* window flags */

@@ -1,6 +1,9 @@
 /* nuklear - 1.32.0 - public domain */
 
+#include <stdio.h>
 #include <SDL.h>
+#define ENABLE_LCD 1
+#include "../../../peanut_gb.h"
 #include "nuklear_proj.h"
 #define NK_SDL_RENDERER_IMPLEMENTATION
 #include "nuklear_sdl_renderer.h"
@@ -40,7 +43,7 @@
   #include "../../demo/common/canvas.c"
 #endif
 #ifdef INCLUDE_OVERVIEW
-  #include "overview.c"
+int overview(struct nk_context *ctx);
 #endif
 #ifdef INCLUDE_NODE_EDITOR
   #include "../../demo/common/node_editor.c"
@@ -54,7 +57,141 @@
 #  include <shellscalingapi.h>
 # endif
 
-void set_dpi_awareness(void)
+static SDL_Renderer *renderer;
+typedef struct {
+	SDL_Texture *gb_lcd_tex;
+	void *pixels;
+	int pitch;
+} gb_priv_s;
+static uint8_t *rom;
+static uint8_t *ram;
+
+static uint8_t gb_rom_read(struct gb_s *ctx, const uint_fast32_t addr)
+{
+	return rom[addr];
+}
+
+static uint8_t gb_cart_ram_read(struct gb_s *ctx, const uint_fast32_t addr)
+{
+	return ram[addr];
+}
+
+static void gb_cart_ram_write(struct gb_s *ctx, const uint_fast32_t addr,
+		const uint8_t val)
+{
+	ram[addr] = val;
+}
+
+static void gb_error(struct gb_s *ctx, const enum gb_error_e err,
+		const uint16_t val)
+{
+	const char *err_str[] = {
+		"Unknown", "Invalid opcode", "Invalid read", "Invalid write",
+		"Halted forever"
+	};
+	SDL_Log("Error: %s", err_str[err]);
+	SDL_assert_release(0);
+}
+
+static void lcd_draw_line(struct gb_s *gb, const uint8_t *pixels,
+		const uint_fast8_t line)
+{
+	const uint32_t colour_lut[4] = {
+		0xFFFFFFFF, 0x7F7F7FFF, 0x2F2F2FFF, 0
+	};
+	gb_priv_s *priv = gb->direct.priv;
+	uint8_t *tex = priv->pixels;
+
+	for(unsigned int x = 0; x < LCD_WIDTH; x++)
+	{
+		tex[line + x] = colour_lut[pixels[x] & 3];
+	}
+
+	return;
+}
+
+static void render_peanut_gb(struct nk_context *ctx)
+{
+	static int start = 1;
+	static struct gb_s gb;
+	static char title_str[16] = "No Game";
+	static gb_priv_s gb_priv;
+
+	if(start)
+	{
+		size_t ram_sz;
+
+		start = 0;
+		gb_init(&gb, gb_rom_read, gb_cart_ram_read, gb_cart_ram_write,
+				gb_error, &gb_priv);
+
+		gb_init_lcd(&gb, lcd_draw_line);
+		gb_priv.gb_lcd_tex = SDL_CreateTexture(renderer,
+				SDL_PIXELFORMAT_RGBA32,
+				SDL_TEXTUREACCESS_STREAMING,
+				LCD_WIDTH, LCD_HEIGHT);
+		SDL_assert_release(gb_priv.gb_lcd_tex != NULL);
+
+		gb_get_rom_name(&gb, title_str);
+		ram_sz = gb_get_save_size(&gb);
+		if(ram_sz != 0)
+		{
+			ram = SDL_malloc(ram_sz);
+		}
+	}
+
+	SDL_assert_always(SDL_LockTexture(gb_priv.gb_lcd_tex,
+		NULL, &gb_priv.pixels, &gb_priv.pitch) == 0);
+	gb_run_frame(&gb);
+	SDL_UnlockTexture(gb_priv.gb_lcd_tex);
+
+	/* GUI */
+	if (nk_begin(ctx, title_str,
+				nk_rect(50, 50, 50 + LCD_WIDTH, 50 + LCD_HEIGHT),
+				NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|NK_WINDOW_TITLE))
+	{
+		struct nk_rect emu_lcd;
+		SDL_FRect targ_rect;
+
+		emu_lcd = nk_window_get_content_region(ctx);
+		targ_rect.h = emu_lcd.h;
+		targ_rect.w = emu_lcd.w;
+		targ_rect.x = emu_lcd.x;
+		targ_rect.y = emu_lcd.y;
+		SDL_RenderCopyF(renderer, gb_priv.gb_lcd_tex, NULL, &targ_rect);
+	}
+	nk_end(ctx);
+}
+
+/**
+ * Returns a pointer to the allocated space containing the ROM. Must be freed.
+ */
+static uint8_t *read_rom_to_ram(const char *file_name)
+{
+	FILE *rom_file = fopen(file_name, "rb");
+	size_t rom_size;
+	uint8_t *rom = NULL;
+
+	if(rom_file == NULL)
+		return NULL;
+
+	fseek(rom_file, 0, SEEK_END);
+	rom_size = ftell(rom_file);
+	rewind(rom_file);
+	rom = malloc(rom_size);
+
+	if(fread(rom, sizeof(uint8_t), rom_size, rom_file) != rom_size)
+	{
+		free(rom);
+		fclose(rom_file);
+		return NULL;
+	}
+
+	fclose(rom_file);
+	return rom;
+}
+
+static inline void set_dpi_awareness(void)
 {
 # if (_WIN32_WINNT >= 0x0605)
 	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
@@ -79,7 +216,6 @@ main(int argc, char *argv[])
 {
     /* Platform */
     SDL_Window *win;
-    SDL_Renderer *renderer;
     int running = 1;
     float font_scale = 1;
 
@@ -89,13 +225,30 @@ main(int argc, char *argv[])
 
     set_dpi_awareness();
 
+    /* Make sure a file name is given. */
+    if(argc != 2)
+    {
+	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+		    "Usage: %s FILE [SAVE]\n", argv[0]);
+	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+		    "SAVE is set by default if not provided.");
+	    return EXIT_FAILURE;
+    }
+
+    /* Copy input ROM file to allocated memory. */
+    if((rom = read_rom_to_ram(argv[1])) == NULL)
+    {
+	    SDL_Log("%d: %s\n", __LINE__, strerror(errno));
+	    return EXIT_FAILURE;
+    }
+
     /* SDL setup */
     SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "0");
     SDL_Init(SDL_INIT_VIDEO);
 
-    win = SDL_CreateWindow("Demo",
-        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN|SDL_WINDOW_ALLOW_HIGHDPI);
+    win = SDL_CreateWindow("Demo", SDL_WINDOWPOS_CENTERED,
+	    SDL_WINDOWPOS_CENTERED,WINDOW_WIDTH, WINDOW_HEIGHT,
+	    SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI);
 
     if (win == NULL) {
         SDL_Log("Error SDL_CreateWindow %s", SDL_GetError());
@@ -226,6 +379,7 @@ main(int argc, char *argv[])
         #endif
         /* ----------------------------------------- */
 
+	render_peanut_gb(ctx);
         SDL_SetRenderDrawColor(renderer, bg.r * 255, bg.g * 255, bg.b * 255, bg.a * 255);
         SDL_RenderClear(renderer);
 
