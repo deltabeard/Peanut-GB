@@ -60,7 +60,7 @@
 
 /* Play BIOS before playing cartridge.
  * This setting is currently not implemented. */
-#ifdef PEANUT_GB_USE_BIOS
+#ifndef PEANUT_GB_USE_BIOS
 	#define PEANUT_GB_USE_BIOS 0
 #endif
 
