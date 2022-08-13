@@ -54,23 +54,38 @@ typedef struct {
 	SDL_Texture *gb_lcd_tex;
 	void *pixels;
 	int pitch;
+	uint8_t *rom;
+	uint8_t *ram;
 } gb_priv_s;
-static uint8_t *rom;
-static uint8_t *ram;
 
 static uint8_t gb_rom_read(struct gb_s *ctx, const uint_fast32_t addr)
 {
+	gb_priv_s *gb_priv;
+	uint8_t *rom;
+
+	gb_priv = ctx->direct.priv;
+	rom = gb_priv->rom;
 	return rom[addr];
 }
 
 static uint8_t gb_cart_ram_read(struct gb_s *ctx, const uint_fast32_t addr)
 {
+	gb_priv_s *gb_priv;
+	uint8_t *ram;
+
+	gb_priv = ctx->direct.priv;
+	ram = gb_priv->ram;
 	return ram[addr];
 }
 
 static void gb_cart_ram_write(struct gb_s *ctx, const uint_fast32_t addr,
 		const uint8_t val)
 {
+	gb_priv_s *gb_priv;
+	uint8_t *ram;
+
+	gb_priv = ctx->direct.priv;
+	ram = gb_priv->ram;
 	ram[addr] = val;
 }
 
@@ -102,43 +117,18 @@ static void lcd_draw_line(struct gb_s *gb, const uint8_t *pixels,
 	return;
 }
 
-static void render_peanut_gb(struct nk_context *ctx)
+static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 {
-	static int start = 1;
-	static struct gb_s gb;
-	static char title_str[16] = "No Game";
-	static gb_priv_s gb_priv;
+	static const char *win_str = "LCD";
+	gb_priv_s *gb_priv = gb->direct.priv;
 
-	if(start)
-	{
-		size_t ram_sz;
-
-		start = 0;
-		gb_init(&gb, gb_rom_read, gb_cart_ram_read, gb_cart_ram_write,
-				gb_error, &gb_priv);
-
-		gb_init_lcd(&gb, lcd_draw_line);
-		gb_priv.gb_lcd_tex = SDL_CreateTexture(renderer,
-				SDL_PIXELFORMAT_RGBA32,
-				SDL_TEXTUREACCESS_STREAMING,
-				LCD_WIDTH, LCD_HEIGHT);
-		SDL_assert_release(gb_priv.gb_lcd_tex != NULL);
-
-		gb_get_rom_name(&gb, title_str);
-		ram_sz = gb_get_save_size(&gb);
-		if(ram_sz != 0)
-		{
-			ram = SDL_malloc(ram_sz);
-		}
-	}
-
-	SDL_assert_always(SDL_LockTexture(gb_priv.gb_lcd_tex,
-		NULL, &gb_priv.pixels, &gb_priv.pitch) == 0);
-	gb_run_frame(&gb);
-	SDL_UnlockTexture(gb_priv.gb_lcd_tex);
+	SDL_assert_always(SDL_LockTexture(gb_priv->gb_lcd_tex,
+		NULL, &gb_priv->pixels, &gb_priv->pitch) == 0);
+	gb_run_frame(gb);
+	SDL_UnlockTexture(gb_priv->gb_lcd_tex);
 
 	/* GUI */
-	if (nk_begin(ctx, title_str,
+	if (nk_begin(ctx, win_str,
 				nk_rect(50, 50, 50 + LCD_WIDTH, 50 + LCD_HEIGHT),
 				NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|NK_WINDOW_TITLE))
 	{
@@ -151,7 +141,7 @@ static void render_peanut_gb(struct nk_context *ctx)
 		canvas = nk_window_get_canvas(ctx);
 		total_space = nk_window_get_content_region(ctx);
 		grid_color = nk_rgba(255, 255, 255, 255);
-		nk_gb_lcd = nk_image_ptr(gb_priv.gb_lcd_tex);
+		nk_gb_lcd = nk_image_ptr(gb_priv->gb_lcd_tex);
 		nk_draw_image(canvas, total_space, &nk_gb_lcd, grid_color);
 	}
 	nk_end(ctx);
@@ -226,7 +216,9 @@ main(int argc, char *argv[])
     struct nk_context *ctx;
     struct nk_colorf bg;
 
-    set_dpi_awareness();
+    /* GB */
+    struct gb_s gb;
+    gb_priv_s gb_priv;
 
     /* Make sure a file name is given. */
     if(argc != 2)
@@ -236,21 +228,36 @@ main(int argc, char *argv[])
 	    return EXIT_FAILURE;
     }
 
+    /* Peanut-GB setup. */
     /* Copy input ROM file to allocated memory. */
-    if((rom = read_rom_to_ram(argv[1])) == NULL)
+    if((gb_priv.rom = read_rom_to_ram(argv[1])) == NULL)
     {
 	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
 			    "%d: %s\n", __LINE__, SDL_GetError());
 	    return EXIT_FAILURE;
     }
+    {
+	    size_t ram_sz;
+
+	    gb_init(&gb, gb_rom_read, gb_cart_ram_read, gb_cart_ram_write,
+			    gb_error, &gb_priv);
+
+	    gb_init_lcd(&gb, lcd_draw_line);
+	    ram_sz = gb_get_save_size(&gb);
+	    if(ram_sz != 0)
+		    gb_priv.ram = SDL_malloc(ram_sz);
+	    else
+		    gb_priv.ram = NULL;
+    }
 
     /* SDL setup */
+    set_dpi_awareness();
     SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "0");
     if(SDL_Init(SDL_INIT_EVERYTHING) < 0)
     {
 	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
 			    "Error SDL_init: %s", SDL_GetError());
-	    SDL_free(rom);
+	    SDL_free(gb_priv.rom);
 	    goto out;
     }
 
@@ -260,9 +267,15 @@ main(int argc, char *argv[])
     if (win == NULL) {
 	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
 			    "Error SDL_CreateWindow: %s", SDL_GetError());
-	    SDL_free(rom);
+	    SDL_free(gb_priv.rom);
 	    SDL_Quit();
 	    goto out;
+    }
+    {
+	    char title_str[64] = "Peanut-GB Debugger: ";
+
+	    gb_get_rom_name(&gb, &title_str[0] + strlen(title_str));
+	    SDL_SetWindowTitle(win, title_str);
     }
 
     renderer = SDL_CreateRenderer(win, -1,
@@ -270,10 +283,18 @@ main(int argc, char *argv[])
     if (renderer == NULL) {
 	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
 			    "Error SDL_CreateRenderer: %s", SDL_GetError());
-	    SDL_free(rom);
+	    SDL_free(gb_priv.rom);
 	    SDL_DestroyWindow(win);
 	    SDL_Quit();
 	    goto out;
+    }
+
+    {
+	    gb_priv.gb_lcd_tex = SDL_CreateTexture(renderer,
+			    SDL_PIXELFORMAT_RGBA32,
+			    SDL_TEXTUREACCESS_STREAMING,
+			    LCD_WIDTH, LCD_HEIGHT);
+	    SDL_assert_release(gb_priv.gb_lcd_tex != NULL);
     }
 
     /* scale the renderer output for High-DPI displays */
@@ -385,7 +406,7 @@ main(int argc, char *argv[])
         #endif
         /* ----------------------------------------- */
 
-	render_peanut_gb(ctx);
+	render_peanut_gb(ctx, &gb);
         SDL_SetRenderDrawColor(renderer, bg.r * 255, bg.g * 255, bg.b * 255, bg.a * 255);
         SDL_RenderClear(renderer);
 
@@ -395,6 +416,8 @@ main(int argc, char *argv[])
     }
 
 cleanup:
+    SDL_free(gb_priv.rom);
+    SDL_free(gb_priv.ram);
     nk_sdl_shutdown();
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(win);
