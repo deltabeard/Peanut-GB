@@ -49,14 +49,6 @@ int overview(struct nk_context *ctx);
   #include "../../demo/common/node_editor.c"
 #endif
 
-#ifdef _WIN32
-# define WIN32_LEAN_AND_MEAN
-# include <Windows.h>
-
-# if (_WIN32_WINNT >= 0x0603)
-#  include <shellscalingapi.h>
-# endif
-
 static SDL_Renderer *renderer;
 typedef struct {
 	SDL_Texture *gb_lcd_tex;
@@ -97,14 +89,14 @@ static void lcd_draw_line(struct gb_s *gb, const uint8_t *pixels,
 		const uint_fast8_t line)
 {
 	const uint32_t colour_lut[4] = {
-		0xFFFFFFFF, 0x7F7F7FFF, 0x2F2F2FFF, 0
+		0xFFFFFFFF, 0x7F7F7FFF, 0x2F2F2FFF, 0x00000000
 	};
 	gb_priv_s *priv = gb->direct.priv;
-	uint8_t *tex = priv->pixels;
+	uint32_t *tex = priv->pixels;
 
 	for(unsigned int x = 0; x < LCD_WIDTH; x++)
 	{
-		tex[line + x] = colour_lut[pixels[x] & 3];
+		tex[(line * LCD_WIDTH) + x] = colour_lut[pixels[x] & 3];
 	}
 
 	return;
@@ -151,14 +143,20 @@ static void render_peanut_gb(struct nk_context *ctx)
 				NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|NK_WINDOW_TITLE))
 	{
 		struct nk_rect emu_lcd;
+		struct nk_image nk_gb_lcd;
 		SDL_FRect targ_rect;
+		struct nk_command_buffer *canvas = nk_window_get_canvas(ctx);
+		struct nk_rect total_space = nk_window_get_content_region(ctx);
+		const struct nk_color grid_color = nk_rgba(255, 255, 255, 255);
 
-		emu_lcd = nk_window_get_content_region(ctx);
-		targ_rect.h = emu_lcd.h;
-		targ_rect.w = emu_lcd.w;
-		targ_rect.x = emu_lcd.x;
-		targ_rect.y = emu_lcd.y;
-		SDL_RenderCopyF(renderer, gb_priv.gb_lcd_tex, NULL, &targ_rect);
+		//emu_lcd = nk_window_get_content_region(ctx);
+		//targ_rect.h = emu_lcd.h;
+		//targ_rect.w = emu_lcd.w;
+		//targ_rect.x = emu_lcd.x;
+		//targ_rect.y = emu_lcd.y;
+		//SDL_RenderCopyF(renderer, gb_priv.gb_lcd_tex, NULL, &targ_rect);
+		nk_gb_lcd = nk_image_ptr(gb_priv.gb_lcd_tex);
+		nk_draw_image(canvas, total_space, &nk_gb_lcd, grid_color);
 	}
 	nk_end(ctx);
 }
@@ -191,6 +189,15 @@ static uint8_t *read_rom_to_ram(const char *file_name)
 	return rom;
 }
 
+#ifdef _WIN32
+# define WIN32_LEAN_AND_MEAN
+# include <Windows.h>
+
+# if (_WIN32_WINNT >= 0x0603)
+#  include <shellscalingapi.h>
+# endif
+#endif
+
 static inline void set_dpi_awareness(void)
 {
 # if (_WIN32_WINNT >= 0x0605)
@@ -204,7 +211,6 @@ static inline void set_dpi_awareness(void)
 # endif
 	return;
 }
-#endif
 
 /* ===============================================================
  *
@@ -229,16 +235,15 @@ main(int argc, char *argv[])
     if(argc != 2)
     {
 	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-		    "Usage: %s FILE [SAVE]\n", argv[0]);
-	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-		    "SAVE is set by default if not provided.");
+		    "Usage: %s FILE\n", argv[0]);
 	    return EXIT_FAILURE;
     }
 
     /* Copy input ROM file to allocated memory. */
     if((rom = read_rom_to_ram(argv[1])) == NULL)
     {
-	    SDL_Log("%d: %s\n", __LINE__, strerror(errno));
+	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+			    "%d: %s\n", __LINE__, SDL_GetError());
 	    return EXIT_FAILURE;
     }
 

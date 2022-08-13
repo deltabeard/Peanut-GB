@@ -1,3 +1,4 @@
+#include <SDL.h>
 #define NK_ASSERT	SDL_assert
 #define NK_MEMSET	SDL_memset
 #define NK_MEMCPY	SDL_memcpy
