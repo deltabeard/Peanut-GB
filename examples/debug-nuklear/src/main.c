@@ -142,19 +142,15 @@ static void render_peanut_gb(struct nk_context *ctx)
 				nk_rect(50, 50, 50 + LCD_WIDTH, 50 + LCD_HEIGHT),
 				NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|NK_WINDOW_TITLE))
 	{
-		struct nk_rect emu_lcd;
 		struct nk_image nk_gb_lcd;
-		SDL_FRect targ_rect;
-		struct nk_command_buffer *canvas = nk_window_get_canvas(ctx);
-		struct nk_rect total_space = nk_window_get_content_region(ctx);
-		const struct nk_color grid_color = nk_rgba(255, 255, 255, 255);
+		struct nk_command_buffer *canvas;
+		struct nk_rect total_space;
+		struct nk_color grid_color;
 
-		//emu_lcd = nk_window_get_content_region(ctx);
-		//targ_rect.h = emu_lcd.h;
-		//targ_rect.w = emu_lcd.w;
-		//targ_rect.x = emu_lcd.x;
-		//targ_rect.y = emu_lcd.y;
-		//SDL_RenderCopyF(renderer, gb_priv.gb_lcd_tex, NULL, &targ_rect);
+		/* Draw Game Boy LCD to screen. */
+		canvas = nk_window_get_canvas(ctx);
+		total_space = nk_window_get_content_region(ctx);
+		grid_color = nk_rgba(255, 255, 255, 255);
 		nk_gb_lcd = nk_image_ptr(gb_priv.gb_lcd_tex);
 		nk_draw_image(canvas, total_space, &nk_gb_lcd, grid_color);
 	}
