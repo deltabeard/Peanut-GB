@@ -216,6 +216,7 @@ static inline void set_dpi_awareness(void)
 int
 main(int argc, char *argv[])
 {
+    int ret = EXIT_FAILURE;
     /* Platform */
     SDL_Window *win;
     int running = 1;
@@ -245,30 +246,34 @@ main(int argc, char *argv[])
 
     /* SDL setup */
     SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "0");
-    SDL_Init(SDL_INIT_VIDEO);
-
-    win = SDL_CreateWindow("Demo", SDL_WINDOWPOS_CENTERED,
-	    SDL_WINDOWPOS_CENTERED,WINDOW_WIDTH, WINDOW_HEIGHT,
-	    SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI);
-
-    if (win == NULL) {
-        SDL_Log("Error SDL_CreateWindow %s", SDL_GetError());
-        exit(-1);
+    if(SDL_Init(SDL_INIT_EVERYTHING) < 0)
+    {
+	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+			    "Error SDL_init: %s", SDL_GetError());
+	    SDL_free(rom);
+	    goto out;
     }
 
-#if 0
-    SDL_SetHint(SDL_HINT_RENDER_BATCHING, "1");
-    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
-    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
-    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
-    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2");
-#endif
+    win = SDL_CreateWindow("Debugger", SDL_WINDOWPOS_CENTERED,
+		    SDL_WINDOWPOS_CENTERED,WINDOW_WIDTH, WINDOW_HEIGHT,
+		    SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI);
+    if (win == NULL) {
+	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+			    "Error SDL_CreateWindow: %s", SDL_GetError());
+	    SDL_free(rom);
+	    SDL_Quit();
+	    goto out;
+    }
 
     renderer = SDL_CreateRenderer(win, -1,
 		    SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (renderer == NULL) {
-        SDL_Log("Error SDL_CreateRenderer %s", SDL_GetError());
-        exit(-1);
+	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+			    "Error SDL_CreateRenderer: %s", SDL_GetError());
+	    SDL_free(rom);
+	    SDL_DestroyWindow(win);
+	    SDL_Quit();
+	    goto out;
     }
 
     /* scale the renderer output for High-DPI displays */
@@ -394,5 +399,8 @@ cleanup:
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(win);
     SDL_Quit();
-    return 0;
+    ret = EXIT_SUCCESS;
+
+out:
+    return ret;
 }
