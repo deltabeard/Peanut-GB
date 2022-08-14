@@ -193,8 +193,15 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 
 			/* If the scale is less than 1, then stretch to fill
 			 * canvas. */
-			if(scale_w == 0 && scale_h == 0)
+			if(scale_w == 0 || scale_h == 0)
+			{
+				if(total_space.w < total_space.h)
+					total_space.h = total_space.w;
+				else if(total_space.h < total_space.w)
+					total_space.w = total_space.h;
+
 				break;
+			}
 
 			scale_w = scale_w > scale_h ? scale_h : scale_w;
 			scale_h = scale_h > scale_w ? scale_w : scale_h;
