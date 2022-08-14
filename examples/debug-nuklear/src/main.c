@@ -117,18 +117,61 @@ static void lcd_draw_line(struct gb_s *gb, const uint8_t *pixels,
 	return;
 }
 
+typedef enum {
+	GB_STATE_PLAYING,
+	GB_STATE_PAUSED,
+	GB_STATE_STEP
+} gb_state_e;
+
 static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 {
-	static const char *win_str = "LCD";
+	const char *const win_str_lut[] = {
+		"LCD: Playing", "LCD: Paused", "LCD: Frame Step"
+	};
 	gb_priv_s *gb_priv = gb->direct.priv;
+	static int frame_step = 0;
+	static gb_state_e gb_state = GB_STATE_PAUSED;
 
-	SDL_assert_always(SDL_LockTexture(gb_priv->gb_lcd_tex,
-		NULL, &gb_priv->pixels, &gb_priv->pitch) == 0);
-	gb_run_frame(gb);
-	SDL_UnlockTexture(gb_priv->gb_lcd_tex);
+	/* Game Boy Control */
+	if (nk_begin(ctx, "Control", nk_rect(250, 50, 250, 150),
+				NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|
+				NK_WINDOW_SCALABLE|NK_WINDOW_TITLE|
+				NK_WINDOW_MINIMIZABLE))
+	{
+		nk_layout_row_dynamic(ctx, 30, 2);
+                if (nk_button_label(ctx, "Frame Step"))
+		{
+			frame_step++;
+			gb_state = GB_STATE_STEP;
+		}
+
+		if (gb_state == GB_STATE_PLAYING)
+		{
+			if(nk_button_label(ctx, "Pause"))
+				gb_state = GB_STATE_PAUSED;
+		}
+		else if (nk_button_label(ctx, "Run"))
+		{
+			gb_state = GB_STATE_PLAYING;
+		}
+	}
+	nk_end(ctx);
+
+	if(gb_state == GB_STATE_PLAYING ||
+			(gb_state == GB_STATE_STEP && frame_step != 0))
+	{
+		int ret;
+		ret = SDL_LockTexture(gb_priv->gb_lcd_tex, NULL,
+				&gb_priv->pixels, &gb_priv->pitch);
+		SDL_assert_always(ret == 0);
+		gb_run_frame(gb);
+		SDL_UnlockTexture(gb_priv->gb_lcd_tex);
+
+		frame_step = 0;
+	}
 
 	/* LCD */
-	if (nk_begin(ctx, win_str,
+	if (nk_begin_titled(ctx, "LCD", win_str_lut[gb_state],
 				nk_rect(50, 50, 50 + LCD_WIDTH, 50 + LCD_HEIGHT),
 				NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|
 				NK_WINDOW_SCALABLE|NK_WINDOW_TITLE|
@@ -143,15 +186,22 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 		canvas = nk_window_get_canvas(ctx);
 		total_space = nk_window_get_content_region(ctx);
 		/* Use integer scaling. */
-		{
+		do {
 			unsigned scale_w, scale_h;
 			scale_w = ((unsigned)total_space.w / LCD_WIDTH);
 			scale_h = ((unsigned)total_space.h / LCD_HEIGHT);
+
+			/* If the scale is less than 1, then stretch to fill
+			 * canvas. */
+			if(scale_w == 0 && scale_h == 0)
+				break;
+
 			scale_w = scale_w > scale_h ? scale_h : scale_w;
 			scale_h = scale_h > scale_w ? scale_w : scale_h;
 			total_space.w = LCD_WIDTH * scale_w;
 			total_space.h = LCD_HEIGHT * scale_h;
 		}
+		while(0);
 
 		nk_gb_lcd = nk_image_ptr(gb_priv->gb_lcd_tex);
 		nk_draw_image(canvas, total_space, &nk_gb_lcd, grid_color);
