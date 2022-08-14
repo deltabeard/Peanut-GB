@@ -637,7 +637,7 @@ overview(struct nk_context *ctx)
             nk_layout_row_dynamic(ctx, 100, 1);
             if (nk_chart_begin(ctx, NK_CHART_LINES, 32, -1.0f, 1.0f)) {
                 for (i = 0; i < 32; ++i) {
-                    nk_flags res = nk_chart_push(ctx, (float)cos(id));
+                    nk_flags res = nk_chart_push(ctx, (float)NK_COS(id));
                     if (res & NK_CHART_HOVERING)
                         index = (int)i;
                     if (res & NK_CHART_CLICKED)
@@ -648,17 +648,17 @@ overview(struct nk_context *ctx)
             }
 
             if (index != -1)
-                nk_tooltipf(ctx, "Value: %.2f", (float)cos((float)index*step));
+                nk_tooltipf(ctx, "Value: %.2f", (float)NK_COS((float)index*step));
             if (line_index != -1) {
                 nk_layout_row_dynamic(ctx, 20, 1);
-                nk_labelf(ctx, NK_TEXT_LEFT, "Selected value: %.2f", (float)cos((float)index*step));
+                nk_labelf(ctx, NK_TEXT_LEFT, "Selected value: %.2f", (float)NK_COS((float)index*step));
             }
 
             /* column chart */
             nk_layout_row_dynamic(ctx, 100, 1);
             if (nk_chart_begin(ctx, NK_CHART_COLUMN, 32, 0.0f, 1.0f)) {
                 for (i = 0; i < 32; ++i) {
-                    nk_flags res = nk_chart_push(ctx, (float)fabs(sin(id)));
+                    nk_flags res = nk_chart_push(ctx, (float)SDL_fabs(NK_SIN(id)));
                     if (res & NK_CHART_HOVERING)
                         index = (int)i;
                     if (res & NK_CHART_CLICKED)
@@ -668,10 +668,10 @@ overview(struct nk_context *ctx)
                 nk_chart_end(ctx);
             }
             if (index != -1)
-                nk_tooltipf(ctx, "Value: %.2f", (float)fabs(sin(step * (float)index)));
+                nk_tooltipf(ctx, "Value: %.2f", (float)SDL_fabs(NK_SIN(step * (float)index)));
             if (col_index != -1) {
                 nk_layout_row_dynamic(ctx, 20, 1);
-                nk_labelf(ctx, NK_TEXT_LEFT, "Selected value: %.2f", (float)fabs(sin(step * (float)col_index)));
+                nk_labelf(ctx, NK_TEXT_LEFT, "Selected value: %.2f", (float)SDL_fabs(NK_SIN(step * (float)col_index)));
             }
 
             /* mixed chart */
@@ -680,9 +680,9 @@ overview(struct nk_context *ctx)
                 nk_chart_add_slot(ctx, NK_CHART_LINES, 32, -1.0f, 1.0f);
                 nk_chart_add_slot(ctx, NK_CHART_LINES, 32, -1.0f, 1.0f);
                 for (id = 0, i = 0; i < 32; ++i) {
-                    nk_chart_push_slot(ctx, (float)fabs(sin(id)), 0);
-                    nk_chart_push_slot(ctx, (float)cos(id), 1);
-                    nk_chart_push_slot(ctx, (float)sin(id), 2);
+                    nk_chart_push_slot(ctx, (float)SDL_fabs(NK_SIN(id)), 0);
+                    nk_chart_push_slot(ctx, (float)NK_COS(id), 1);
+                    nk_chart_push_slot(ctx, (float)NK_SIN(id), 2);
                     id += step;
                 }
             }
@@ -694,9 +694,9 @@ overview(struct nk_context *ctx)
                 nk_chart_add_slot_colored(ctx, NK_CHART_LINES, nk_rgb(0,0,255), nk_rgb(0,0,150),32, -1.0f, 1.0f);
                 nk_chart_add_slot_colored(ctx, NK_CHART_LINES, nk_rgb(0,255,0), nk_rgb(0,150,0), 32, -1.0f, 1.0f);
                 for (id = 0, i = 0; i < 32; ++i) {
-                    nk_chart_push_slot(ctx, (float)fabs(sin(id)), 0);
-                    nk_chart_push_slot(ctx, (float)cos(id), 1);
-                    nk_chart_push_slot(ctx, (float)sin(id), 2);
+                    nk_chart_push_slot(ctx, (float)SDL_fabs(NK_SIN(id)), 0);
+                    nk_chart_push_slot(ctx, (float)NK_COS(id), 1);
+                    nk_chart_push_slot(ctx, (float)NK_SIN(id), 2);
                     id += step;
                 }
             }
@@ -986,8 +986,8 @@ overview(struct nk_context *ctx)
                         if (nk_chart_begin_colored(ctx, NK_CHART_LINES, nk_rgb(255,0,0), nk_rgb(150,0,0), 32, 0.0f, 1.0f)) {
                             nk_chart_add_slot_colored(ctx, NK_CHART_LINES, nk_rgb(0,0,255), nk_rgb(0,0,150),32, -1.0f, 1.0f);
                             for (i = 0, id = 0; i < 32; ++i) {
-                                nk_chart_push_slot(ctx, (float)fabs(sin(id)), 0);
-                                nk_chart_push_slot(ctx, (float)cos(id), 1);
+                                nk_chart_push_slot(ctx, (float)SDL_fabs(NK_SIN(id)), 0);
+                                nk_chart_push_slot(ctx, (float)NK_COS(id), 1);
                                 id += step;
                             }
                         }
@@ -997,7 +997,7 @@ overview(struct nk_context *ctx)
                         nk_layout_row_dynamic(ctx, 100, 1);
                         if (nk_chart_begin_colored(ctx, NK_CHART_COLUMN, nk_rgb(255,0,0), nk_rgb(150,0,0), 32, 0.0f, 1.0f)) {
                             for (i = 0, id = 0; i < 32; ++i) {
-                                nk_chart_push_slot(ctx, (float)fabs(sin(id)), 0);
+                                nk_chart_push_slot(ctx, (float)SDL_fabs(NK_SIN(id)), 0);
                                 id += step;
                             }
                         }
@@ -1009,9 +1009,9 @@ overview(struct nk_context *ctx)
                             nk_chart_add_slot_colored(ctx, NK_CHART_LINES, nk_rgb(0,0,255), nk_rgb(0,0,150),32, -1.0f, 1.0f);
                             nk_chart_add_slot_colored(ctx, NK_CHART_COLUMN, nk_rgb(0,255,0), nk_rgb(0,150,0), 32, 0.0f, 1.0f);
                             for (i = 0, id = 0; i < 32; ++i) {
-                                nk_chart_push_slot(ctx, (float)fabs(sin(id)), 0);
-                                nk_chart_push_slot(ctx, (float)fabs(cos(id)), 1);
-                                nk_chart_push_slot(ctx, (float)fabs(sin(id)), 2);
+                                nk_chart_push_slot(ctx, (float)SDL_fabs(NK_SIN(id)), 0);
+                                nk_chart_push_slot(ctx, (float)SDL_fabs(NK_COS(id)), 1);
+                                nk_chart_push_slot(ctx, (float)SDL_fabs(NK_SIN(id)), 2);
                                 id += step;
                             }
                         }
