@@ -49,6 +49,8 @@ int overview(struct nk_context *ctx);
   #include "../../demo/common/node_editor.c"
 #endif
 
+#define SDL_arraysize(array) (sizeof(array)/sizeof(array[0]))
+
 static SDL_Renderer *renderer;
 typedef struct {
 	SDL_Texture *gb_lcd_tex;
@@ -214,6 +216,20 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 		nk_draw_image(canvas, total_space, &nk_gb_lcd, grid_color);
 	}
 	nk_end(ctx);
+
+	/* Dissassembler */
+	if (nk_begin(ctx, "Assembly",
+				nk_rect(200, 50, 300, 600),
+				NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|
+				NK_WINDOW_SCALABLE|NK_WINDOW_TITLE|
+				NK_WINDOW_MINIMIZABLE))
+	{
+		static nk_bool selected[2 * 1024] = {0};
+		nk_layout_row_dynamic(ctx, 18, 1);
+		for(unsigned i = 0; i < SDL_arraysize(selected); i++)
+                        nk_selectable_label(ctx, (selected[i]) ? "Selected": "Unselected", NK_TEXT_CENTERED, &selected[i]);
+	}
+	nk_end(ctx);
 }
 
 /**
@@ -322,7 +338,7 @@ main(int argc, char *argv[])
     /* SDL setup */
     set_dpi_awareness();
     SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "0");
-    if(SDL_Init(SDL_INIT_EVERYTHING) < 0)
+    if(SDL_Init(SDL_INIT_VIDEO) < 0)
     {
 	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
 			    "Error SDL_init: %s", SDL_GetError());
