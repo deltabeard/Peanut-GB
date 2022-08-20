@@ -1,5 +1,6 @@
 /* nuklear - 1.32.0 - public domain */
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <SDL.h>
 #define ENABLE_LCD 1
@@ -232,7 +233,7 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 	nk_end(ctx);
 
 	/* Game Boy Registers */
-	if (nk_begin(ctx, "Registers", nk_rect(350, 50, 300, 220),
+	if (nk_begin(ctx, "Registers", nk_rect(350, 50, 360, 200),
 				NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|
 				NK_WINDOW_SCALABLE|NK_WINDOW_TITLE|
 				NK_WINDOW_MINIMIZABLE))
@@ -256,7 +257,7 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 		reg_str_len[5] = SDL_snprintf(reg_str[5], 5, "%04X",
 				gb->cpu_reg.pc);
 
-		nk_layout_row_dynamic(ctx, 60, 6);
+		nk_layout_row_dynamic(ctx, 60, 7);
 		for(unsigned i = 0; i < SDL_arraysize(reg_labels); i++)
 		{
 			if (nk_group_begin(ctx, reg_labels[i],
@@ -289,6 +290,92 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 					gb->cpu_reg.f_bits.z ? 'Z' : '-');
 			nk_text(ctx, flags, flags_len, NK_TEXT_CENTERED);
 			nk_group_end(ctx);
+		}
+
+		for(unsigned i = 0; i < 3; i++)
+		{
+			const char timer_str[3][5] = {
+				"TIMA", "TMA", "DIV"
+			};
+			const uint8_t *timer_reg[3] = {
+				&gb->gb_reg.TIMA, &gb->gb_reg.TMA, &gb->gb_reg.DIV
+			};
+			static char timer_reg_str[3][3];
+
+			if (nk_group_begin(ctx, timer_str[i],
+						NK_WINDOW_NO_SCROLLBAR |
+						NK_WINDOW_BORDER))
+			{
+				int timer_reg_str_len;
+				nk_layout_row_dynamic(ctx, 25, 1);
+				nk_label(ctx, timer_str[i], NK_TEXT_CENTERED);
+				timer_reg_str_len = SDL_snprintf(
+						timer_reg_str[i], 3,
+						"%02X", *timer_reg[i]);
+				nk_text(ctx, timer_reg_str[i],
+						timer_reg_str_len,
+						NK_TEXT_CENTERED);
+				nk_group_end(ctx);
+			}
+		}
+
+#if 0
+		for(unsigned i = 0; i < 4; i++)
+		{
+			const char count_str[4][7] = {
+				"LCD", "DIV", "TIMA", "SERIAL"
+			};
+			const uint_fast16_t *count_ptrs[4] = {
+				&gb->counter.lcd_count,
+				&gb->counter.div_count,
+				&gb->counter.tima_count,
+				&gb->counter.serial_count
+			};
+			static char timer_reg_str[4][16];
+
+			if (nk_group_begin(ctx, count_str[i],
+						NK_WINDOW_NO_SCROLLBAR |
+						NK_WINDOW_BORDER))
+			{
+				int timer_reg_str_len;
+				nk_layout_row_dynamic(ctx, 25, 1);
+				nk_label(ctx, count_str[i], NK_TEXT_CENTERED);
+				timer_reg_str_len = SDL_snprintf(
+						timer_reg_str[i], 16,
+						"%" PRIuFAST16, *count_ptrs[i]);
+				nk_text(ctx, timer_reg_str[i],
+						timer_reg_str_len,
+						NK_TEXT_CENTERED);
+				nk_group_end(ctx);
+			}
+		}
+#endif
+		for(unsigned i = 0; i < 2; i++)
+		{
+			const char count_str[2][7] = {
+				"IF", "IE"
+			};
+			const uint8_t *count_ptrs[2] = {
+				&gb->gb_reg.IF,
+				&gb->gb_reg.IE
+			};
+			static char timer_reg_str[2][3];
+
+			if (nk_group_begin(ctx, count_str[i],
+						NK_WINDOW_NO_SCROLLBAR |
+						NK_WINDOW_BORDER))
+			{
+				int reg_str_len;
+				nk_layout_row_dynamic(ctx, 25, 1);
+				nk_label(ctx, count_str[i], NK_TEXT_CENTERED);
+				reg_str_len = SDL_snprintf(
+						timer_reg_str[i], 16,
+						"%" PRIu8, *count_ptrs[i]);
+				nk_text(ctx, timer_reg_str[i],
+						reg_str_len,
+						NK_TEXT_CENTERED);
+				nk_group_end(ctx);
+			}
 		}
 	}
 	nk_end(ctx);
