@@ -230,6 +230,68 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
                         nk_selectable_label(ctx, (selected[i]) ? "Selected": "Unselected", NK_TEXT_CENTERED, &selected[i]);
 	}
 	nk_end(ctx);
+
+	/* Game Boy Registers */
+	if (nk_begin(ctx, "Registers", nk_rect(350, 50, 300, 220),
+				NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|
+				NK_WINDOW_SCALABLE|NK_WINDOW_TITLE|
+				NK_WINDOW_MINIMIZABLE))
+	{
+		static const char reg_labels[6][3] = {
+			"AF", "BC", "DE", "HL", "SP", "PC"
+		};
+		static char reg_str[6][5];
+		int reg_str_len[6];
+
+		reg_str_len[0] = SDL_snprintf(reg_str[0], 5, "%02X%02X",
+				gb->cpu_reg.a, gb->cpu_reg.f);
+		reg_str_len[1] = SDL_snprintf(reg_str[1], 5, "%02X%02X",
+				gb->cpu_reg.b, gb->cpu_reg.c);
+		reg_str_len[2] = SDL_snprintf(reg_str[2], 5, "%02X%02X",
+				gb->cpu_reg.d, gb->cpu_reg.e);
+		reg_str_len[3] = SDL_snprintf(reg_str[3], 5, "%02X%02X",
+				gb->cpu_reg.h, gb->cpu_reg.l);
+		reg_str_len[4] = SDL_snprintf(reg_str[4], 5, "%04X",
+				gb->cpu_reg.sp);
+		reg_str_len[5] = SDL_snprintf(reg_str[5], 5, "%04X",
+				gb->cpu_reg.pc);
+
+		nk_layout_row_dynamic(ctx, 60, 6);
+		for(unsigned i = 0; i < SDL_arraysize(reg_labels); i++)
+		{
+			if (nk_group_begin(ctx, reg_labels[i],
+						NK_WINDOW_NO_SCROLLBAR |
+						NK_WINDOW_BORDER))
+			{
+				nk_layout_row_dynamic(ctx, 25, 1);
+				nk_text(ctx, reg_labels[i], 2,
+						NK_TEXT_CENTERED);
+				nk_text(ctx, reg_str[i], reg_str_len[i],
+						NK_TEXT_CENTERED);
+				nk_group_end(ctx);
+			}
+		}
+
+		if (nk_group_begin(ctx, "Flags",
+					NK_WINDOW_NO_SCROLLBAR |
+					NK_WINDOW_BORDER))
+		{
+			static char flags[5] = "----";
+			int flags_len;
+			nk_layout_row_dynamic(ctx, 25, 1);
+			nk_label(ctx, "Flags", NK_TEXT_CENTERED);
+
+			flags_len = SDL_snprintf(flags, sizeof(flags),
+					"%c%c%c%c",
+					gb->cpu_reg.f_bits.c ? 'C' : '-',
+					gb->cpu_reg.f_bits.h ? 'H' : '-',
+					gb->cpu_reg.f_bits.n ? 'N' : '-',
+					gb->cpu_reg.f_bits.z ? 'Z' : '-');
+			nk_text(ctx, flags, flags_len, NK_TEXT_CENTERED);
+			nk_group_end(ctx);
+		}
+	}
+	nk_end(ctx);
 }
 
 /**
