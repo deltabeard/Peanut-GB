@@ -12,6 +12,9 @@
 #define WINDOW_WIDTH 1200
 #define WINDOW_HEIGHT 800
 
+#define VRAM_WIDTH VRAM_BANK_SIZE
+#define VRAM_HEIGHT VRAM_BANK_SIZE
+
 /* ===============================================================
  *
  *                          EXAMPLE
@@ -55,6 +58,7 @@ int overview(struct nk_context *ctx);
 static SDL_Renderer *renderer;
 typedef struct {
 	SDL_Texture *gb_lcd_tex;
+	SDL_Texture *gb_vram_tex;
 	void *pixels;
 	int pitch;
 	uint8_t *rom;
@@ -101,6 +105,42 @@ static void gb_error(struct gb_s *ctx, const enum gb_error_e err,
 	};
 	SDL_Log("Error: %s", err_str[err]);
 	SDL_assert_release(0);
+}
+
+static void render_vram_tex(SDL_Texture *tex, const struct gb_s *const gb)
+{
+	int ret;
+	uint32_t *pixels;
+	int pitch;
+	const uint32_t colour_lut[4] = {
+		0xFFFFFFFF, 0x7F7F7FFF, 0x2F2F2FFF, 0x00000000
+	};
+
+	ret = SDL_LockTexture(tex, NULL, (void**)&pixels, &pitch);
+	SDL_assert_always(ret == 0);
+
+	for(unsigned tile = 0; tile < VRAM_BANK_SIZE; tile += 2)
+	{
+		/* fetch first tile */
+		for(unsigned px = 0; px < 8; px++)
+		{
+			uint8_t t1 = gb->vram[tile] >> px;
+			uint8_t t2 = gb->vram[tile + 1] >> px;
+			uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
+			for(unsigned t = 0; t < 8; t++)
+			{
+				/* copy background */
+				pixels[tile/2] = gb->display.bg_palette[c];
+				//pixels[disp_x] |= LCD_PALETTE_BG;
+				pixels[tile/2] = colour_lut[pixels[tile/2]];
+				t1 = t1 >> 1;
+				t2 = t2 >> 1;
+			}
+		}
+	}
+
+	SDL_UnlockTexture(tex);
+	return;
 }
 
 static void lcd_draw_line(struct gb_s *gb, const uint8_t *pixels,
@@ -167,7 +207,10 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 		ret = SDL_LockTexture(gb_priv->gb_lcd_tex, NULL,
 				&gb_priv->pixels, &gb_priv->pitch);
 		SDL_assert_always(ret == 0);
+
 		gb_run_frame(gb);
+		render_vram_tex(gb_priv->gb_vram_tex, gb);
+
 		SDL_UnlockTexture(gb_priv->gb_lcd_tex);
 
 		frame_step = 0;
@@ -228,7 +271,11 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 		static nk_bool selected[2 * 1024] = {0};
 		nk_layout_row_dynamic(ctx, 18, 1);
 		for(unsigned i = 0; i < SDL_arraysize(selected); i++)
-                        nk_selectable_label(ctx, (selected[i]) ? "Selected": "Unselected", NK_TEXT_CENTERED, &selected[i]);
+		{
+                        nk_selectable_label(ctx,
+					selected[i] ? "Selected": "Unselected",
+					NK_TEXT_CENTERED, &selected[i]);
+		}
 	}
 	nk_end(ctx);
 
@@ -377,6 +424,52 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 				nk_group_end(ctx);
 			}
 		}
+	}
+	nk_end(ctx);
+
+	/* VRAM */
+	if (nk_begin(ctx, "VRAM Viewer",
+				nk_rect(50, 50, 300, 300),
+				NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|
+				NK_WINDOW_SCALABLE|NK_WINDOW_TITLE|
+				NK_WINDOW_NO_SCROLLBAR))
+	{
+		struct nk_image nk_gb_vram;
+		struct nk_command_buffer *canvas;
+		struct nk_rect total_space;
+		const struct nk_color grid_color = { 0xFF, 0xFF, 0xFF, 0xFF };
+
+		/* Draw VRAM to screen. */
+		canvas = nk_window_get_canvas(ctx);
+		total_space = nk_window_get_content_region(ctx);
+
+		/* Use integer scaling. */
+		do {
+			unsigned scale_w, scale_h;
+			scale_w = ((unsigned)total_space.w / VRAM_WIDTH);
+			scale_h = ((unsigned)total_space.h / VRAM_HEIGHT);
+
+			/* If the scale is less than 1, then stretch to fill
+			 * canvas. */
+			if(scale_w == 0 || scale_h == 0)
+			{
+				if(total_space.w < total_space.h)
+					total_space.h = total_space.w;
+				else if(total_space.h < total_space.w)
+					total_space.w = total_space.h;
+
+				break;
+			}
+
+			scale_w = scale_w > scale_h ? scale_h : scale_w;
+			scale_h = scale_h > scale_w ? scale_w : scale_h;
+			total_space.w = VRAM_WIDTH * scale_w;
+			total_space.h = VRAM_HEIGHT * scale_h;
+		}
+		while(0);
+
+		nk_gb_vram = nk_image_ptr(gb_priv->gb_vram_tex);
+		nk_draw_image(canvas, total_space, &nk_gb_vram, grid_color);
 	}
 	nk_end(ctx);
 }
@@ -529,6 +622,11 @@ main(int argc, char *argv[])
 			    SDL_TEXTUREACCESS_STREAMING,
 			    LCD_WIDTH, LCD_HEIGHT);
 	    SDL_assert_release(gb_priv.gb_lcd_tex != NULL);
+	    gb_priv.gb_vram_tex = SDL_CreateTexture(renderer,
+			    SDL_PIXELFORMAT_RGBA32,
+			    SDL_TEXTUREACCESS_STREAMING,
+			    VRAM_WIDTH, VRAM_HEIGHT);
+	    SDL_assert_release(gb_priv.gb_vram_tex != NULL);
     }
 
     /* scale the renderer output for High-DPI displays */
