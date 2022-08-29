@@ -43,6 +43,16 @@
 #include <string.h>	/* Required for memset */
 #include <time.h>	/* Required for tm struct */
 
+#if defined __BYTE_ORDER__
+# if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
+#  error "Peanut-GB only supports little endian targets"
+/* This is because the 16-bit address functions take advantage of the fact that
+ * the host system is also little endian. If you would like to run Peanut-GB on
+ * a big endian machine, you have to change the order of the 8-bit CPU
+ * registers. */
+# endif
+#endif
+
 /** Definitions for compile-time setting of features. **/
 /**
  * Sound support must be provided by an external library. When audio_read() and
