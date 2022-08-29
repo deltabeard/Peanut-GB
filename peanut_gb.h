@@ -32,7 +32,12 @@
 #ifndef PEANUT_GB_H
 #define PEANUT_GB_H
 
-#include "version.all"	/* Version information */
+#if defined __has_include
+# if __has_include("version.all")
+#  include "version.all"	/* Version information */
+# endif
+#endif
+
 #include <stdlib.h>	/* Required for qsort */
 #include <stdint.h>	/* Required for int types */
 #include <string.h>	/* Required for memset */
@@ -45,23 +50,23 @@
  * before including peanut_gb.h in order for these functions to be used.
  */
 #ifndef ENABLE_SOUND
-#	define ENABLE_SOUND 0
+# define ENABLE_SOUND 0
 #endif
 
 /* Enable LCD drawing. On by default. May be turned off for testing purposes. */
 #ifndef ENABLE_LCD
-#	define ENABLE_LCD 1
+# define ENABLE_LCD 1
 #endif
 
 /* Adds more code to improve LCD rendering accuracy. */
 #ifndef PEANUT_GB_HIGH_LCD_ACCURACY
-	#define PEANUT_GB_HIGH_LCD_ACCURACY 1
+# define PEANUT_GB_HIGH_LCD_ACCURACY 1
 #endif
 
 /* Play BIOS before playing cartridge.
  * This setting is currently not implemented. */
 #ifndef PEANUT_GB_USE_BIOS
-	#define PEANUT_GB_USE_BIOS 0
+# define PEANUT_GB_USE_BIOS 0
 #endif
 
 /** Internal source code. **/
@@ -105,16 +110,16 @@
 
 /* Serial clock locked to 8192Hz on DMG.
  * 4194304 / (8192 / 8) = 4096 clock cycles for sending 1 byte. */
-#define SERIAL_CYCLES		4096
+#define SERIAL_CYCLES       4096
 
 /* Calculating VSYNC. */
-#define DMG_CLOCK_FREQ		4194304.0
-#define SCREEN_REFRESH_CYCLES	70224.0
-#define VERTICAL_SYNC		(DMG_CLOCK_FREQ/SCREEN_REFRESH_CYCLES)
+#define DMG_CLOCK_FREQ      4194304.0
+#define SCREEN_REFRESH_CYCLES 70224.0
+#define VERTICAL_SYNC       (DMG_CLOCK_FREQ/SCREEN_REFRESH_CYCLES)
 
 /* SERIAL SC register masks. */
-#define SERIAL_SC_TX_START	0x80
-#define SERIAL_SC_CLOCK_SRC	0x01
+#define SERIAL_SC_TX_START  0x80
+#define SERIAL_SC_CLOCK_SRC 0x01
 
 /* STAT register masks */
 #define STAT_LYC_INTR       0x40
@@ -170,7 +175,7 @@
 #define ROM_HEADER_CHECKSUM_LOC	0x014D
 
 #ifndef MIN
-	#define MIN(a, b)   ((a) < (b) ? (a) : (b))
+# define MIN(a, b)          ((a) < (b) ? (a) : (b))
 #endif
 
 #define PEANUT_GB_ARRAYSIZE(array)    (sizeof(array)/sizeof(array[0]))
@@ -500,13 +505,13 @@ struct gb_s
 		{
 			struct
 			{
-				unsigned a		: 1;
-				unsigned b		: 1;
+				unsigned a	: 1;
+				unsigned b	: 1;
 				unsigned select	: 1;
 				unsigned start	: 1;
 				unsigned right	: 1;
 				unsigned left	: 1;
-				unsigned up		: 1;
+				unsigned up	: 1;
 				unsigned down	: 1;
 			} joypad_bits;
 			uint8_t joypad;
@@ -3869,7 +3874,7 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	return GB_INIT_NO_ERROR;
 }
 
-const char* gb_get_rom_name(struct gb_s* gb, char title_str[static 16])
+const char* gb_get_rom_name(struct gb_s* gb, char *title_str)
 {
 	uint_fast16_t title_loc = 0x134;
 	/* End of title may be 0x13E for newer games. */
@@ -4065,7 +4070,7 @@ uint8_t gb_colour_hash(struct gb_s *gb);
  * \param title_str Allocated string at least 16 characters.
  * \returns	Pointer to start of string, null terminated.
  */
-const char* gb_get_rom_name(struct gb_s* gb, char title_str[static 16]);
+const char* gb_get_rom_name(struct gb_s* gb, char *title_str);
 
 /**
  * Tick the internal RTC by one second. This does not affect games with no RTC
