@@ -240,7 +240,7 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 		SDL_assert_always(ret == 0);
 
 		gb_run_frame(gb);
-		render_vram_tex(gb_priv->gb_vram_tex, gb);
+		//render_vram_tex(gb_priv->gb_vram_tex, gb);
 
 		SDL_UnlockTexture(gb_priv->gb_lcd_tex);
 
@@ -561,8 +561,7 @@ static inline void set_dpi_awareness(void)
  *                          DEMO
  *
  * ===============================================================*/
-int
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
     int ret = EXIT_FAILURE;
     /* Platform */
