@@ -4046,4 +4046,21 @@ void gb_tick_rtc(struct gb_s *gb);
  */
 void gb_set_rtc(struct gb_s *gb, const struct tm * const time);
 
+/* Undefine CPU Flag helper functions. */
+#undef PEANUT_GB_CPUFLAG_MASK_CARRY
+#undef PEANUT_GB_CPUFLAG_MASK_HALFC
+#undef PEANUT_GB_CPUFLAG_MASK_ARITH
+#undef PEANUT_GB_CPUFLAG_MASK_ZERO
+#undef PEANUT_GB_CPUFLAG_BIT_CARRY
+#undef PEANUT_GB_CPUFLAG_BIT_HALFC
+#undef PEANUT_GB_CPUFLAG_BIT_ARITH
+#undef PEANUT_GB_CPUFLAG_BIT_ZERO
+#undef PGB_SET_CARRY
+#undef PGB_SET_HALFC
+#undef PGB_SET_ARITH
+#undef PGB_SET_ZERO
+#undef PGB_GET_CARRY
+#undef PGB_GET_HALFC
+#undef PGB_GET_ARITH
+#undef PGB_GET_ZERO
 #endif //PEANUT_GB_H
