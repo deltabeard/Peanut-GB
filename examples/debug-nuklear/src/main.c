@@ -109,7 +109,8 @@ static void gb_error(struct gb_s *ctx, const enum gb_error_e err,
 		"Unknown", "Invalid opcode", "Invalid read", "Invalid write",
 		"Halted forever"
 	};
-	SDL_Log("Error: %s", err_str[err]);
+	SDL_LogError(PGBDBG_LOG_APPLICATION,
+			"Error: %s", err_str[err]);
 	SDL_assert_release(0);
 }
 
@@ -553,6 +554,7 @@ main(int argc, char *argv[])
     struct gb_s gb;
     gb_priv_s gb_priv;
 
+    /* Print application log. */
     SDL_LogSetPriority(PGBDBG_LOG_APPLICATION, SDL_LOG_PRIORITY_INFO);
 
     /* Make sure a file name is given. */
@@ -572,6 +574,7 @@ main(int argc, char *argv[])
 	    return EXIT_FAILURE;
     }
 
+    /* Initialise Peanut-GB. */
     {
 	    size_t ram_sz;
 
@@ -588,6 +591,7 @@ main(int argc, char *argv[])
 
     /* SDL setup */
     set_dpi_awareness();
+    SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "0");
     SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "0");
     if(SDL_Init(SDL_INIT_VIDEO) < 0)
     {
@@ -607,9 +611,10 @@ main(int argc, char *argv[])
 	    SDL_Quit();
 	    goto out;
     }
+
+    /* Set window title to ROM name. */
     {
 	    char title_str[64] = "Peanut-GB Debugger: ";
-
 	    gb_get_rom_name(&gb, &title_str[0] + strlen(title_str));
 	    SDL_SetWindowTitle(win, title_str);
     }
@@ -625,6 +630,7 @@ main(int argc, char *argv[])
 	    goto out;
     }
 
+    /* Create textures for LCD and VRAM viewer. */
     {
 	    gb_priv.gb_lcd_tex = SDL_CreateTexture(renderer,
 			    SDL_PIXELFORMAT_RGBA32,
@@ -638,7 +644,7 @@ main(int argc, char *argv[])
 	    SDL_assert_release(gb_priv.gb_vram_tex != NULL);
     }
 
-    /* scale the renderer output for High-DPI displays */
+    /* Scale the renderer output for High-DPI displays */
     {
         int render_w, render_h;
         int window_w, window_h;
@@ -651,7 +657,7 @@ main(int argc, char *argv[])
         font_scale = scale_y;
     }
 
-    /* GUI */
+    /* Initialise Nuklear GUI */
     ctx = nk_sdl_init(win, renderer);
     /* Load Fonts: if none of these are loaded a default font will be used  */
     /* Load Cursor: if you uncomment cursor loading please hide the cursor */
