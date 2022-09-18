@@ -1,10 +1,12 @@
-/* nuklear - 1.32.0 - public domain */
-
 #include <inttypes.h>
 #include <stdio.h>
+
+#define SDL_MAIN_HANDLED
 #include <SDL.h>
+
 #define ENABLE_LCD 1
 #include "../../../peanut_gb.h"
+
 #include "nuklear_proj.h"
 #define NK_SDL_RENDERER_IMPLEMENTATION
 #include "nuklear_sdl_renderer.h"
