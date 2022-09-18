@@ -28,10 +28,11 @@
 
 cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 
-set(CURRENT_CPM_VERSION 0.35.1)
+set(CURRENT_CPM_VERSION 0.35.6)
 
+get_filename_component(CPM_CURRENT_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}" REALPATH)
 if(CPM_DIRECTORY)
-  if(NOT CPM_DIRECTORY STREQUAL CMAKE_CURRENT_LIST_DIR)
+  if(NOT CPM_DIRECTORY STREQUAL CPM_CURRENT_DIRECTORY)
     if(CPM_VERSION VERSION_LESS CURRENT_CPM_VERSION)
       message(
         AUTHOR_WARNING
@@ -66,6 +67,26 @@ endif()
 
 set_property(GLOBAL PROPERTY CPM_INITIALIZED true)
 
+macro(cpm_set_policies)
+  # the policy allows us to change options without caching
+  cmake_policy(SET CMP0077 NEW)
+  set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+
+  # the policy allows us to change set(CACHE) without caching
+  if(POLICY CMP0126)
+    cmake_policy(SET CMP0126 NEW)
+    set(CMAKE_POLICY_DEFAULT_CMP0126 NEW)
+  endif()
+
+  # The policy uses the download time for timestamp, instead of the timestamp in the archive. This
+  # allows for proper rebuilds when a projects url changes
+  if(POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+    set(CMAKE_POLICY_DEFAULT_CMP0135 NEW)
+  endif()
+endmacro()
+cpm_set_policies()
+
 option(CPM_USE_LOCAL_PACKAGES "Always try to use `find_package` to get dependencies"
        $ENV{CPM_USE_LOCAL_PACKAGES}
 )
@@ -93,7 +114,7 @@ set(CPM_VERSION
     CACHE INTERNAL ""
 )
 set(CPM_DIRECTORY
-    ${CMAKE_CURRENT_LIST_DIR}
+    ${CPM_CURRENT_DIRECTORY}
     CACHE INTERNAL ""
 )
 set(CPM_FILE
@@ -214,6 +235,9 @@ function(cpm_find_package NAME VERSION)
   string(REPLACE " " ";" EXTRA_ARGS "${ARGN}")
   find_package(${NAME} ${VERSION} ${EXTRA_ARGS} QUIET)
   if(${CPM_ARGS_NAME}_FOUND)
+    if(DEFINED ${CPM_ARGS_NAME}_VERSION)
+      set(VERSION ${${CPM_ARGS_NAME}_VERSION})
+    endif()
     message(STATUS "${CPM_INDENT} using local package ${CPM_ARGS_NAME}@${VERSION}")
     CPMRegisterPackage(${CPM_ARGS_NAME} "${VERSION}")
     set(CPM_PACKAGE_FOUND
@@ -476,6 +500,8 @@ endfunction()
 
 # Download and add a package from source
 function(CPMAddPackage)
+  cpm_set_policies()
+
   list(LENGTH ARGN argnLength)
   if(argnLength EQUAL 1)
     cpm_parse_add_package_single_arg("${ARGN}" ARGN)
@@ -650,6 +676,20 @@ function(CPMAddPackage)
     list(APPEND CPM_ARGS_UNPARSED_ARGUMENTS DOWNLOAD_COMMAND ${CPM_ARGS_DOWNLOAD_COMMAND})
   elseif(DEFINED CPM_ARGS_SOURCE_DIR)
     list(APPEND CPM_ARGS_UNPARSED_ARGUMENTS SOURCE_DIR ${CPM_ARGS_SOURCE_DIR})
+    if(NOT IS_ABSOLUTE ${CPM_ARGS_SOURCE_DIR})
+      # Expand `CPM_ARGS_SOURCE_DIR` relative path. This is important because EXISTS doesn't work
+      # for relative paths.
+      get_filename_component(
+        source_directory ${CPM_ARGS_SOURCE_DIR} REALPATH BASE_DIR ${CMAKE_CURRENT_BINARY_DIR}
+      )
+    else()
+      set(source_directory ${CPM_ARGS_SOURCE_DIR})
+    endif()
+    if(NOT EXISTS ${source_directory})
+      string(TOLOWER ${CPM_ARGS_NAME} lower_case_name)
+      # remove timestamps so CMake will re-download the dependency
+      file(REMOVE_RECURSE "${CPM_FETCHCONTENT_BASE_DIR}/${lower_case_name}-subbuild")
+    endif()
   elseif(CPM_SOURCE_CACHE AND NOT CPM_ARGS_NO_CACHE)
     string(TOLOWER ${CPM_ARGS_NAME} lower_case_name)
     set(origin_parameters ${CPM_ARGS_UNPARSED_ARGUMENTS})
@@ -672,7 +712,7 @@ function(CPMAddPackage)
       )
       cpm_get_fetch_properties("${CPM_ARGS_NAME}")
 
-      if(DEFINED CPM_ARGS_GIT_TAG)
+      if(DEFINED CPM_ARGS_GIT_TAG AND NOT (PATCH_COMMAND IN_LIST CPM_ARGS_UNPARSED_ARGUMENTS))
         # warn if cache has been changed since checkout
         cpm_check_git_working_dir_is_clean(${download_directory} ${CPM_ARGS_GIT_TAG} IS_CLEAN)
         if(NOT ${IS_CLEAN})
@@ -891,16 +931,6 @@ function(
       set(addSubdirectoryExtraArgs "")
     endif()
     if(OPTIONS)
-      # the policy allows us to change options without caching
-      cmake_policy(SET CMP0077 NEW)
-      set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-
-      # the policy allows us to change set(CACHE) without caching
-      if(POLICY CMP0126)
-        cmake_policy(SET CMP0126 NEW)
-        set(CMAKE_POLICY_DEFAULT_CMP0126 NEW)
-      endif()
-
       foreach(OPTION ${OPTIONS})
         cpm_parse_option("${OPTION}")
         set(${OPTION_KEY} "${OPTION_VALUE}")
