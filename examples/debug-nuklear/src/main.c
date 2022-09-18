@@ -55,6 +55,10 @@ int overview(struct nk_context *ctx);
   #include "../../demo/common/node_editor.c"
 #endif
 
+enum {
+	PGBDBG_LOG_APPLICATION = SDL_LOG_CATEGORY_CUSTOM,
+};
+
 #define SDL_arraysize(array) (sizeof(array)/sizeof(array[0]))
 
 static SDL_Renderer *renderer;
@@ -549,10 +553,12 @@ main(int argc, char *argv[])
     struct gb_s gb;
     gb_priv_s gb_priv;
 
+    SDL_LogSetPriority(PGBDBG_LOG_APPLICATION, SDL_LOG_PRIORITY_INFO);
+
     /* Make sure a file name is given. */
     if(argc != 2)
     {
-	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+	    SDL_LogError(PGBDBG_LOG_APPLICATION,
 		    "Usage: %s FILE\n", argv[0]);
 	    return EXIT_FAILURE;
     }
@@ -561,10 +567,11 @@ main(int argc, char *argv[])
     /* Copy input ROM file to allocated memory. */
     if((gb_priv.rom = read_rom_to_ram(argv[1])) == NULL)
     {
-	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+	    SDL_LogError(PGBDBG_LOG_APPLICATION,
 			    "%d: %s\n", __LINE__, SDL_GetError());
 	    return EXIT_FAILURE;
     }
+
     {
 	    size_t ram_sz;
 
@@ -584,7 +591,7 @@ main(int argc, char *argv[])
     SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "0");
     if(SDL_Init(SDL_INIT_VIDEO) < 0)
     {
-	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+	    SDL_LogError(PGBDBG_LOG_APPLICATION,
 			    "Error SDL_init: %s", SDL_GetError());
 	    SDL_free(gb_priv.rom);
 	    goto out;
@@ -594,7 +601,7 @@ main(int argc, char *argv[])
 		    SDL_WINDOWPOS_CENTERED,WINDOW_WIDTH, WINDOW_HEIGHT,
 		    SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI);
     if (win == NULL) {
-	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+	    SDL_LogError(PGBDBG_LOG_APPLICATION,
 			    "Error SDL_CreateWindow: %s", SDL_GetError());
 	    SDL_free(gb_priv.rom);
 	    SDL_Quit();
@@ -610,7 +617,7 @@ main(int argc, char *argv[])
     renderer = SDL_CreateRenderer(win, -1,
 		    SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (renderer == NULL) {
-	    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+	    SDL_LogError(PGBDBG_LOG_APPLICATION,
 			    "Error SDL_CreateRenderer: %s", SDL_GetError());
 	    SDL_free(gb_priv.rom);
 	    SDL_DestroyWindow(win);
