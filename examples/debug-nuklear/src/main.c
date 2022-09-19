@@ -14,8 +14,8 @@
 #define WINDOW_WIDTH 1200
 #define WINDOW_HEIGHT 800
 
-#define VRAM_WIDTH VRAM_BANK_SIZE
-#define VRAM_HEIGHT VRAM_BANK_SIZE
+#define VRAM_WIDTH 128
+#define VRAM_HEIGHT 256
 
 /* ===============================================================
  *
@@ -117,35 +117,59 @@ static void gb_error(struct gb_s *ctx, const enum gb_error_e err,
 static void render_vram_tex(SDL_Texture *tex, const struct gb_s *const gb)
 {
 	int ret;
-	uint32_t *pixels;
+	uint32_t tile_pixels[8*8];
+	SDL_Surface *s, *tile;
 	int pitch;
 	const uint32_t colour_lut[4] = {
 		0xFFFFFFFF, 0x7F7F7FFF, 0x2F2F2FFF, 0x00000000
 	};
+	uint32_t *pixels, *tile_pixels_p;
 
+	tile_pixels_p = &tile_pixels[0];
 	ret = SDL_LockTexture(tex, NULL, (void**)&pixels, &pitch);
 	SDL_assert_always(ret == 0);
 
-	for(unsigned tile = 0; tile < VRAM_BANK_SIZE; tile += 2)
+	s = SDL_CreateRGBSurfaceFrom(pixels, VRAM_WIDTH, VRAM_HEIGHT, 32,
+			VRAM_WIDTH * sizeof(uint32_t), 0, 0, 0, 0);
+	//		0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF);
+	tile = SDL_CreateRGBSurfaceFrom(tile_pixels, 8, 8, 32,
+			8 * sizeof(uint32_t), 0, 0, 0, 0);
+
+	uint8_t tile_line = 0;
+	for(unsigned tile_num = 0; tile_num < VRAM_BANK_SIZE; tile_num += 2)
 	{
 		/* fetch first tile */
 		for(unsigned px = 0; px < 8; px++)
 		{
-			uint8_t t1 = gb->vram[tile] >> px;
-			uint8_t t2 = gb->vram[tile + 1] >> px;
+			uint8_t t1 = gb->vram[tile_num] >> px;
+			uint8_t t2 = gb->vram[tile_num + 1] >> px;
 			uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
-			for(unsigned t = 0; t < 8; t++)
-			{
-				/* copy background */
-				pixels[tile/2] = gb->display.bg_palette[c];
-				//pixels[disp_x] |= LCD_PALETTE_BG;
-				pixels[tile/2] = colour_lut[pixels[tile/2]];
-				t1 = t1 >> 1;
-				t2 = t2 >> 1;
-			}
+
+			*tile_pixels_p = colour_lut[gb->display.bg_palette[c]];
+			tile_pixels_p++;
+		}
+		continue;
+
+		tile_line++;
+		if(tile_line == 7)
+		{
+			SDL_Rect r;
+			const unsigned tiles_on_line = VRAM_WIDTH / 8;
+			tile_pixels_p = &tile_pixels[0];
+			tile_line = 0;
+
+			r.w = 8;
+			r.h = 8;
+			r.x = tile_num % VRAM_WIDTH;
+			r.y = tile_num / tiles_on_line;
+			SDL_BlitSurface(tile, NULL, s, &r);
+
+			printf("%dx%d\n", r.x, r.h);
 		}
 	}
 
+	SDL_FreeSurface(tile);
+	SDL_FreeSurface(s);
 	SDL_UnlockTexture(tex);
 	return;
 }
