@@ -195,7 +195,6 @@ struct cpu_registers_s
 	/* Define specific bits of Flag register. */
 	struct
 	{
-		unsigned unused : 4;
 		unsigned c : 1; /* Carry flag. */
 		unsigned h : 1; /* Half carry flag. */
 		unsigned n : 1; /* Add/sub flag. */
