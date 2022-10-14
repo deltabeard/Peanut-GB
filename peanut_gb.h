@@ -32,7 +32,7 @@
 #ifndef PEANUT_GB_H
 #define PEANUT_GB_H
 
-#if defined __has_include
+#if defined(__has_include)
 # if __has_include("version.all")
 #  include "version.all"	/* Version information */
 # endif
@@ -43,14 +43,30 @@
 #include <string.h>	/* Required for memset */
 #include <time.h>	/* Required for tm struct */
 
-#if defined __BYTE_ORDER__
-# if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
-#  error "Peanut-GB only supports little endian targets"
-/* This is because the 16-bit address functions take advantage of the fact that
- * the host system is also little endian. If you would like to run Peanut-GB on
- * a big endian machine, you have to change the order of the 8-bit CPU
- * registers. */
+/**
+* If PEANUT_GB_IS_LITTLE_ENDIAN is positive, then Peanut-GB will be configured
+* for a little endian platform. If 0, then big endian.
+*/
+#if !defined(PEANUT_GB_IS_LITTLE_ENDIAN)
+/* If endian is not defined, then attempt to detect it. */
+# if defined(__BYTE_ORDER__)
+#  if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
+/ * Building for a big endian platform. */
+#   PEANUT_GB_IS_LITTLE_ENDIAN 0
+#  else
+#   PEANUT_GB_IS_LITTLE_ENDIAN 1
+#  endif /* __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__ */
+# elif !defined(PEANUT_GB_IS_LITTLE_ENDIAN)
+#  error "Could not detect target platform endian. Please define PEANUT_GB_IS_LITTLE_ENDIAN"
 # endif
+#endif /* !defined(PEANUT_GB_IS_LITTLE_ENDIAN) */
+
+#if PEANUT_GB_IS_LITTLE_ENDIAN == 0
+# error "Peanut-GB only supports little endian targets"
+/* This is because the 16 - bit address functions take advantage of the fact that
+* the host system is also little endian.If you would like to run Peanut - GB on
+* a big endian machine, you have to change the order of the 8 - bit CPU
+* registers. */
 #endif
 
 /** Definitions for compile-time setting of features. **/
@@ -192,6 +208,13 @@
 
 struct cpu_registers_s
 {
+/* Change register order if big endian.
+ * Macro receives registers in little endian order. */
+#if PEANUT_GB_IS_LITTLE_ENDIAN
+# define PEANUT_GB_LE_REG(x,y) x,y
+#else
+# define PEANUT_GB_LE_REG(x,y) y,x
+#endif
 	/* Define specific bits of Flag register. */
 	struct
 	{
@@ -206,8 +229,7 @@ struct cpu_registers_s
 	{
 		struct
 		{
-			uint8_t c;
-			uint8_t b;
+			uint8_t PEANUT_GB_LE_REG(c,b);
 		};
 		uint16_t bc;
 	};
@@ -216,8 +238,7 @@ struct cpu_registers_s
 	{
 		struct
 		{
-			uint8_t e;
-			uint8_t d;
+			uint8_t PEANUT_GB_LE_REG(e,d);
 		};
 		uint16_t de;
 	};
@@ -226,14 +247,14 @@ struct cpu_registers_s
 	{
 		struct
 		{
-			uint8_t l;
-			uint8_t h;
+			uint8_t PEANUT_GB_LE_REG(l,h);
 		};
 		uint16_t hl;
 	};
 
 	uint16_t sp; /* Stack pointer */
 	uint16_t pc; /* Program counter */
+#undef PEANUT_GB_LE_REG
 };
 
 struct count_s
