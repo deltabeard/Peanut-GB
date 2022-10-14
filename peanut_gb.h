@@ -192,28 +192,16 @@
 
 struct cpu_registers_s
 {
-	/* Combine A and F registers. */
-	union
+	/* Define specific bits of Flag register. */
+	struct
 	{
-		struct
-		{
-			/* Define specific bits of Flag register. */
-			union
-			{
-				struct
-				{
-					unsigned unused : 4;
-					unsigned c : 1; /* Carry flag. */
-					unsigned h : 1; /* Half carry flag. */
-					unsigned n : 1; /* Add/sub flag. */
-					unsigned z : 1; /* Zero flag. */
-				} f_bits;
-				uint8_t f;
-			};
-			uint8_t a;
-		};
-		uint16_t af;
-	};
+		unsigned unused : 4;
+		unsigned c : 1; /* Carry flag. */
+		unsigned h : 1; /* Half carry flag. */
+		unsigned n : 1; /* Add/sub flag. */
+		unsigned z : 1; /* Zero flag. */
+	} f_bits;
+	uint8_t a;
 
 	union
 	{
@@ -3761,7 +3749,11 @@ void gb_reset(struct gb_s *gb)
 	gb->cart_mode_select = 0;
 
 	/* Initialise CPU registers as though a DMG. */
-	gb->cpu_reg.af = 0x01B0;
+	gb->cpu_reg.a = 0x01;
+	gb->cpu_reg.f_bits.z = 1;
+	gb->cpu_reg.f_bits.n = 0;
+	gb->cpu_reg.f_bits.h = 1;
+	gb->cpu_reg.f_bits.c = 1;
 	gb->cpu_reg.bc = 0x0013;
 	gb->cpu_reg.de = 0x00D8;
 	gb->cpu_reg.hl = 0x014D;
