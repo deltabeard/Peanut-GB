@@ -570,10 +570,11 @@ struct gb_s
 
 /**
  * Internal function used to read bytes.
+ * addr is host platform endian.
  */
-uint8_t __gb_read(struct gb_s *gb, const uint_fast16_t addr)
+uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 {
-	switch(addr >> 12)
+	switch(PEANUT_GB_GET_MSN16(addr))
 	{
 	case 0x0:
 
@@ -660,7 +661,7 @@ uint8_t __gb_read(struct gb_s *gb, const uint_fast16_t addr)
 		}
 
 		/* IO and Interrupts. */
-		switch(addr & 0xFF)
+		switch(PEANUT_GB_GET_LSB16(addr))
 		{
 		/* IO Registers */
 		case 0x00:
@@ -908,7 +909,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 		}
 
 		/* IO and Interrupts. */
-		switch(addr & 0xFF)
+		switch(PEANUT_GB_GET_LSB16(addr))
 		{
 		/* Joypad */
 		case 0x00:
@@ -1006,10 +1007,10 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 		/* DMA Register */
 		case 0x46:
 		{
-			uint_fast16_t dma_addr = (uint_fast16_t)val << 8;
+			uint16_t dma_addr = (uint_fast16_t)val << 8;
 			gb->gb_reg.DMA = val;
 
-			for(uint_fast16_t i = 0; i < OAM_SIZE; i++)
+			for(uint16_t i = 0; i < OAM_SIZE; i++)
 			{
 				gb->oam[i] = __gb_read(gb, dma_addr + i);
 			}
