@@ -1726,8 +1726,8 @@ void __gb_step_cpu(struct gb_s *gb)
 	{
 		uint16_t temp = __gb_read(gb, gb->cpu_reg.pc++);
 		temp |= __gb_read(gb, gb->cpu_reg.pc++) << 8;
-		__gb_write(gb, temp++, gb->cpu_reg.sp & 0xFF);
-		__gb_write(gb, temp, gb->cpu_reg.sp >> 8);
+		__gb_write(gb, temp++, gb->cpu_reg.sp_bytes.p);
+		__gb_write(gb, temp, gb->cpu_reg.sp_bytes.s);
 		break;
 	}
 
@@ -3083,8 +3083,8 @@ void __gb_step_cpu(struct gb_s *gb)
 	case 0xC0: /* RET NZ */
 		if(!gb->cpu_reg.f_bits.z)
 		{
-			gb->cpu_reg.pc = __gb_read(gb, gb->cpu_reg.sp++);
-			gb->cpu_reg.pc |= __gb_read(gb, gb->cpu_reg.sp++) << 8;
+			gb->cpu_reg.pc_bytes.c = __gb_read(gb, gb->cpu_reg.sp++);
+			gb->cpu_reg.pc_bytes.p = __gb_read(gb, gb->cpu_reg.sp++);
 			inst_cycles += 12;
 		}
 
@@ -3098,9 +3098,11 @@ void __gb_step_cpu(struct gb_s *gb)
 	case 0xC2: /* JP NZ, imm */
 		if(!gb->cpu_reg.f_bits.z)
 		{
-			uint16_t temp = __gb_read(gb, gb->cpu_reg.pc++);
-			temp |= __gb_read(gb, gb->cpu_reg.pc++) << 8;
-			gb->cpu_reg.pc = temp;
+			uint8_t p, c;
+			c = __gb_read(gb, gb->cpu_reg.pc++);
+			p = __gb_read(gb, gb->cpu_reg.pc++);
+			gb->cpu_reg.pc_bytes.c = c;
+			gb->cpu_reg.pc_bytes.p = p;
 			inst_cycles += 4;
 		}
 		else
@@ -3110,9 +3112,11 @@ void __gb_step_cpu(struct gb_s *gb)
 
 	case 0xC3: /* JP imm */
 	{
-		uint16_t temp = __gb_read(gb, gb->cpu_reg.pc++);
-		temp |= __gb_read(gb, gb->cpu_reg.pc) << 8;
-		gb->cpu_reg.pc = temp;
+		uint8_t p, c;
+		c = __gb_read(gb, gb->cpu_reg.pc++);
+		p = __gb_read(gb, gb->cpu_reg.pc);
+		gb->cpu_reg.pc_bytes.c = c;
+		gb->cpu_reg.pc_bytes.p = p;
 		break;
 	}
 
