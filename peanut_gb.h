@@ -2019,8 +2019,8 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0x31: /* LD SP, imm */
-		gb->cpu_reg.sp = __gb_read(gb, gb->cpu_reg.pc++);
-		gb->cpu_reg.sp |= __gb_read(gb, gb->cpu_reg.pc++) << 8;
+		gb->cpu_reg.sp_bytes.p = __gb_read(gb, gb->cpu_reg.pc++);
+		gb->cpu_reg.sp_bytes.s = __gb_read(gb, gb->cpu_reg.pc++);
 		break;
 
 	case 0x32: /* LD (HL), A */
