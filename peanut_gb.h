@@ -647,8 +647,8 @@ uint8_t __gb_read(struct gb_s *gb, const uint_fast16_t addr)
 
 		case 0x41:
 		{
-			return (gb->gb_reg.STAT & STAT_USER_BITS) |
-				(gb->gb_reg.LCDC & LCDC_ENABLE) ? gb->lcd_mode : 0;
+			return ((gb->gb_reg.STAT & STAT_USER_BITS) |
+				(gb->gb_reg.LCDC & LCDC_ENABLE)) ? gb->lcd_mode : 0;
 #if 0
 			uint8_t ret;
 			ret = gb->gb_reg.STAT & STAT_USER_BITS;
