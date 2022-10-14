@@ -211,10 +211,12 @@
 # define PEANUT_GB_GET_LSB16(x) (x & 0xFF)
 # define PEANUT_GB_GET_MSB16(x) (x >> 8)
 # define PEANUT_GB_GET_MSN16(x) (x >> 12)
+# define PEANUT_GB_U8_TO_U16(h,l) ((l) | ((h) << 8))
 #else
 # define PEANUT_GB_GET_LSB16(x) (x >> 8)
 # define PEANUT_GB_GET_MSB16(x) (x & 0xFF)
 # define PEANUT_GB_GET_MSN16(x) ((x & 0xF0) >> 4)
+# define PEANUT_GB_U8_TO_U16(h,l) ((h) | ((l) << 8))
 #endif
 
 struct cpu_registers_s
@@ -1641,8 +1643,8 @@ void __gb_step_cpu(struct gb_s *gb)
 			gb->gb_ime = 0;
 
 			/* Push Program Counter */
-			__gb_write(gb, --gb->cpu_reg.sp, gb->cpu_reg.pc >> 8);
-			__gb_write(gb, --gb->cpu_reg.sp, gb->cpu_reg.pc & 0xFF);
+			__gb_write(gb, --gb->cpu_reg.sp, gb->cpu_reg.pc_bytes.p);
+			__gb_write(gb, --gb->cpu_reg.sp, gb->cpu_reg.pc_bytes.c);
 
 			/* Call interrupt handler if required. */
 			if(gb->gb_reg.IF & gb->gb_reg.IE & VBLANK_INTR)
@@ -1724,8 +1726,11 @@ void __gb_step_cpu(struct gb_s *gb)
 
 	case 0x08: /* LD (imm), SP */
 	{
-		uint16_t temp = __gb_read(gb, gb->cpu_reg.pc++);
-		temp |= __gb_read(gb, gb->cpu_reg.pc++) << 8;
+		uint8_t h, l;
+		uint16_t temp;
+		l = __gb_read(gb, gb->cpu_reg.pc++);
+		h = __gb_read(gb, gb->cpu_reg.pc++);
+		temp = PEANUT_GB_U8_TO_U16(h,l);
 		__gb_write(gb, temp++, gb->cpu_reg.sp_bytes.p);
 		__gb_write(gb, temp, gb->cpu_reg.sp_bytes.s);
 		break;
