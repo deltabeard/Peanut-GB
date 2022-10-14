@@ -241,8 +241,6 @@ struct cpu_registers_s
 	uint16_t pc; /* Program counter */
 };
 
-_Static_assert(sizeof(struct cpu_registers_s) == 12, "Incorrect cpu_reg size");
-
 struct count_s
 {
 	uint_fast16_t lcd_count;	/* LCD Timing */
@@ -1900,7 +1898,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		if((a & 0x100) == 0x100)
 			PGB_SET_CARRY(1);
 
-		gb->cpu_reg.a = a;
+		gb->cpu_reg.a = (uint8_t) a;
 		PGB_SET_ZERO((gb->cpu_reg.a == 0));
 		PGB_SET_HALFC(0);
 

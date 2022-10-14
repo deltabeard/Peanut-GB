@@ -930,7 +930,7 @@ int main(int argc, char **argv)
 	while(SDL_QuitRequested() == SDL_FALSE)
 	{
 		int delay;
-		static unsigned int rtc_timer = 0;
+		static double rtc_timer = 0;
 		static unsigned int selected_palette = 3;
 		static unsigned int dump_bmp = 0;
 
@@ -1162,11 +1162,11 @@ int main(int argc, char **argv)
 		gb_run_frame(&gb);
 
 		/* Tick the internal RTC when 1 second has passed. */
-		rtc_timer += target_speed_ms / fast_mode;
+		rtc_timer += target_speed_ms / (double) fast_mode;
 
-		if(rtc_timer >= 1000)
+		if(rtc_timer >= 1000.0)
 		{
-			rtc_timer -= 1000;
+			rtc_timer -= 1000.0;
 			gb_tick_rtc(&gb);
 		}
 
