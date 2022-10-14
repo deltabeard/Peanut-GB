@@ -200,11 +200,22 @@
 
 #define ROM_HEADER_CHECKSUM_LOC	0x014D
 
+/* Local macros. */
 #ifndef MIN
 # define MIN(a, b)          ((a) < (b) ? (a) : (b))
 #endif
 
 #define PEANUT_GB_ARRAYSIZE(array)    (sizeof(array)/sizeof(array[0]))
+
+#if PEANUT_GB_IS_LITTLE_ENDIAN
+# define PEANUT_GB_GET_LSB16(x) (x & 0xFF)
+# define PEANUT_GB_GET_MSB16(x) (x >> 8)
+# define PEANUT_GB_GET_MSN16(x) (x >> 12)
+#else
+# define PEANUT_GB_GET_LSB16(x) (x >> 8)
+# define PEANUT_GB_GET_MSB16(x) (x & 0xFF)
+# define PEANUT_GB_GET_MSN16(x) ((x & 0xF0) >> 4)
+#endif
 
 struct cpu_registers_s
 {
@@ -252,8 +263,25 @@ struct cpu_registers_s
 		uint16_t hl;
 	};
 
-	uint16_t sp; /* Stack pointer */
-	uint16_t pc; /* Program counter */
+	/* Stack pointer */
+	union
+	{
+		struct
+		{
+			uint8_t PEANUT_GB_LE_REG(p, s);
+		} sp_bytes;
+		uint16_t sp;
+	};
+
+	/* Program counter */
+	union
+	{
+		struct
+		{
+			uint8_t PEANUT_GB_LE_REG(c, p);
+		} pc_bytes;
+		uint16_t pc;
+	};
 #undef PEANUT_GB_LE_REG
 };
 
