@@ -51,7 +51,7 @@
 /* If endian is not defined, then attempt to detect it. */
 # if defined(__BYTE_ORDER__)
 #  if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
-/ * Building for a big endian platform. */
+/* Building for a big endian platform. */
 #   PEANUT_GB_IS_LITTLE_ENDIAN 0
 #  else
 #   PEANUT_GB_IS_LITTLE_ENDIAN 1
