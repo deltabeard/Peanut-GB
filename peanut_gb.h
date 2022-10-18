@@ -51,10 +51,10 @@
 /* If endian is not defined, then attempt to detect it. */
 # if defined(__BYTE_ORDER__)
 #  if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
-/ * Building for a big endian platform. */
-#   PEANUT_GB_IS_LITTLE_ENDIAN 0
+/* Building for a big endian platform. */
+#   define PEANUT_GB_IS_LITTLE_ENDIAN 0
 #  else
-#   PEANUT_GB_IS_LITTLE_ENDIAN 1
+#   define PEANUT_GB_IS_LITTLE_ENDIAN 1
 #  endif /* __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__ */
 # elif !defined(PEANUT_GB_IS_LITTLE_ENDIAN)
 #  error "Could not detect target platform endian. Please define PEANUT_GB_IS_LITTLE_ENDIAN"
@@ -62,7 +62,7 @@
 #endif /* !defined(PEANUT_GB_IS_LITTLE_ENDIAN) */
 
 #if PEANUT_GB_IS_LITTLE_ENDIAN == 0
-# error "Peanut-GB only supports little endian targets"
+//# error "Peanut-GB only supports little endian targets"
 /* This is because the 16 - bit address functions take advantage of the fact that
 * the host system is also little endian.If you would like to run Peanut - GB on
 * a big endian machine, you have to change the order of the 8 - bit CPU
@@ -771,7 +771,7 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
  */
 void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 {
-	switch(addr >> 12)
+	switch(PEANUT_GB_GET_MSN16(addr))
 	{
 	case 0x0:
 	case 0x1:
@@ -4133,7 +4133,7 @@ uint_fast32_t gb_get_save_size(struct gb_s *gb);
  * Calculates and returns a hash of the game header in the same way the Game
  * Boy Color does for colourising old Game Boy games. The frontend can use this
  * hash to automatically set a colour palette.
- * 
+ *
  * \param gb	An initialised emulator context. Must not be NULL.
  * \returns	Hash of the game header.
  */
