@@ -62,7 +62,7 @@
 #endif /* !defined(PEANUT_GB_IS_LITTLE_ENDIAN) */
 
 #if PEANUT_GB_IS_LITTLE_ENDIAN == 0
-//# error "Peanut-GB only supports little endian targets"
+# error "Peanut-GB only supports little endian targets"
 /* This is because the 16 - bit address functions take advantage of the fact that
 * the host system is also little endian.If you would like to run Peanut - GB on
 * a big endian machine, you have to change the order of the 8 - bit CPU
