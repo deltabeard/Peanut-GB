@@ -43,6 +43,19 @@
 #include <string.h>	/* Required for memset */
 #include <time.h>	/* Required for tm struct */
 
+#if defined(_MSC_VER)
+# include <immintrin.h>
+# define PGB_SUBBORROW_U8(a,b,r) _subborrow_u8(0,a,b,r)
+# define PGB_SUBCARRY_U8(c,a,b,r) _subborrow_u8(c,a,b,r)
+# define PGB_ADDCARRY_U8(c,a,b,r) _addcarry_u8(c,a,b,r)
+#elif defined(__GNUC__)
+# define PGB_SUBBORROW_U8(a,b,r) __builtin_sub_overflow(a,b,r)
+# define PGB_SUBCARRY_U8(c,a,b,r) __builtin_sub_overflow(a,b+c,r)
+# define PGB_ADDCARRY_U8(c,a,b,r) __builtin_add_overflow(a,b+c,r)
+#else
+# error "Only MSVC, GCC, and Clang are supported"
+#endif
+
 /**
 * If PEANUT_GB_IS_LITTLE_ENDIAN is positive, then Peanut-GB will be configured
 * for a little endian platform. If 0, then big endian.
@@ -2492,13 +2505,14 @@ void __gb_step_cpu(struct gb_s *gb)
 
 	case 0x85: /* ADD A, L */
 	{
-		uint16_t temp = gb->cpu_reg.a + gb->cpu_reg.l;
-		gb->cpu_reg.f_bits.z = ((temp & 0xFF) == 0x00);
+		uint8_t temp;
+		gb->cpu_reg.f_bits.c = PGB_ADDCARRY_U8(0,
+				gb->cpu_reg.a, gb->cpu_reg.l, &temp);
+		gb->cpu_reg.f_bits.z = (temp == 0x00);
 		gb->cpu_reg.f_bits.n = 0;
 		gb->cpu_reg.f_bits.h =
 			(gb->cpu_reg.a ^ gb->cpu_reg.l ^ temp) & 0x10 ? 1 : 0;
-		gb->cpu_reg.f_bits.c = (temp & 0xFF00) ? 1 : 0;
-		gb->cpu_reg.a = (temp & 0xFF);
+		gb->cpu_reg.a = temp;
 		break;
 	}
 
@@ -2626,86 +2640,87 @@ void __gb_step_cpu(struct gb_s *gb)
 
 	case 0x90: /* SUB B */
 	{
-		uint16_t temp = gb->cpu_reg.a - gb->cpu_reg.b;
-		gb->cpu_reg.f_bits.z = ((temp & 0xFF) == 0x00);
+		uint8_t temp;
+		gb->cpu_reg.f_bits.c = PGB_SUBBORROW_U8(gb->cpu_reg.a, gb->cpu_reg.b, &temp);
+		gb->cpu_reg.f_bits.z = (temp == 0x00);
 		gb->cpu_reg.f_bits.n = 1;
 		gb->cpu_reg.f_bits.h =
 			(gb->cpu_reg.a ^ gb->cpu_reg.b ^ temp) & 0x10 ? 1 : 0;
-		gb->cpu_reg.f_bits.c = (temp & 0xFF00) ? 1 : 0;
-		gb->cpu_reg.a = (temp & 0xFF);
+		gb->cpu_reg.a = temp;
 		break;
 	}
 
 	case 0x91: /* SUB C */
 	{
-		uint16_t temp = gb->cpu_reg.a - gb->cpu_reg.c;
-		gb->cpu_reg.f_bits.z = ((temp & 0xFF) == 0x00);
+		uint8_t temp;
+		gb->cpu_reg.f_bits.c = PGB_SUBBORROW_U8(gb->cpu_reg.a, gb->cpu_reg.c, &temp);
+		gb->cpu_reg.f_bits.z = (temp == 0x00);
 		gb->cpu_reg.f_bits.n = 1;
 		gb->cpu_reg.f_bits.h =
 			(gb->cpu_reg.a ^ gb->cpu_reg.c ^ temp) & 0x10 ? 1 : 0;
-		gb->cpu_reg.f_bits.c = (temp & 0xFF00) ? 1 : 0;
-		gb->cpu_reg.a = (temp & 0xFF);
+		gb->cpu_reg.a = temp;
 		break;
 	}
 
 	case 0x92: /* SUB D */
 	{
-		uint16_t temp = gb->cpu_reg.a - gb->cpu_reg.d;
-		gb->cpu_reg.f_bits.z = ((temp & 0xFF) == 0x00);
+		uint8_t temp;
+		gb->cpu_reg.f_bits.c = PGB_SUBBORROW_U8(gb->cpu_reg.a, gb->cpu_reg.d, &temp);
+		gb->cpu_reg.f_bits.z = (temp == 0x00);
 		gb->cpu_reg.f_bits.n = 1;
 		gb->cpu_reg.f_bits.h =
 			(gb->cpu_reg.a ^ gb->cpu_reg.d ^ temp) & 0x10 ? 1 : 0;
-		gb->cpu_reg.f_bits.c = (temp & 0xFF00) ? 1 : 0;
-		gb->cpu_reg.a = (temp & 0xFF);
+		gb->cpu_reg.a = temp;
 		break;
 	}
 
 	case 0x93: /* SUB E */
 	{
-		uint16_t temp = gb->cpu_reg.a - gb->cpu_reg.e;
-		gb->cpu_reg.f_bits.z = ((temp & 0xFF) == 0x00);
+		uint8_t temp;
+		gb->cpu_reg.f_bits.c = PGB_SUBBORROW_U8(gb->cpu_reg.a, gb->cpu_reg.e, &temp);
+		gb->cpu_reg.f_bits.z = (temp == 0x00);
 		gb->cpu_reg.f_bits.n = 1;
 		gb->cpu_reg.f_bits.h =
 			(gb->cpu_reg.a ^ gb->cpu_reg.e ^ temp) & 0x10 ? 1 : 0;
-		gb->cpu_reg.f_bits.c = (temp & 0xFF00) ? 1 : 0;
-		gb->cpu_reg.a = (temp & 0xFF);
+		gb->cpu_reg.a = temp;
 		break;
 	}
 
 	case 0x94: /* SUB H */
 	{
-		uint16_t temp = gb->cpu_reg.a - gb->cpu_reg.h;
-		gb->cpu_reg.f_bits.z = ((temp & 0xFF) == 0x00);
+		uint8_t temp;
+		gb->cpu_reg.f_bits.c = PGB_SUBBORROW_U8(gb->cpu_reg.a, gb->cpu_reg.h, &temp);
+		gb->cpu_reg.f_bits.z = (temp == 0x00);
 		gb->cpu_reg.f_bits.n = 1;
 		gb->cpu_reg.f_bits.h =
-			(gb->cpu_reg.a ^ gb->cpu_reg.h ^ temp) & 0x10 ? 1 : 0;
-		gb->cpu_reg.f_bits.c = (temp & 0xFF00) ? 1 : 0;
-		gb->cpu_reg.a = (temp & 0xFF);
+			(gb->cpu_reg.a ^ gb->cpu_reg.h^ temp) & 0x10 ? 1 : 0;
+		gb->cpu_reg.a = temp;
 		break;
 	}
 
 	case 0x95: /* SUB L */
 	{
-		uint16_t temp = gb->cpu_reg.a - gb->cpu_reg.l;
-		gb->cpu_reg.f_bits.z = ((temp & 0xFF) == 0x00);
+		uint8_t temp;
+		gb->cpu_reg.f_bits.c = PGB_SUBBORROW_U8(gb->cpu_reg.a, gb->cpu_reg.l, &temp);
+		gb->cpu_reg.f_bits.z = (temp == 0x00);
 		gb->cpu_reg.f_bits.n = 1;
 		gb->cpu_reg.f_bits.h =
 			(gb->cpu_reg.a ^ gb->cpu_reg.l ^ temp) & 0x10 ? 1 : 0;
-		gb->cpu_reg.f_bits.c = (temp & 0xFF00) ? 1 : 0;
-		gb->cpu_reg.a = (temp & 0xFF);
+		gb->cpu_reg.a = temp;
 		break;
 	}
 
 	case 0x96: /* SUB (HL) */
 	{
-		uint8_t val = __gb_read(gb, gb->cpu_reg.hl);
-		uint16_t temp = gb->cpu_reg.a - val;
-		gb->cpu_reg.f_bits.z = ((temp & 0xFF) == 0x00);
+		uint8_t val;
+		uint8_t temp;
+		val = __gb_read(gb, gb->cpu_reg.hl);
+		gb->cpu_reg.f_bits.c = PGB_SUBBORROW_U8(gb->cpu_reg.a, val, &temp);
+		gb->cpu_reg.f_bits.z = (temp == 0x00);
 		gb->cpu_reg.f_bits.n = 1;
 		gb->cpu_reg.f_bits.h =
 			(gb->cpu_reg.a ^ val ^ temp) & 0x10 ? 1 : 0;
-		gb->cpu_reg.f_bits.c = (temp & 0xFF00) ? 1 : 0;
-		gb->cpu_reg.a = (temp & 0xFF);
+		gb->cpu_reg.a = temp;
 		break;
 	}
 
@@ -2719,13 +2734,14 @@ void __gb_step_cpu(struct gb_s *gb)
 
 	case 0x98: /* SBC A, B */
 	{
-		uint16_t temp = gb->cpu_reg.a - gb->cpu_reg.b - gb->cpu_reg.f_bits.c;
-		gb->cpu_reg.f_bits.z = ((temp & 0xFF) == 0x00);
+		uint8_t temp;
+		gb->cpu_reg.f_bits.c = PGB_SUBCARRY_U8(gb->cpu_reg.f_bits.c,
+					gb->cpu_reg.a, gb->cpu_reg.b, &temp);
+		gb->cpu_reg.f_bits.z = (temp == 0x00);
 		gb->cpu_reg.f_bits.n = 1;
 		gb->cpu_reg.f_bits.h =
 			(gb->cpu_reg.a ^ gb->cpu_reg.b ^ temp) & 0x10 ? 1 : 0;
-		gb->cpu_reg.f_bits.c = (temp & 0xFF00) ? 1 : 0;
-		gb->cpu_reg.a = (temp & 0xFF);
+		gb->cpu_reg.a = temp;
 		break;
 	}
 
