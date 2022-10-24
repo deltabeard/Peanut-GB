@@ -162,8 +162,8 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
 		 * function. */
 		fprintf(stdout, "Invalid opcode %#04x at PC: %#06x, SP: %#06x\n",
 			val,
-			gb->cpu_reg.pc - 1,
-			gb->cpu_reg.sp);
+			gb->cpu_reg.pc.reg - 1,
+			gb->cpu_reg.sp.reg);
 		break;
 
 	/* Ignoring non fatal errors. */
