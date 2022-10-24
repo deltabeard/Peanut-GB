@@ -45,11 +45,9 @@
 
 #if defined(_MSC_VER)
 # include <immintrin.h>
-# define PGB_SUBBORROW_U8(a,b,r) _subborrow_u8(0,a,b,r)
 # define PGB_SUBCARRY_U8(c,a,b,r) _subborrow_u8(c,a,b,r)
 # define PGB_ADDCARRY_U8(c,a,b,r) _addcarry_u8(c,a,b,r)
 #elif defined(__GNUC__)
-# define PGB_SUBBORROW_U8(a,b,r) __builtin_sub_overflow(a,b,r)
 # define PGB_SUBCARRY_U8(c,a,b,r) __builtin_sub_overflow(a,b+c,r)
 # define PGB_ADDCARRY_U8(c,a,b,r) __builtin_add_overflow(a,b+c,r)
 #else
@@ -2641,7 +2639,7 @@ void __gb_step_cpu(struct gb_s *gb)
 	case 0x90: /* SUB B */
 	{
 		uint8_t temp;
-		gb->cpu_reg.f_bits.c = PGB_SUBBORROW_U8(gb->cpu_reg.a, gb->cpu_reg.b, &temp);
+		gb->cpu_reg.f_bits.c = PGB_SUBCARRY_U8(0, gb->cpu_reg.a, gb->cpu_reg.b, &temp);
 		gb->cpu_reg.f_bits.z = (temp == 0x00);
 		gb->cpu_reg.f_bits.n = 1;
 		gb->cpu_reg.f_bits.h =
@@ -2653,7 +2651,7 @@ void __gb_step_cpu(struct gb_s *gb)
 	case 0x91: /* SUB C */
 	{
 		uint8_t temp;
-		gb->cpu_reg.f_bits.c = PGB_SUBBORROW_U8(gb->cpu_reg.a, gb->cpu_reg.c, &temp);
+		gb->cpu_reg.f_bits.c = PGB_SUBCARRY_U8(0, gb->cpu_reg.a, gb->cpu_reg.c, &temp);
 		gb->cpu_reg.f_bits.z = (temp == 0x00);
 		gb->cpu_reg.f_bits.n = 1;
 		gb->cpu_reg.f_bits.h =
@@ -2665,7 +2663,7 @@ void __gb_step_cpu(struct gb_s *gb)
 	case 0x92: /* SUB D */
 	{
 		uint8_t temp;
-		gb->cpu_reg.f_bits.c = PGB_SUBBORROW_U8(gb->cpu_reg.a, gb->cpu_reg.d, &temp);
+		gb->cpu_reg.f_bits.c = PGB_SUBCARRY_U8(0, gb->cpu_reg.a, gb->cpu_reg.d, &temp);
 		gb->cpu_reg.f_bits.z = (temp == 0x00);
 		gb->cpu_reg.f_bits.n = 1;
 		gb->cpu_reg.f_bits.h =
@@ -2677,7 +2675,7 @@ void __gb_step_cpu(struct gb_s *gb)
 	case 0x93: /* SUB E */
 	{
 		uint8_t temp;
-		gb->cpu_reg.f_bits.c = PGB_SUBBORROW_U8(gb->cpu_reg.a, gb->cpu_reg.e, &temp);
+		gb->cpu_reg.f_bits.c = PGB_SUBCARRY_U8(0, gb->cpu_reg.a, gb->cpu_reg.e, &temp);
 		gb->cpu_reg.f_bits.z = (temp == 0x00);
 		gb->cpu_reg.f_bits.n = 1;
 		gb->cpu_reg.f_bits.h =
@@ -2689,7 +2687,7 @@ void __gb_step_cpu(struct gb_s *gb)
 	case 0x94: /* SUB H */
 	{
 		uint8_t temp;
-		gb->cpu_reg.f_bits.c = PGB_SUBBORROW_U8(gb->cpu_reg.a, gb->cpu_reg.h, &temp);
+		gb->cpu_reg.f_bits.c = PGB_SUBCARRY_U8(0, gb->cpu_reg.a, gb->cpu_reg.h, &temp);
 		gb->cpu_reg.f_bits.z = (temp == 0x00);
 		gb->cpu_reg.f_bits.n = 1;
 		gb->cpu_reg.f_bits.h =
@@ -2701,7 +2699,7 @@ void __gb_step_cpu(struct gb_s *gb)
 	case 0x95: /* SUB L */
 	{
 		uint8_t temp;
-		gb->cpu_reg.f_bits.c = PGB_SUBBORROW_U8(gb->cpu_reg.a, gb->cpu_reg.l, &temp);
+		gb->cpu_reg.f_bits.c = PGB_SUBCARRY_U8(0, gb->cpu_reg.a, gb->cpu_reg.l, &temp);
 		gb->cpu_reg.f_bits.z = (temp == 0x00);
 		gb->cpu_reg.f_bits.n = 1;
 		gb->cpu_reg.f_bits.h =
@@ -2715,7 +2713,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		uint8_t val;
 		uint8_t temp;
 		val = __gb_read(gb, gb->cpu_reg.hl);
-		gb->cpu_reg.f_bits.c = PGB_SUBBORROW_U8(gb->cpu_reg.a, val, &temp);
+		gb->cpu_reg.f_bits.c = PGB_SUBCARRY_U8(0, gb->cpu_reg.a, val, &temp);
 		gb->cpu_reg.f_bits.z = (temp == 0x00);
 		gb->cpu_reg.f_bits.n = 1;
 		gb->cpu_reg.f_bits.h =
