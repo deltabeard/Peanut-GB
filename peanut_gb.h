@@ -56,6 +56,9 @@
 #  else
 #   define PEANUT_GB_IS_LITTLE_ENDIAN 1
 #  endif /* __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__ */
+# elif defined(_WIN32)
+/* We assume that Windows is always little endian by default. */
+#  define PEANUT_GB_IS_LITTLE_ENDIAN 1
 # elif !defined(PEANUT_GB_IS_LITTLE_ENDIAN)
 #  error "Could not detect target platform endian. Please define PEANUT_GB_IS_LITTLE_ENDIAN"
 # endif
@@ -63,10 +66,8 @@
 
 #if PEANUT_GB_IS_LITTLE_ENDIAN == 0
 # error "Peanut-GB only supports little endian targets"
-/* This is because the 16 - bit address functions take advantage of the fact that
-* the host system is also little endian.If you would like to run Peanut - GB on
-* a big endian machine, you have to change the order of the 8 - bit CPU
-* registers. */
+/* This is because the logic has been written with assumption of little
+ * endian byte order. */
 #endif
 
 /** Definitions for compile-time setting of features. **/
