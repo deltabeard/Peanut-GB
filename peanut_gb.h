@@ -248,6 +248,15 @@
 		gb->cpu_reg.f_bits.z = (temp == 0x00);				\
 		gb->cpu_reg.a = temp;						\
 	}
+
+# define PGB_INSTR_CP_R8(r)							\
+	{									\
+		uint8_t temp;							\
+		gb->cpu_reg.f_bits.c = PGB_INTRIN_SBC(gb->cpu_reg.a,r,0,temp);	\
+		gb->cpu_reg.f_bits.h = ((gb->cpu_reg.a ^ r ^ temp) & 0x10) > 0;	\
+		gb->cpu_reg.f_bits.n = 1;					\
+		gb->cpu_reg.f_bits.z = (temp == 0x00);				\
+	}
 #else
 # define PGB_INSTR_SBC_R8(r,cin)						\
 	{									\
@@ -257,6 +266,15 @@
 		gb->cpu_reg.f_bits.n = 1;					\
 		gb->cpu_reg.f_bits.z = ((temp & 0xFF) == 0x00);			\
 		gb->cpu_reg.a = (temp & 0xFF);					\
+	}
+
+# define PGB_INSTR_CP_R8(r)							\
+	{									\
+		uint16_t temp = gb->cpu_reg.a - r;				\
+		gb->cpu_reg.f_bits.c = (temp & 0xFF00) ? 1 : 0;			\
+		gb->cpu_reg.f_bits.h = ((gb->cpu_reg.a ^ r ^ temp) & 0x10) > 0; \
+		gb->cpu_reg.f_bits.n = 1;					\
+		gb->cpu_reg.f_bits.z = ((temp & 0xFF) == 0x00);			\
 	}
 #endif  /* PGB_INTRIN_SBC */
 
@@ -2832,81 +2850,33 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0xB8: /* CP B */
-	{
-		uint16_t temp = gb->cpu_reg.a - gb->cpu_reg.bc.bytes.b;
-		gb->cpu_reg.f_bits.z = ((temp & 0xFF) == 0x00);
-		gb->cpu_reg.f_bits.n = 1;
-		gb->cpu_reg.f_bits.h =
-			(gb->cpu_reg.a ^ gb->cpu_reg.bc.bytes.b ^ temp) & 0x10 ? 1 : 0;
-		gb->cpu_reg.f_bits.c = (temp & 0xFF00) ? 1 : 0;
+		PGB_INSTR_CP_R8(gb->cpu_reg.bc.bytes.b);
 		break;
-	}
 
 	case 0xB9: /* CP C */
-	{
-		uint16_t temp = gb->cpu_reg.a - gb->cpu_reg.bc.bytes.c;
-		gb->cpu_reg.f_bits.z = ((temp & 0xFF) == 0x00);
-		gb->cpu_reg.f_bits.n = 1;
-		gb->cpu_reg.f_bits.h =
-			(gb->cpu_reg.a ^ gb->cpu_reg.bc.bytes.c ^ temp) & 0x10 ? 1 : 0;
-		gb->cpu_reg.f_bits.c = (temp & 0xFF00) ? 1 : 0;
+		PGB_INSTR_CP_R8(gb->cpu_reg.bc.bytes.c);
 		break;
-	}
 
 	case 0xBA: /* CP D */
-	{
-		uint16_t temp = gb->cpu_reg.a - gb->cpu_reg.de.bytes.d;
-		gb->cpu_reg.f_bits.z = ((temp & 0xFF) == 0x00);
-		gb->cpu_reg.f_bits.n = 1;
-		gb->cpu_reg.f_bits.h =
-			(gb->cpu_reg.a ^ gb->cpu_reg.de.bytes.d ^ temp) & 0x10 ? 1 : 0;
-		gb->cpu_reg.f_bits.c = (temp & 0xFF00) ? 1 : 0;
+		PGB_INSTR_CP_R8(gb->cpu_reg.de.bytes.d);
 		break;
-	}
 
 	case 0xBB: /* CP E */
-	{
-		uint16_t temp = gb->cpu_reg.a - gb->cpu_reg.de.bytes.e;
-		gb->cpu_reg.f_bits.z = ((temp & 0xFF) == 0x00);
-		gb->cpu_reg.f_bits.n = 1;
-		gb->cpu_reg.f_bits.h =
-			(gb->cpu_reg.a ^ gb->cpu_reg.de.bytes.e ^ temp) & 0x10 ? 1 : 0;
-		gb->cpu_reg.f_bits.c = (temp & 0xFF00) ? 1 : 0;
+		PGB_INSTR_CP_R8(gb->cpu_reg.de.bytes.e);
 		break;
-	}
 
 	case 0xBC: /* CP H */
-	{
-		uint16_t temp = gb->cpu_reg.a - gb->cpu_reg.hl.bytes.h;
-		gb->cpu_reg.f_bits.z = ((temp & 0xFF) == 0x00);
-		gb->cpu_reg.f_bits.n = 1;
-		gb->cpu_reg.f_bits.h =
-			(gb->cpu_reg.a ^ gb->cpu_reg.hl.bytes.h ^ temp) & 0x10 ? 1 : 0;
-		gb->cpu_reg.f_bits.c = (temp & 0xFF00) ? 1 : 0;
+		PGB_INSTR_CP_R8(gb->cpu_reg.hl.bytes.h);
 		break;
-	}
 
 	case 0xBD: /* CP L */
-	{
-		uint16_t temp = gb->cpu_reg.a - gb->cpu_reg.hl.bytes.l;
-		gb->cpu_reg.f_bits.z = ((temp & 0xFF) == 0x00);
-		gb->cpu_reg.f_bits.n = 1;
-		gb->cpu_reg.f_bits.h =
-			(gb->cpu_reg.a ^ gb->cpu_reg.hl.bytes.l ^ temp) & 0x10 ? 1 : 0;
-		gb->cpu_reg.f_bits.c = (temp & 0xFF00) ? 1 : 0;
+		PGB_INSTR_CP_R8(gb->cpu_reg.hl.bytes.l);
 		break;
-	}
 
-	/* TODO: Optimsation by combining similar opcode routines. */
-	case 0xBE: /* CP B */
+	case 0xBE: /* CP (HL) */
 	{
 		uint8_t val = __gb_read(gb, gb->cpu_reg.hl.reg);
-		uint16_t temp = gb->cpu_reg.a - val;
-		gb->cpu_reg.f_bits.z = ((temp & 0xFF) == 0x00);
-		gb->cpu_reg.f_bits.n = 1;
-		gb->cpu_reg.f_bits.h =
-			(gb->cpu_reg.a ^ val ^ temp) & 0x10 ? 1 : 0;
-		gb->cpu_reg.f_bits.c = (temp & 0xFF00) ? 1 : 0;
+		PGB_INSTR_CP_R8(val);
 		break;
 	}
 
@@ -2981,16 +2951,8 @@ void __gb_step_cpu(struct gb_s *gb)
 
 	case 0xC6: /* ADD A, imm */
 	{
-		/* TODO: use builtin/intrinsic functions to detect overflows. */
-		/* Taken from SameBoy, which is released under MIT Licence. */
-		uint8_t value = __gb_read(gb, gb->cpu_reg.pc.reg++);
-		uint16_t calc = gb->cpu_reg.a + value;
-		gb->cpu_reg.f_bits.z = ((uint8_t)calc == 0) ? 1 : 0;
-		gb->cpu_reg.f_bits.h =
-			((gb->cpu_reg.a & 0xF) + (value & 0xF) > 0x0F) ? 1 : 0;
-		gb->cpu_reg.f_bits.c = calc > 0xFF ? 1 : 0;
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.a = (uint8_t)calc;
+		uint8_t val = __gb_read(gb, gb->cpu_reg.pc.reg++);
+		PGB_INSTR_ADC_R8(val, 0);
 		break;
 	}
 
@@ -3066,18 +3028,8 @@ void __gb_step_cpu(struct gb_s *gb)
 
 	case 0xCE: /* ADC A, imm */
 	{
-		uint8_t value, a, carry;
-		value = __gb_read(gb, gb->cpu_reg.pc.reg++);
-		a = gb->cpu_reg.a;
-		carry = gb->cpu_reg.f_bits.c;
-		gb->cpu_reg.a = a + value + carry;
-
-		gb->cpu_reg.f_bits.z = gb->cpu_reg.a == 0 ? 1 : 0;
-		gb->cpu_reg.f_bits.h =
-			((a & 0xF) + (value & 0xF) + carry > 0x0F) ? 1 : 0;
-		gb->cpu_reg.f_bits.c =
-			(((uint16_t) a) + ((uint16_t) value) + carry > 0xFF) ? 1 : 0;
-		gb->cpu_reg.f_bits.n = 0;
+		uint8_t val = __gb_read(gb, gb->cpu_reg.pc.reg++);
+		PGB_INSTR_ADC_R8(val, gb->cpu_reg.f_bits.c);
 		break;
 	}
 
@@ -3210,14 +3162,8 @@ void __gb_step_cpu(struct gb_s *gb)
 
 	case 0xDE: /* SBC A, imm */
 	{
-		uint8_t temp_8 = __gb_read(gb, gb->cpu_reg.pc.reg++);
-		uint16_t temp_16 = gb->cpu_reg.a - temp_8 - gb->cpu_reg.f_bits.c;
-		gb->cpu_reg.f_bits.z = ((temp_16 & 0xFF) == 0x00);
-		gb->cpu_reg.f_bits.n = 1;
-		gb->cpu_reg.f_bits.h =
-			(gb->cpu_reg.a ^ temp_8 ^ temp_16) & 0x10 ? 1 : 0;
-		gb->cpu_reg.f_bits.c = (temp_16 & 0xFF00) ? 1 : 0;
-		gb->cpu_reg.a = (temp_16 & 0xFF);
+		uint8_t val = __gb_read(gb, gb->cpu_reg.pc.reg++);
+		PGB_INSTR_SBC_R8(val, gb->cpu_reg.f_bits.c);
 		break;
 	}
 
@@ -3380,12 +3326,8 @@ void __gb_step_cpu(struct gb_s *gb)
 
 	case 0xFE: /* CP imm */
 	{
-		uint8_t temp_8 = __gb_read(gb, gb->cpu_reg.pc.reg++);
-		uint16_t temp_16 = gb->cpu_reg.a - temp_8;
-		gb->cpu_reg.f_bits.z = ((temp_16 & 0xFF) == 0x00);
-		gb->cpu_reg.f_bits.n = 1;
-		gb->cpu_reg.f_bits.h = ((gb->cpu_reg.a ^ temp_8 ^ temp_16) & 0x10) ? 1 : 0;
-		gb->cpu_reg.f_bits.c = (temp_16 & 0xFF00) ? 1 : 0;
+		uint8_t val = __gb_read(gb, gb->cpu_reg.pc.reg++);
+		PGB_INSTR_CP_R8(val);
 		break;
 	}
 
