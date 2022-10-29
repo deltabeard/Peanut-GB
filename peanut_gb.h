@@ -258,11 +258,13 @@
 	}
 #endif  /* PGB_INTRIN_SUBCB */
 
-#define PGB_INSTR_DEC_R8(reg,byte)						\
-	gb->cpu_reg.reg.bytes.byte--;						\
-	gb->cpu_reg.f_bits.z = (gb->cpu_reg.reg.bytes.byte == 0x00);		\
+//#define PGB_INSTR_ADD_R8()
+
+#define PGB_INSTR_DEC_R8(r)							\
+	r--;									\
+	gb->cpu_reg.f_bits.z = (r == 0x00);					\
 	gb->cpu_reg.f_bits.n = 1;						\
-	gb->cpu_reg.f_bits.h = ((gb->cpu_reg.reg.bytes.byte & 0x0F) == 0x0F);
+	gb->cpu_reg.f_bits.h = ((r & 0x0F) == 0x0F);
 
 #if PEANUT_GB_IS_LITTLE_ENDIAN
 # define PEANUT_GB_GET_LSB16(x) (x & 0xFF)
@@ -1763,7 +1765,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0x05: /* DEC B */
-		PGB_INSTR_DEC_R8(bc,b);
+		PGB_INSTR_DEC_R8(gb->cpu_reg.bc.bytes.b);
 		break;
 
 	case 0x06: /* LD B, imm */
@@ -1817,7 +1819,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0x0D: /* DEC C */
-		PGB_INSTR_DEC_R8(bc,c);
+		PGB_INSTR_DEC_R8(gb->cpu_reg.bc.bytes.c);
 		break;
 
 	case 0x0E: /* LD C, imm */
@@ -1857,7 +1859,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0x15: /* DEC D */
-		PGB_INSTR_DEC_R8(de,d);
+		PGB_INSTR_DEC_R8(gb->cpu_reg.de.bytes.d);
 		break;
 
 	case 0x16: /* LD D, imm */
@@ -1909,7 +1911,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0x1D: /* DEC E */
-		PGB_INSTR_DEC_R8(de,e);
+		PGB_INSTR_DEC_R8(gb->cpu_reg.de.bytes.e);
 		break;
 
 	case 0x1E: /* LD E, imm */
@@ -1961,7 +1963,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0x25: /* DEC H */
-		PGB_INSTR_DEC_R8(hl,h);
+		PGB_INSTR_DEC_R8(gb->cpu_reg.hl.bytes.h);
 		break;
 
 	case 0x26: /* LD H, imm */
@@ -2037,7 +2039,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0x2D: /* DEC L */
-		PGB_INSTR_DEC_R8(hl,l);
+		PGB_INSTR_DEC_R8(gb->cpu_reg.hl.bytes.l);
 		break;
 
 	case 0x2E: /* LD L, imm */
