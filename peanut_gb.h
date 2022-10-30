@@ -2057,11 +2057,10 @@ void __gb_step_cpu(struct gb_s *gb)
 
 	case 0x29: /* ADD HL, HL */
 	{
-		uint_fast32_t temp = gb->cpu_reg.hl.reg + gb->cpu_reg.hl.reg;
+		gb->cpu_reg.f_bits.c = (gb->cpu_reg.hl.reg & 0x8000) > 0;
+		gb->cpu_reg.hl.reg <<= 1;
 		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = (temp & 0x1000) ? 1 : 0;
-		gb->cpu_reg.f_bits.c = (temp & 0xFFFF0000) ? 1 : 0;
-		gb->cpu_reg.hl.reg = (temp & 0x0000FFFF);
+		gb->cpu_reg.f_bits.h = (gb->cpu_reg.hl.reg & 0x1000) > 0;
 		break;
 	}
 
