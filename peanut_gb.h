@@ -2013,7 +2013,8 @@ void __gb_step_cpu(struct gb_s *gb)
 
 	case 0x27: /* DAA */
 	{
-		uint16_t a = gb->cpu_reg.a;
+		/* The following is from SameBoy. MIT License. */
+		int16_t a = gb->cpu_reg.a;
 
 		if(gb->cpu_reg.f_bits.n)
 		{
