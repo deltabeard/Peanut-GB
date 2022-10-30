@@ -2654,7 +2654,7 @@ void __gb_step_cpu(struct gb_s *gb)
 
 	case 0x9F: /* SBC A, A */
 		gb->cpu_reg.a = gb->cpu_reg.f_bits.c ? 0xFF : 0x00;
-		gb->cpu_reg.f_bits.z = gb->cpu_reg.f_bits.c ? 0x00 : 0x01;
+		gb->cpu_reg.f_bits.z = !gb->cpu_reg.f_bits.c;
 		gb->cpu_reg.f_bits.n = 1;
 		gb->cpu_reg.f_bits.h = gb->cpu_reg.f_bits.c;
 		break;
