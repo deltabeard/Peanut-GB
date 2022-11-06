@@ -9,10 +9,8 @@ ifeq ($(CC),cl)
 	CFLAGS := /O2 /W2 /utf-8
 endif
 
-all: peanut-benchmark peanut-benchmark-rom
+all: peanut-benchmark
 peanut-benchmark: peanut_benchmark.c ../../peanut_gb.h
-	$(CC) $(CFLAGS) $(LDFLAGS) $(OUTSWITCH)$@ $< $(LDLIBS)
-peanut-benchmark-rom: peanut_benchmark_rom.c ../../peanut_gb.h
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OUTSWITCH)$@ $< $(LDLIBS)
 
 clean:
