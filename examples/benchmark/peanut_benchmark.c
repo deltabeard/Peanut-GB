@@ -21,6 +21,11 @@
 #include <stdlib.h>
 #include <time.h>
 
+#ifdef _WIN32
+# define WIN32_LEAN_AND_MEAN 1
+# include <Windows.h>
+#endif
+
 const uint_fast32_t frames_per_run = 64 * 1024;
 
 struct priv_t
@@ -143,6 +148,10 @@ int main(int argc, char **argv)
 			fprintf(stderr, "%s ROM\n", argv[0]);
 			exit(EXIT_FAILURE);
 	}
+
+#ifdef _WIN32
+	//SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
+#endif
 
 	for(unsigned int i = 0; i < 5; i++)
 	{

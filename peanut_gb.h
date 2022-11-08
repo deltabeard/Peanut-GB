@@ -43,7 +43,7 @@
 
 #include <stdlib.h>	/* Required for qsort */
 #include <stdint.h>	/* Required for int types */
-#include <string.h>	/* Required for memset */
+#include <string.h>	/* Required for memset and memcpy */
 #include <time.h>	/* Required for tm struct */
 
 /**
@@ -997,9 +997,30 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 			uint16_t dma_addr = (uint_fast16_t)val << 8;
 			gb->hram_io[IO_DMA] = val;
 
-			for(uint16_t i = 0; i < OAM_SIZE; i++)
+#ifdef PEANUT_GB_GET_ROM_POINTER
+#endif
+
+			if (dma_addr >= WRAM_0_ADDR && dma_addr < ECHO_ADDR)
 			{
-				gb->oam[i] = __gb_read(gb, dma_addr + i);
+				//uint32_t *dma_addr32, *oam32;
+
+				dma_addr -= WRAM_0_ADDR;
+				//dma_addr32 = (uint32_t *)(gb->wram + dma_addr);
+				//oam32 = (uint32_t *)gb->oam;
+
+				memcpy(gb->oam, &gb->wram[dma_addr], OAM_SIZE);
+				//for (uint8_t i = 0; i < OAM_SIZE; i++)
+				//{
+				//	gb->oam[i] = gb->wram[dma_addr + i];
+					//oam32[i] = dma_addr32[i];
+				//}
+			}
+			else
+			{
+				for(uint16_t i = 0; i < OAM_SIZE; i++)
+				{
+					gb->oam[i] = __gb_read(gb, dma_addr + i);
+				}
 			}
 
 			return;
