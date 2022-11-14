@@ -447,8 +447,8 @@ struct count_s
 	* Bit mask for whether a pixel is OBJ0, OBJ1, or BG. Each may have a different
 	* palette when playing a DMG game on CGB.
 	*/
-	#define LCD_PALETTE_OBJ	0x10
-	#define LCD_PALETTE_BG	0x20
+	#define LCD_PALETTE_OBJ	0x04
+	#define LCD_PALETTE_BG	0x08
 	/**
 	* Bit mask for the two bits listed above.
 	* LCD_PALETTE_ALL == 0b00 --> OBJ0
@@ -456,7 +456,7 @@ struct count_s
 	* LCD_PALETTE_ALL == 0b10 --> BG
 	* LCD_PALETTE_ALL == 0b11 --> NOT POSSIBLE
 	*/
-	#define LCD_PALETTE_ALL 0x30
+	#define LCD_PALETTE_ALL 0x0C
 #endif
 
 /**
@@ -597,7 +597,9 @@ struct gb_s
 	uint8_t gb_bios_enable : 1;
 #endif
 	uint8_t gb_frame : 1; /* New frame drawn. */
+#if ENABLE_LCD
 	uint8_t lcd_blank : 1;
+#endif
 
 	struct cpu_registers_s cpu_reg;
 	struct count_s counter;
@@ -636,7 +638,7 @@ struct gb_s
 		 * guaranteed to be between 0-144 inclusive.
 		 */
 		void (*lcd_draw_line)(const uint8_t* pixels,
-			const uint_fast8_t line, void *priv);
+			const uint8_t line, void *priv);
 	} display;
 #endif
 
@@ -946,7 +948,9 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 				(val & LCDC_ENABLE))
 			{
 				gb->counter.lcd_count = 0;
+#if ENABLE_LCD
 				gb->lcd_blank = 1;
+#endif
 			}
 
 			gb->hram_io[IO_LCDC] = val;
@@ -1513,8 +1517,7 @@ void __gb_draw_line(struct gb_s *gb)
 
 #if !PEANUT_GB_HIGH_LCD_ACCURACY
 			/* If sprite isn't on this line, continue. */
-			if(gb->hram_io[IO_LY +
-					(gb->hram_io[IO_LCDC] & LCDC_OBJ_SIZE ? 0 : 8) >= OY ||
+			if(gb->hram_io[IO_LY] + (gb->hram_io[IO_LCDC] & LCDC_OBJ_SIZE ? 0 : 8) >= OY ||
 					gb->hram_io[IO_LY] + 16 < OY)
 				continue;
 #endif
@@ -1576,7 +1579,7 @@ void __gb_draw_line(struct gb_s *gb)
 							 ? gb->display.sp_palette[c + 4]
 							 : gb->display.sp_palette[c];
 					/* Set pixel palette (OBJ0 or OBJ1). */
-					pixels[disp_x] |= (OF & OBJ_PALETTE);
+					pixels[disp_x] |= ((OF >> 2) & OBJ_PALETTE);
 					/* Deselect BG palette. */
 					pixels[disp_x] &= ~LCD_PALETTE_BG;
 				}
@@ -3351,12 +3354,12 @@ void __gb_step_cpu(struct gb_s *gb)
 				gb->hram_io[IO_STAT] = STAT_MODE & IO_STAT_MODE_VBLANK;
 				gb->gb_frame = 1;
 				gb->hram_io[IO_IF] |= VBLANK_INTR;
-				gb->lcd_blank = 0;
 
 				if(gb->hram_io[IO_STAT] & STAT_MODE_1_INTR)
 					gb->hram_io[IO_IF] |= LCDC_INTR;
 
 #if ENABLE_LCD
+				gb->lcd_blank = 0;
 
 				/* If frame skip is activated, check if we need to draw
 				 * the frame or skip it. */
@@ -3381,12 +3384,14 @@ void __gb_step_cpu(struct gb_s *gb)
 				/* Normal Line */
 			else if(gb->hram_io[IO_LY] < LCD_HEIGHT)
 			{
+#if ENABLE_LCD
 				if(gb->hram_io[IO_LY] == 0)
 				{
 					/* Clear Screen */
 					gb->display.WY = gb->hram_io[IO_WY];
 					gb->display.window_clear = 0;
 				}
+#endif
 
 				gb->hram_io[IO_STAT] = STAT_MODE & IO_STAT_MODE_HBLANK;
 
@@ -3611,8 +3616,10 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	gb->num_rom_banks_mask = num_rom_banks_mask[gb->gb_rom_read(bank_count_location, gb->priv)] - 1;
 	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(ram_size_location, gb->priv)];
 
+#if ENABLE_LCD
 	gb->lcd_blank = 0;
 	gb->display.lcd_draw_line = NULL;
+#endif
 
 	gb_reset(gb);
 
@@ -3646,7 +3653,7 @@ const char* gb_get_rom_name(struct gb_s* gb, char *title_str)
 #if ENABLE_LCD
 void gb_init_lcd(struct gb_s *gb,
 		void (*lcd_draw_line)(const uint8_t *pixels,
-			const uint_fast8_t line, void *priv))
+			const uint8_t line, void *priv))
 {
 	gb->display.lcd_draw_line = lcd_draw_line;
 
@@ -3766,7 +3773,7 @@ void gb_reset(struct gb_s *gb);
 #if ENABLE_LCD
 void gb_init_lcd(struct gb_s *gb,
 		void (*lcd_draw_line)(const uint8_t *pixels,
-			const uint_fast8_t line, void *priv));
+			const uint8_t line, void *priv));
 #endif
 
 /**

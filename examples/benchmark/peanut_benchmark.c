@@ -9,6 +9,8 @@
 # define ENABLE_LCD 1
 #endif
 
+#define PEANUT_GB_HIGH_LCD_ACCURACY 1
+
 /* Sound is disabled for this project. */
 #define ENABLE_SOUND 0
 
@@ -118,17 +120,28 @@ static void gb_error(const enum gb_error_e gb_err, const uint16_t val, void *pri
 	abort();
 }
 
+//#include <assert.h>
 #if ENABLE_LCD
 /**
  * Draws scanline into framebuffer.
  */
-static void lcd_draw_line(const uint8_t pixels[160], const uint_fast8_t line, void *priv)
+static void lcd_draw_line(const uint8_t pixels[160], const uint8_t line, void *priv)
 {
 	struct priv_t *p = priv;
-	const uint16_t palette[] = { 0x7FFF, 0x5294, 0x294A, 0x0000 };
+	const uint16_t palette[12] = {
+		 0x7FFF, 0x5294, 0x294A, 0x0000,
+		 0x7FFF, 0x5294, 0x294A, 0x0000,
+		 0x7FFF, 0x5294, 0x294A, 0x0000
+	};
 
-	for (unsigned int x = 0; x < LCD_WIDTH; x++)
-		p->fb[line][x] = palette[pixels[x] & 3];
+	for (int x = 0; x < LCD_WIDTH; x++)
+	{
+		if(pixels[x] >= 12)
+			__assume(0);
+
+		//assert(pixels[x] < PEANUT_GB_ARRAYSIZE(palette));
+		p->fb[line][x] = palette[pixels[x]];
+	}
 }
 #endif
 
