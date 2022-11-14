@@ -42,28 +42,28 @@ struct priv_t
 /**
  * Returns a byte from the ROM file at the given address.
  */
-static uint8_t gb_rom_read(struct gb_s *gb, const uint_fast32_t addr)
+static uint8_t gb_rom_read(const uint_fast32_t addr, void *priv)
 {
-	const struct priv_t * const p = gb->direct.priv;
+	const struct priv_t * const p = priv;
 	return p->rom[addr];
 }
 
 /**
  * Returns a byte from the cartridge RAM at the given address.
  */
-static uint8_t gb_cart_ram_read(struct gb_s *gb, const uint_fast32_t addr)
+static uint8_t gb_cart_ram_read(const uint_fast32_t addr, void *priv)
 {
-	const struct priv_t * const p = gb->direct.priv;
+	const struct priv_t * const p = priv;
 	return p->cart_ram[addr];
 }
 
 /**
  * Writes a given byte to the cartridge RAM at the given address.
  */
-static void gb_cart_ram_write(struct gb_s *gb, const uint_fast32_t addr,
-		const uint8_t val)
+static void gb_cart_ram_write(const uint_fast32_t addr,
+		const uint8_t val, void *priv)
 {
-	const struct priv_t * const p = gb->direct.priv;
+	const struct priv_t * const p = priv;
 	p->cart_ram[addr] = val;
 }
 
@@ -98,7 +98,7 @@ static uint8_t *read_rom_to_ram(const char *file_name)
 /**
  * Ignore all errors.
  */
-static void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
+static void gb_error(const enum gb_error_e gb_err, const uint16_t val, void *priv)
 {
 	const char* gb_err_str[4] = {
 		"UNKNOWN",
@@ -112,7 +112,7 @@ static void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16
 				gb_err_str[0] : gb_err_str[gb_err]);
 
 	/* Unused parameters. */
-	(void)gb;
+	(void)priv;
 	(void)val;
 
 	abort();
@@ -122,14 +122,13 @@ static void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16
 /**
  * Draws scanline into framebuffer.
  */
-static void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
-		const uint_least8_t line)
+static void lcd_draw_line(const uint8_t pixels[160], const uint_fast8_t line, void *priv)
 {
-	struct priv_t *priv = gb->direct.priv;
+	struct priv_t *p = priv;
 	const uint16_t palette[] = { 0x7FFF, 0x5294, 0x294A, 0x0000 };
 
 	for (unsigned int x = 0; x < LCD_WIDTH; x++)
-		priv->fb[line][x] = palette[pixels[x] & 3];
+		p->fb[line][x] = palette[pixels[x] & 3];
 }
 #endif
 

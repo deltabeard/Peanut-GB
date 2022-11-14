@@ -343,10 +343,10 @@ struct cpu_registers_s
 	/* Define specific bits of Flag register. */
 	struct
 	{
-		unsigned c : 1; /* Carry flag. */
-		unsigned h : 1; /* Half carry flag. */
-		unsigned n : 1; /* Add/sub flag. */
-		unsigned z : 1; /* Zero flag. */
+		uint8_t c : 1; /* Carry flag. */
+		uint8_t h : 1; /* Half carry flag. */
+		uint8_t n : 1; /* Add/sub flag. */
+		uint8_t z : 1; /* Zero flag. */
 	} f_bits;
 	uint8_t a;
 
@@ -401,10 +401,10 @@ struct cpu_registers_s
 
 struct count_s
 {
-	uint_fast16_t lcd_count;	/* LCD Timing */
-	uint_fast16_t div_count;	/* Divider Register Counter */
-	uint_fast16_t tima_count;	/* Timer Counter */
-	uint_fast16_t serial_count;	/* Serial Counter */
+	int_fast16_t lcd_count;		/* LCD Timing */
+	int_fast16_t div_count;		/* Divider Register Counter */
+	int_fast16_t tima_count;	/* Timer Counter */
+	int_fast16_t serial_count;	/* Serial Counter */
 };
 
 #define IO_JOYP	0x00
@@ -507,7 +507,7 @@ struct gb_s
 	 * \param addr	address
 	 * \return		byte at address in ROM
 	 */
-	uint8_t (*gb_rom_read)(struct gb_s*, const uint_fast32_t addr);
+	uint8_t (*gb_rom_read)(const uint_fast32_t addr, void *priv);
 
 	/**
 	 * Return byte from cart RAM at given address.
@@ -516,7 +516,7 @@ struct gb_s
 	 * \param addr	address
 	 * \return		byte at address in RAM
 	 */
-	uint8_t (*gb_cart_ram_read)(struct gb_s*, const uint_fast32_t addr);
+	uint8_t (*gb_cart_ram_read)(const uint_fast32_t addr, void *priv);
 
 	/**
 	 * Write byte to cart RAM at given address.
@@ -525,8 +525,7 @@ struct gb_s
 	 * \param addr	address
 	 * \param val	value to write to address in RAM
 	 */
-	void (*gb_cart_ram_write)(struct gb_s*, const uint_fast32_t addr,
-				  const uint8_t val);
+	void (*gb_cart_ram_write)(const uint_fast32_t addr, const uint8_t val, void *priv);
 
 	/**
 	 * Notify front-end of error.
@@ -535,40 +534,28 @@ struct gb_s
 	 * \param gb_error_e	error code
 	 * \param val			arbitrary value related to error
 	 */
-	void (*gb_error)(struct gb_s*, const enum gb_error_e, const uint16_t val);
+	void (*gb_error)(const enum gb_error_e, const uint16_t val, void *priv);
 
 	/* Transmit one byte and return the received byte. */
-	void (*gb_serial_tx)(struct gb_s*, const uint8_t tx);
-	enum gb_serial_rx_ret_e (*gb_serial_rx)(struct gb_s*, uint8_t* rx);
-
-	struct
-	{
-		unsigned gb_halt	: 1;
-		unsigned gb_ime		: 1;
-#if PEANUT_GB_USE_BIOS
-		unsigned gb_bios_enable : 1;
-#endif
-		unsigned gb_frame	: 1; /* New frame drawn. */
-
-		unsigned lcd_blank	: 1;
-	};
+	void (*gb_serial_tx)(const uint8_t tx, void *priv);
+	enum gb_serial_rx_ret_e (*gb_serial_rx)(uint8_t* rx, void *priv);
 
 	/* Cartridge information:
 	 * Memory Bank Controller (MBC) type. */
 	uint8_t mbc;
 	/* Whether the MBC has internal RAM. */
 	uint8_t cart_ram;
-	/* Number of ROM banks in cartridge. */
-	uint16_t num_rom_banks_mask;
+	uint8_t cart_ram_bank;
 	/* Number of RAM banks in cartridge. */
 	uint8_t num_ram_banks;
-
-	uint16_t selected_rom_bank;
-	/* WRAM and VRAM bank selection not available. */
-	uint8_t cart_ram_bank;
 	uint8_t enable_cart_ram;
 	/* Cartridge ROM/RAM mode select. */
 	uint8_t cart_mode_select;
+
+	/* Number of ROM banks in cartridge. */
+	uint16_t num_rom_banks_mask;
+	uint16_t selected_rom_bank;
+
 	union
 	{
 		struct
@@ -582,18 +569,53 @@ struct gb_s
 		uint8_t cart_rtc[5];
 	};
 
+	/* Emulation input and configuration. */
+	/* Set to enable interlacing. Interlacing will start immediately
+	* (at the next line drawing). */
+	union
+	 {
+		struct
+		 {
+			uint8_t a : 1;
+			uint8_t b : 1;
+			uint8_t select : 1;
+			uint8_t start : 1;
+			uint8_t right : 1;
+			uint8_t left : 1;
+			uint8_t up : 1;
+			uint8_t down : 1;
+		} joypad_bits;
+		uint8_t joypad;
+	};
+	uint8_t interlace : 1;
+	uint8_t frame_skip : 1;
+
+	/* Misc. Game Boy Status variables. */
+	uint8_t gb_halt : 1;
+	uint8_t gb_ime : 1;
+#if PEANUT_GB_USE_BIOS
+	uint8_t gb_bios_enable : 1;
+#endif
+	uint8_t gb_frame : 1; /* New frame drawn. */
+	uint8_t lcd_blank : 1;
+
 	struct cpu_registers_s cpu_reg;
-	//struct gb_registers_s gb_reg;
 	struct count_s counter;
 
-	/* TODO: Allow implementation to allocate WRAM, VRAM and Frame Buffer. */
-	uint8_t wram[WRAM_SIZE];
-	uint8_t vram[VRAM_SIZE];
-	uint8_t oam[OAM_SIZE];
-	uint8_t hram_io[HRAM_IO_SIZE];
-
+#if ENABLE_LCD
 	struct
 	{
+		uint8_t window_clear;
+		uint8_t WY;
+
+		/* Only support 30fps frame skip. */
+		uint8_t frame_skip_count;
+		uint8_t interlace_count;
+
+		/* Palettes */
+		uint8_t bg_palette[4];
+		uint8_t sp_palette[8];
+
 		/**
 		 * Draw line on screen.
 		 *
@@ -613,56 +635,19 @@ struct gb_s
 		 * \param line		Line to draw pixels on. This is
 		 * guaranteed to be between 0-144 inclusive.
 		 */
-		void (*lcd_draw_line)(struct gb_s *gb,
-				const uint8_t *pixels,
-				const uint_fast8_t line);
-
-		/* Palettes */
-		uint8_t bg_palette[4];
-		uint8_t sp_palette[8];
-
-		uint8_t window_clear;
-		uint8_t WY;
-
-		/* Only support 30fps frame skip. */
-		unsigned frame_skip_count : 1;
-		unsigned interlace_count : 1;
+		void (*lcd_draw_line)(const uint8_t* pixels,
+			const uint_fast8_t line, void *priv);
 	} display;
+#endif
 
-	/**
-	 * Variables that may be modified directly by the front-end.
-	 * This method seems to be easier and possibly less overhead than
-	 * calling a function to modify these variables each time.
-	 *
-	 * None of this is thread-safe.
-	 */
-	struct
-	{
-		/* Set to enable interlacing. Interlacing will start immediately
-		 * (at the next line drawing).
-		 */
-		unsigned interlace : 1;
-		unsigned frame_skip : 1;
+	/* TODO: Allow implementation to allocate WRAM, VRAM and Frame Buffer. */
+	uint8_t wram[WRAM_SIZE];
+	uint8_t vram[VRAM_SIZE];
+	uint8_t oam[OAM_SIZE];
+	uint8_t hram_io[HRAM_IO_SIZE];
 
-		union
-		{
-			struct
-			{
-				unsigned a	: 1;
-				unsigned b	: 1;
-				unsigned select	: 1;
-				unsigned start	: 1;
-				unsigned right	: 1;
-				unsigned left	: 1;
-				unsigned up	: 1;
-				unsigned down	: 1;
-			} joypad_bits;
-			uint8_t joypad;
-		};
-
-		/* Implementation defined data. Set to NULL if not required. */
-		void *priv;
-	} direct;
+	/* Implementation defined data. Set to NULL if not required. */
+	void* priv;
 };
 
 /**
@@ -679,17 +664,18 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 	case 0x1:
 	case 0x2:
 	case 0x3:
-		return gb->gb_rom_read(gb, addr);
+		return gb->gb_rom_read(addr, gb->priv);
 
 	case 0x4:
 	case 0x5:
 	case 0x6:
 	case 0x7:
 		if(gb->mbc == 1 && gb->cart_mode_select)
-			return gb->gb_rom_read(gb,
-					       addr + ((gb->selected_rom_bank & 0x1F) - 1) * ROM_BANK_SIZE);
+			return gb->gb_rom_read(addr + ((gb->selected_rom_bank & 0x1F) - 1) * ROM_BANK_SIZE,
+				gb->priv);
 		else
-			return gb->gb_rom_read(gb, addr + (gb->selected_rom_bank - 1) * ROM_BANK_SIZE);
+			return gb->gb_rom_read(addr + (gb->selected_rom_bank - 1) * ROM_BANK_SIZE,
+				gb->priv);
 
 	case 0x8:
 	case 0x9:
@@ -704,11 +690,10 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 			else if((gb->cart_mode_select || gb->mbc != 1) &&
 					gb->cart_ram_bank < gb->num_ram_banks)
 			{
-				return gb->gb_cart_ram_read(gb, addr - CART_RAM_ADDR +
-							    (gb->cart_ram_bank * CRAM_BANK_SIZE));
+				return gb->gb_cart_ram_read(addr - CART_RAM_ADDR + (gb->cart_ram_bank * CRAM_BANK_SIZE), gb->priv);
 			}
 			else
-				return gb->gb_cart_ram_read(gb, addr - CART_RAM_ADDR);
+				return gb->gb_cart_ram_read(addr - CART_RAM_ADDR, gb->priv);
 		}
 
 		return 0xFF;
@@ -758,8 +743,7 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 			return gb->hram_io[addr - IO_ADDR];
 	}
 
-
-	(gb->gb_error)(gb, GB_INVALID_READ, addr);
+	(gb->gb_error)(GB_INVALID_READ, addr, gb->priv);
 	return 0xFF;
 }
 
@@ -850,14 +834,13 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 		{
 			if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
 				gb->cart_rtc[gb->cart_ram_bank - 0x08] = val;
-			else if(gb->cart_mode_select &&
-					gb->cart_ram_bank < gb->num_ram_banks)
+			else if(gb->cart_mode_select && gb->cart_ram_bank < gb->num_ram_banks)
 			{
-				gb->gb_cart_ram_write(gb,
-						      addr - CART_RAM_ADDR + (gb->cart_ram_bank * CRAM_BANK_SIZE), val);
+				gb->gb_cart_ram_write(addr - CART_RAM_ADDR + (gb->cart_ram_bank * CRAM_BANK_SIZE),
+					val, gb->priv);
 			}
 			else if(gb->num_ram_banks)
-				gb->gb_cart_ram_write(gb, addr - CART_RAM_ADDR, val);
+				gb->gb_cart_ram_write(addr - CART_RAM_ADDR, val, gb->priv);
 		}
 
 		return;
@@ -919,10 +902,10 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 
 			/* Direction keys selected */
 			if((gb->hram_io[IO_JOYP] & 0b010000) == 0)
-				gb->hram_io[IO_JOYP] |= (gb->direct.joypad >> 4);
+				gb->hram_io[IO_JOYP] |= (gb->joypad >> 4);
 			/* Button keys selected */
 			else
-				gb->hram_io[IO_JOYP] |= (gb->direct.joypad & 0x0F);
+				gb->hram_io[IO_JOYP] |= (gb->joypad & 0x0F);
 
 			return;
 
@@ -1009,9 +992,6 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 			uint16_t dma_addr = (uint_fast16_t)val << 8;
 			gb->hram_io[IO_DMA] = val;
 
-#ifdef PEANUT_GB_GET_ROM_POINTER
-#endif
-
 			if (dma_addr >= WRAM_0_ADDR && dma_addr < ECHO_ADDR)
 			{
 				dma_addr -= WRAM_0_ADDR;
@@ -1031,26 +1011,32 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 		/* DMG Palette Registers */
 		case 0x47:
 			gb->hram_io[IO_BGP] = val;
+#if ENABLE_LCD
 			gb->display.bg_palette[0] = (gb->hram_io[IO_BGP] & 0x03);
 			gb->display.bg_palette[1] = (gb->hram_io[IO_BGP] >> 2) & 0x03;
 			gb->display.bg_palette[2] = (gb->hram_io[IO_BGP] >> 4) & 0x03;
 			gb->display.bg_palette[3] = (gb->hram_io[IO_BGP] >> 6) & 0x03;
+#endif
 			return;
 
 		case 0x48:
 			gb->hram_io[IO_OBP0] = val;
+#if ENABLE_LCD
 			gb->display.sp_palette[0] = (gb->hram_io[IO_OBP0] & 0x03);
 			gb->display.sp_palette[1] = (gb->hram_io[IO_OBP0] >> 2) & 0x03;
 			gb->display.sp_palette[2] = (gb->hram_io[IO_OBP0] >> 4) & 0x03;
 			gb->display.sp_palette[3] = (gb->hram_io[IO_OBP0] >> 6) & 0x03;
+#endif
 			return;
 
 		case 0x49:
 			gb->hram_io[IO_OBP1] = val;
+#if ENABLE_LCD
 			gb->display.sp_palette[4] = (gb->hram_io[IO_OBP1] & 0x03);
 			gb->display.sp_palette[5] = (gb->hram_io[IO_OBP1] >> 2) & 0x03;
 			gb->display.sp_palette[6] = (gb->hram_io[IO_OBP1] >> 4) & 0x03;
 			gb->display.sp_palette[7] = (gb->hram_io[IO_OBP1] >> 6) & 0x03;
+#endif
 			return;
 
 		/* Window Position Registers */
@@ -1076,7 +1062,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 		}
 	}
 
-	(gb->gb_error)(gb, GB_INVALID_WRITE, addr);
+	(gb->gb_error)(GB_INVALID_WRITE, addr, gb->priv);
 }
 
 uint8_t __gb_execute_cb(struct gb_s *gb)
@@ -1095,12 +1081,12 @@ uint8_t __gb_execute_cb(struct gb_s *gb)
 	{
 	case 0x06:
 	case 0x86:
-    	case 0xC6:
+	case 0xC6:
 		inst_cycles += 8;
-    	break;
-    	case 0x46:
+	break;
+	case 0x46:
 		inst_cycles += 4;
-    	break;
+	break;
 	}
 
 	switch(r)
@@ -1300,12 +1286,12 @@ void __gb_draw_line(struct gb_s *gb)
 	if(gb->display.lcd_draw_line == NULL)
 		return;
 
-	if(gb->direct.frame_skip && !gb->display.frame_skip_count)
+	if(gb->frame_skip && !gb->display.frame_skip_count)
 		return;
 
 	/* If interlaced mode is activated, check if we need to draw the current
 	 * line. */
-	if(gb->direct.interlace)
+	if(gb->interlace)
 	{
 		if((gb->display.interlace_count == 0
 				&& (gb->hram_io[IO_LY] & 1) == 0)
@@ -1601,7 +1587,7 @@ void __gb_draw_line(struct gb_s *gb)
 		}
 	}
 
-	gb->display.lcd_draw_line(gb, pixels, gb->hram_io[IO_LY]);
+	gb->display.lcd_draw_line(pixels, gb->hram_io[IO_LY], gb->priv);
 }
 #endif
 
@@ -2331,7 +2317,7 @@ void __gb_step_cpu(struct gb_s *gb)
 
 		if (gb->hram_io[IO_IE] == 0)
 		{
-			(gb->gb_error)(gb, GB_HALT_FOREVER, gb->cpu_reg.pc.reg - 1);
+			(gb->gb_error)(GB_HALT_FOREVER, gb->cpu_reg.pc.reg - 1, gb->priv);
 		}
 
 		if(gb->hram_io[IO_SC] & SERIAL_SC_TX_START)
@@ -3246,7 +3232,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	default:
-		(gb->gb_error)(gb, GB_INVALID_OPCODE, opcode);
+		(gb->gb_error)(GB_INVALID_OPCODE, opcode, gb->priv);
 	}
 
 	do
@@ -3266,7 +3252,7 @@ void __gb_step_cpu(struct gb_s *gb)
 			/* If new transfer, call TX function. */
 			if(gb->counter.serial_count == 0 &&
 				gb->gb_serial_tx != NULL)
-				(gb->gb_serial_tx)(gb, gb->hram_io[IO_SB]);
+				(gb->gb_serial_tx)(gb->hram_io[IO_SB], gb->priv);
 
 			gb->counter.serial_count += inst_cycles;
 
@@ -3279,7 +3265,7 @@ void __gb_step_cpu(struct gb_s *gb)
 				uint8_t rx;
 
 				if(gb->gb_serial_rx != NULL &&
-					(gb->gb_serial_rx(gb, &rx) ==
+					(gb->gb_serial_rx(&rx, gb->priv) ==
 						GB_SERIAL_RX_SUCCESS))
 				{
 					gb->hram_io[IO_SB] = rx;
@@ -3374,7 +3360,7 @@ void __gb_step_cpu(struct gb_s *gb)
 
 				/* If frame skip is activated, check if we need to draw
 				 * the frame or skip it. */
-				if(gb->direct.frame_skip)
+				if(gb->frame_skip)
 				{
 					gb->display.frame_skip_count =
 						!gb->display.frame_skip_count;
@@ -3383,8 +3369,8 @@ void __gb_step_cpu(struct gb_s *gb)
 				/* If interlaced is activated, change which lines get
 				 * updated. Also, only update lines on frames that are
 				 * actually drawn when frame skip is enabled. */
-				if(gb->direct.interlace &&
-					(!gb->direct.frame_skip ||
+				if(gb->interlace &&
+					(!gb->frame_skip ||
 						gb->display.frame_skip_count))
 				{
 					gb->display.interlace_count =
@@ -3460,14 +3446,13 @@ uint_fast32_t gb_get_save_size(struct gb_s *gb)
 	{
 		0x00, 0x800, 0x2000, 0x8000, 0x20000
 	};
-	uint8_t ram_size = gb->gb_rom_read(gb, ram_size_location);
+	uint8_t ram_size = gb->gb_rom_read(ram_size_location, gb->priv);
 	return ram_sizes[ram_size];
 }
 
 void gb_init_serial(struct gb_s *gb,
-		    void (*gb_serial_tx)(struct gb_s*, const uint8_t),
-		    enum gb_serial_rx_ret_e (*gb_serial_rx)(struct gb_s*,
-			    uint8_t*))
+		    void (*gb_serial_tx)(const uint8_t,void*),
+		    enum gb_serial_rx_ret_e (*gb_serial_rx)(uint8_t*,void*))
 {
 	gb->gb_serial_tx = gb_serial_tx;
 	gb->gb_serial_rx = gb_serial_rx;
@@ -3481,7 +3466,7 @@ uint8_t gb_colour_hash(struct gb_s *gb)
 	uint8_t x = 0;
 
 	for(uint16_t i = ROM_TITLE_START_ADDR; i <= ROM_TITLE_END_ADDR; i++)
-		x += gb->gb_rom_read(gb, i);
+		x += gb->gb_rom_read(i, gb->priv);
 
 	return x;
 }
@@ -3547,7 +3532,7 @@ void gb_reset(struct gb_s *gb)
 	gb->hram_io[IO_WX] = 0x00;
 	gb->hram_io[IO_IE] = 0x00;
 
-	gb->direct.joypad = 0xFF;
+	gb->joypad = 0xFF;
 	gb->hram_io[IO_JOYP] = 0xCF;
 
 	/* Zero the VRAM like the BIOS would. */
@@ -3555,10 +3540,10 @@ void gb_reset(struct gb_s *gb)
 }
 
 enum gb_init_error_e gb_init(struct gb_s *gb,
-			     uint8_t (*gb_rom_read)(struct gb_s*, const uint_fast32_t),
-			     uint8_t (*gb_cart_ram_read)(struct gb_s*, const uint_fast32_t),
-			     void (*gb_cart_ram_write)(struct gb_s*, const uint_fast32_t, const uint8_t),
-			     void (*gb_error)(struct gb_s*, const enum gb_error_e, const uint16_t),
+			     uint8_t (*gb_rom_read)(const uint_fast32_t, void*),
+			     uint8_t (*gb_cart_ram_read)(const uint_fast32_t, void*),
+			     void (*gb_cart_ram_write)(const uint_fast32_t, const uint8_t, void*),
+			     void (*gb_error)(const enum gb_error_e, const uint16_t, void*),
 			     void *priv)
 {
 	const uint16_t mbc_location = 0x0147;
@@ -3594,7 +3579,7 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	gb->gb_cart_ram_read = gb_cart_ram_read;
 	gb->gb_cart_ram_write = gb_cart_ram_write;
 	gb->gb_error = gb_error;
-	gb->direct.priv = priv;
+	gb->priv = priv;
 
 	/* Initialise serial transfer function to NULL. If the front-end does
 	 * not provide serial support, Peanut-GB will emulate no cable connected
@@ -3607,24 +3592,24 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 		uint8_t x = 0;
 
 		for(uint16_t i = 0x0134; i <= 0x014C; i++)
-			x = x - gb->gb_rom_read(gb, i) - 1;
+			x = x - gb->gb_rom_read(i, gb->priv) - 1;
 
-		if(x != gb->gb_rom_read(gb, ROM_HEADER_CHECKSUM_LOC))
+		if(x != gb->gb_rom_read(ROM_HEADER_CHECKSUM_LOC, gb->priv))
 			return GB_INIT_INVALID_CHECKSUM;
 	}
 
 	/* Check if cartridge type is supported, and set MBC type. */
 	{
-		const uint8_t mbc_value = gb->gb_rom_read(gb, mbc_location);
+		const uint8_t mbc_value = gb->gb_rom_read(mbc_location, gb->priv);
 
 		if(mbc_value > sizeof(cart_mbc) - 1 ||
 				(gb->mbc = cart_mbc[mbc_value]) == 255u)
 			return GB_INIT_CARTRIDGE_UNSUPPORTED;
 	}
 
-	gb->cart_ram = cart_ram[gb->gb_rom_read(gb, mbc_location)];
-	gb->num_rom_banks_mask = num_rom_banks_mask[gb->gb_rom_read(gb, bank_count_location)] - 1;
-	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(gb, ram_size_location)];
+	gb->cart_ram = cart_ram[gb->gb_rom_read(mbc_location, gb->priv)];
+	gb->num_rom_banks_mask = num_rom_banks_mask[gb->gb_rom_read(bank_count_location, gb->priv)] - 1;
+	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(ram_size_location, gb->priv)];
 
 	gb->lcd_blank = 0;
 	gb->display.lcd_draw_line = NULL;
@@ -3643,7 +3628,7 @@ const char* gb_get_rom_name(struct gb_s* gb, char *title_str)
 
 	for(; title_loc <= title_end; title_loc++)
 	{
-		const char title_char = gb->gb_rom_read(gb, title_loc);
+		const char title_char = gb->gb_rom_read(title_loc, gb->priv);
 
 		if(title_char >= ' ' && title_char <= '_')
 		{
@@ -3660,15 +3645,14 @@ const char* gb_get_rom_name(struct gb_s* gb, char *title_str)
 
 #if ENABLE_LCD
 void gb_init_lcd(struct gb_s *gb,
-		void (*lcd_draw_line)(struct gb_s *gb,
-			const uint8_t *pixels,
-			const uint_fast8_t line))
+		void (*lcd_draw_line)(const uint8_t *pixels,
+			const uint_fast8_t line, void *priv))
 {
 	gb->display.lcd_draw_line = lcd_draw_line;
 
-	gb->direct.interlace = 0;
+	gb->interlace = 0;
 	gb->display.interlace_count = 0;
-	gb->direct.frame_skip = 0;
+	gb->frame_skip = 0;
 	gb->display.frame_skip_count = 0;
 
 	gb->display.window_clear = 0;
@@ -3742,12 +3726,12 @@ void gb_set_rtc(struct gb_s *gb, const struct tm * const time)
  * 		NULL if unused.
  * \returns	0 on success or an enum that describes the error.
  */
-enum gb_init_error_e gb_init(struct gb_s *gb,
-			     uint8_t (*gb_rom_read)(struct gb_s*, const uint_fast32_t),
-			     uint8_t (*gb_cart_ram_read)(struct gb_s*, const uint_fast32_t),
-			     void (*gb_cart_ram_write)(struct gb_s*, const uint_fast32_t, const uint8_t),
-			     void (*gb_error)(struct gb_s*, const enum gb_error_e, const uint16_t),
-			     void *priv);
+enum gb_init_error_e gb_init(struct gb_s* gb,
+	uint8_t(*gb_rom_read)(const uint_fast32_t, void*),
+	uint8_t(*gb_cart_ram_read)(const uint_fast32_t, void*),
+	void (*gb_cart_ram_write)(const uint_fast32_t, const uint8_t, void*),
+	void (*gb_error)(const enum gb_error_e, const uint16_t, void*),
+	void* priv);
 
 /**
  * Executes the emulator and runs for one frame.
@@ -3781,9 +3765,8 @@ void gb_reset(struct gb_s *gb);
  */
 #if ENABLE_LCD
 void gb_init_lcd(struct gb_s *gb,
-		void (*lcd_draw_line)(struct gb_s *gb,
-			const uint8_t *pixels,
-			const uint_fast8_t line));
+		void (*lcd_draw_line)(const uint8_t *pixels,
+			const uint_fast8_t line, void *priv));
 #endif
 
 /**
@@ -3799,9 +3782,8 @@ void gb_init_lcd(struct gb_s *gb,
  *		return GB_SERIAL_RX_NO_CONNECTION. Must not be NULL.
  */
 void gb_init_serial(struct gb_s *gb,
-		    void (*gb_serial_tx)(struct gb_s*, const uint8_t),
-		    enum gb_serial_rx_ret_e (*gb_serial_rx)(struct gb_s*,
-			    uint8_t*));
+		    void (*gb_serial_tx)(const uint8_t, void *),
+		    enum gb_serial_rx_ret_e (*gb_serial_rx)(uint8_t *, void *));
 
 /**
  * Obtains the save size of the game (size of the Cart RAM). Required by the
