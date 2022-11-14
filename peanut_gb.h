@@ -41,11 +41,6 @@
 # define __has_include(x) 0
 #endif
 
-#include <stdlib.h>	/* Required for qsort */
-#include <stdint.h>	/* Required for int types */
-#include <string.h>	/* Required for memset and memcpy */
-#include <time.h>	/* Required for tm struct */
-
 /**
 * If PEANUT_GB_IS_LITTLE_ENDIAN is positive, then Peanut-GB will be configured
 * for a little endian platform. If 0, then big endian.
@@ -103,6 +98,23 @@
 #ifndef PEANUT_GB_USE_INTRINSICS
 # define PEANUT_GB_USE_INTRINSICS 1
 #endif
+
+/* Includes */
+#ifndef PEANUT_GB_FUNC_MEMCPY
+# include <string.h>
+# define PEANUT_GB_FUNC_MEMCPY(d,s,n) memcpy(d,s,n)
+#endif
+
+#ifndef PEANUT_GB_FUNC_MEMSET
+# include <string.h>
+# define PEANUT_GB_FUNC_MEMSET(s,c,n) memset(s,c,n)
+#endif
+
+#if PEANUT_GB_HIGH_LCD_ACCURACY
+# include <stdlib.h>	/* Required for qsort */
+#endif
+#include <stdint.h>	/* Required for int types */
+#include <time.h>	/* Required for tm struct */
 
 /** Internal source code. **/
 /* Interrupt masks */
@@ -1002,18 +1014,8 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 
 			if (dma_addr >= WRAM_0_ADDR && dma_addr < ECHO_ADDR)
 			{
-				//uint32_t *dma_addr32, *oam32;
-
 				dma_addr -= WRAM_0_ADDR;
-				//dma_addr32 = (uint32_t *)(gb->wram + dma_addr);
-				//oam32 = (uint32_t *)gb->oam;
-
-				memcpy(gb->oam, &gb->wram[dma_addr], OAM_SIZE);
-				//for (uint8_t i = 0; i < OAM_SIZE; i++)
-				//{
-				//	gb->oam[i] = gb->wram[dma_addr + i];
-					//oam32[i] = dma_addr32[i];
-				//}
+				PEANUT_GB_FUNC_MEMCPY(gb->oam, &gb->wram[dma_addr], OAM_SIZE);
 			}
 			else
 			{
@@ -3519,7 +3521,8 @@ void gb_reset(struct gb_s *gb)
 	gb->counter.tima_count = 0;
 	gb->counter.serial_count = 0;
 
-	memset(gb->hram_io, 0xFF, HRAM_IO_SIZE);
+	/* Initialise unused bytes in HRAM. */
+	PEANUT_GB_FUNC_MEMSET(gb->hram_io, 0xFF, HRAM_IO_SIZE);
 
 	gb->hram_io[IO_TIMA] = 0x00;
 	gb->hram_io[IO_TMA ] = 0x00;
@@ -3547,7 +3550,8 @@ void gb_reset(struct gb_s *gb)
 	gb->direct.joypad = 0xFF;
 	gb->hram_io[IO_JOYP] = 0xCF;
 
-	memset(gb->vram, 0x00, VRAM_SIZE);
+	/* Zero the VRAM like the BIOS would. */
+	PEANUT_GB_FUNC_MEMSET(gb->vram, 0x00, VRAM_SIZE);
 }
 
 enum gb_init_error_e gb_init(struct gb_s *gb,
@@ -3845,21 +3849,4 @@ void gb_tick_rtc(struct gb_s *gb);
  */
 void gb_set_rtc(struct gb_s *gb, const struct tm * const time);
 
-/* Undefine CPU Flag helper functions. */
-#undef PEANUT_GB_CPUFLAG_MASK_CARRY
-#undef PEANUT_GB_CPUFLAG_MASK_HALFC
-#undef PEANUT_GB_CPUFLAG_MASK_ARITH
-#undef PEANUT_GB_CPUFLAG_MASK_ZERO
-#undef PEANUT_GB_CPUFLAG_BIT_CARRY
-#undef PEANUT_GB_CPUFLAG_BIT_HALFC
-#undef PEANUT_GB_CPUFLAG_BIT_ARITH
-#undef PEANUT_GB_CPUFLAG_BIT_ZERO
-#undef PGB_SET_CARRY
-#undef PGB_SET_HALFC
-#undef PGB_SET_ARITH
-#undef PGB_SET_ZERO
-#undef PGB_GET_CARRY
-#undef PGB_GET_HALFC
-#undef PGB_GET_ARITH
-#undef PGB_GET_ZERO
 #endif //PEANUT_GB_H
