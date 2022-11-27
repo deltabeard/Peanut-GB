@@ -741,6 +741,13 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 #endif
 		}
 
+		if(addr == 0xFF00)
+			return 0xC0 | gb->hram_io[IO_JOYP];
+		if(addr == 0xFF41)
+			return ((gb->hram_io[IO_STAT] & STAT_USER_BITS) |
+				(gb->hram_io[IO_LCDC] & LCDC_ENABLE)) ?
+					(gb->hram_io[IO_STAT] & STAT_MODE) : 0;
+
 		/* HRAM */
 		if(addr >= IO_ADDR)
 			return gb->hram_io[addr - IO_ADDR];
@@ -961,7 +968,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 			{
 				/* Do not turn off LCD outside of VBLANK. This may
 				 * happen due to poor timing in this emulator. */
-				if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_VBLANK)
+				if((gb->hram_io[IO_STAT] & STAT_MODE) != IO_STAT_MODE_VBLANK)
 				{
 					gb->hram_io[IO_LCDC] |= LCDC_ENABLE;
 					return;
@@ -1507,7 +1514,7 @@ void __gb_draw_line(struct gb_s *gb)
 
 #if !PEANUT_GB_HIGH_LCD_ACCURACY
 			/* If sprite isn't on this line, continue. */
-			if(gb->hram_io[IO_LY +
+			if(gb->hram_io[IO_LY] +
 					(gb->hram_io[IO_LCDC] & LCDC_OBJ_SIZE ? 0 : 8) >= OY ||
 					gb->hram_io[IO_LY] + 16 < OY)
 				continue;
@@ -3516,7 +3523,6 @@ void gb_reset(struct gb_s *gb)
 
 	/* Appease valgrind for invalid reads and unconditional jumps. */
 	gb->hram_io[IO_SC] = 0x7E;
-	gb->hram_io[IO_STAT] = 0;
 	gb->hram_io[IO_LY] = 0;
 
 	__gb_write(gb, 0xFF47, 0xFC);    // BGP
