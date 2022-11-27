@@ -1375,7 +1375,10 @@ struct sprite_data {
 #if PEANUT_GB_HIGH_LCD_ACCURACY
 static int compare_sprites(const void *in1, const void *in2)
 {
-	const struct sprite_data *sd1 = in1, *sd2 = in2;
+	const struct sprite_data *sd1, *sd2;
+       
+	sd1 = (struct sprite_data *)in1;
+	sd2 = (struct sprite_data *)in2;
 	int x_res = (int)sd1->x - (int)sd2->x;
 	if(x_res != 0)
 		return x_res;
