@@ -560,7 +560,7 @@ struct gb_s
 
 	/* Cartridge information:
 	 * Memory Bank Controller (MBC) type. */
-	uint8_t mbc;
+	int8_t mbc;
 	/* Whether the MBC has internal RAM. */
 	uint8_t cart_ram;
 	/* Number of ROM banks in cartridge. */
@@ -3664,7 +3664,7 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	 * TODO: HuC3 is unsupported.
 	 * TODO: HuC1 is unsupported.
 	 **/
-	const uint8_t cart_mbc[] =
+	const int8_t cart_mbc[] =
 	{
 		0, 1, 1, 1, -1, 2, 2, -1, 0, 0, -1, 0, 0, 0, -1, 3,
 		3, 3, 3, 3, -1, -1, -1, -1, -1, 5, 5, 5, 5, 5, 5, -1
@@ -3708,7 +3708,7 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 		const uint8_t mbc_value = gb->gb_rom_read(gb, mbc_location);
 
 		if(mbc_value > sizeof(cart_mbc) - 1 ||
-				(gb->mbc = cart_mbc[mbc_value]) == 255u)
+				(gb->mbc = cart_mbc[mbc_value]) == -1)
 			return GB_INIT_CARTRIDGE_UNSUPPORTED;
 	}
 
