@@ -741,13 +741,6 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 #endif
 		}
 
-		if(addr == 0xFF00)
-			return 0xC0 | gb->hram_io[IO_JOYP];
-		if(addr == 0xFF41)
-			return ((gb->hram_io[IO_STAT] & STAT_USER_BITS) |
-				(gb->hram_io[IO_LCDC] & LCDC_ENABLE)) ?
-					(gb->hram_io[IO_STAT] & STAT_MODE) : 0;
-
 		/* HRAM */
 		if(addr >= IO_ADDR)
 			return gb->hram_io[addr - IO_ADDR];
@@ -3349,7 +3342,8 @@ void __gb_step_cpu(struct gb_s *gb)
 			/* VBLANK Start */
 			if(gb->hram_io[IO_LY] == LCD_HEIGHT)
 			{
-				gb->hram_io[IO_STAT] = STAT_MODE & IO_STAT_MODE_VBLANK;
+				gb->hram_io[IO_STAT] =
+					(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_VBLANK;
 				gb->gb_frame = 1;
 				gb->hram_io[IO_IF] |= VBLANK_INTR;
 				gb->lcd_blank = 0;
@@ -3389,7 +3383,8 @@ void __gb_step_cpu(struct gb_s *gb)
 					gb->display.window_clear = 0;
 				}
 
-				gb->hram_io[IO_STAT] = STAT_MODE & IO_STAT_MODE_HBLANK;
+				gb->hram_io[IO_STAT] =
+					(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_HBLANK;
 
 				if(gb->hram_io[IO_STAT] & STAT_MODE_0_INTR)
 					gb->hram_io[IO_IF] |= LCDC_INTR;
@@ -3403,7 +3398,8 @@ void __gb_step_cpu(struct gb_s *gb)
 		else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_HBLANK &&
 			gb->counter.lcd_count >= LCD_MODE_2_CYCLES)
 		{
-			gb->hram_io[IO_STAT] = STAT_MODE & IO_STAT_MODE_SEARCH_OAM;
+			gb->hram_io[IO_STAT] =
+				(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_SEARCH_OAM;
 
 			if(gb->hram_io[IO_STAT] & STAT_MODE_2_INTR)
 				gb->hram_io[IO_IF] |= LCDC_INTR;
@@ -3416,7 +3412,8 @@ void __gb_step_cpu(struct gb_s *gb)
 		else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_SEARCH_OAM &&
 			gb->counter.lcd_count >= LCD_MODE_3_CYCLES)
 		{
-			gb->hram_io[IO_STAT] = STAT_MODE & IO_STAT_MODE_SEARCH_TRANSFER;
+			gb->hram_io[IO_STAT] =
+				(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_SEARCH_TRANSFER;
 #if ENABLE_LCD
 			if(!gb->lcd_blank)
 				__gb_draw_line(gb);
