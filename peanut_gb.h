@@ -41,7 +41,7 @@
 # define __has_include(x) 0
 #endif
 
-#include <stdlib.h>	/* Required for qsort */
+#include <stdlib.h>	/* Required for qsort and abort */
 #include <stdint.h>	/* Required for int types */
 #include <string.h>	/* Required for memset */
 #include <time.h>	/* Required for tm struct */
@@ -102,6 +102,11 @@
 /* Use intrinsic functions. This may produce smaller and faster code. */
 #ifndef PEANUT_GB_USE_INTRINSICS
 # define PEANUT_GB_USE_INTRINSICS 1
+#endif
+
+/* Function definition for abort(). */
+#ifndef PEANUT_GB_ABORT
+# define PEANUT_GB_ABORT() abort()
 #endif
 
 /** Internal source code. **/
@@ -219,6 +224,12 @@
 #if !defined(__has_builtin)
 /* Stub __has_builtin if it isn't available. */
 # define __has_builtin(x) 0
+#endif
+
+#if __has_builtin(__builtin_unreachable)
+# define PGB_UNREACHABLE() __builtin_unreachable()
+#else
+# define PGB_UNREACHABLE() PEANUT_GB_ABORT()
 #endif
 
 #if PEANUT_GB_USE_INTRINSICS
@@ -452,7 +463,7 @@ struct count_s
  */
 enum gb_error_e
 {
-	GB_UNKNOWN_ERROR,
+	GB_UNKNOWN_ERROR = 0,
 	GB_INVALID_OPCODE,
 	GB_INVALID_READ,
 	GB_INVALID_WRITE,
@@ -466,7 +477,7 @@ enum gb_error_e
  */
 enum gb_init_error_e
 {
-	GB_INIT_NO_ERROR,
+	GB_INIT_NO_ERROR = 0,
 	GB_INIT_CARTRIDGE_UNSUPPORTED,
 	GB_INIT_INVALID_CHECKSUM
 };
@@ -521,9 +532,9 @@ struct gb_s
 	 *
 	 * \param gb_s			emulator context
 	 * \param gb_error_e	error code
-	 * \param val			arbitrary value related to error
+	 * \param addr			address of where error occured
 	 */
-	void (*gb_error)(struct gb_s*, const enum gb_error_e, const uint16_t val);
+	void (*gb_error)(struct gb_s*, const enum gb_error_e, const uint16_t addr);
 
 	/* Transmit one byte and return the received byte. */
 	void (*gb_serial_tx)(struct gb_s*, const uint8_t tx);
@@ -747,8 +758,9 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 	}
 
 
+	/* Return address that caused read error. */
 	(gb->gb_error)(gb, GB_INVALID_READ, addr);
-	return 0xFF;
+	PGB_UNREACHABLE();
 }
 
 /**
@@ -1053,7 +1065,9 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 		}
 	}
 
+	/* Return address that caused write error. */
 	(gb->gb_error)(gb, GB_INVALID_WRITE, addr);
+	PGB_UNREACHABLE();
 }
 
 uint8_t __gb_execute_cb(struct gb_s *gb)
@@ -2311,7 +2325,11 @@ void __gb_step_cpu(struct gb_s *gb)
 
 		if (gb->hram_io[IO_IE] == 0)
 		{
+			/* Return program counter where this halt forever state started. */
+			/* This may be intentional, but this is required to stop an infinite
+			 * loop. */
 			(gb->gb_error)(gb, GB_HALT_FOREVER, gb->cpu_reg.pc.reg - 1);
+			PGB_UNREACHABLE();
 		}
 
 		if(gb->hram_io[IO_SC] & SERIAL_SC_TX_START)
@@ -3226,7 +3244,9 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	default:
-		(gb->gb_error)(gb, GB_INVALID_OPCODE, opcode);
+		/* Return address where invlid opcode that was read. */
+		(gb->gb_error)(gb, GB_INVALID_OPCODE, gb->cpu_reg.pc.reg - 1);
+		PGB_UNREACHABLE();
 	}
 
 	do
@@ -3718,7 +3738,7 @@ void gb_set_rtc(struct gb_s *gb, const struct tm * const time)
  * 		be NULL.
  * \param gb_error Pointer to function that is called when an unrecoverable
  *		error occurs. Must not be NULL. Returning from this
- *		function will continue emulation in an unknown state.
+ *		function is undefined and will result in SIGABRT.
  * \param priv	Private data that is stored within the emulator context. Set to
  * 		NULL if unused.
  * \returns	0 on success or an enum that describes the error.

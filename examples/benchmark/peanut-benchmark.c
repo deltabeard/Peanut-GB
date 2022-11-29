@@ -93,24 +93,24 @@ static uint8_t *read_rom_to_ram(const char *file_name)
 /**
  * Ignore all errors.
  */
-static void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
+static void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t addr)
 {
-	const char* gb_err_str[4] = {
+	const char* gb_err_str[GB_INVALID_MAX] = {
 		"UNKNOWN",
 		"INVALID OPCODE",
 		"INVALID READ",
-		"INVALID WRITE"
+		"INVALID WRITE",
+		"HALT FOREVER"
 	};
-	fprintf(stderr, "Error %d occurred: %s\n. Abort.\n",
-			gb_err,
-			gb_err >= GB_INVALID_MAX ?
-				gb_err_str[0] : gb_err_str[gb_err]);
+	struct priv_t *priv = gb->direct.priv;
 
-	/* Unused parameters. */
-	(void)gb;
-	(void)val;
+	fprintf(stderr, "Error %d occurred: %s at %04X\n. Exiting.\n",
+			gb_err, gb_err_str[gb_err], addr);
 
-	abort();
+	/* Free memory and then exit. */
+	free(priv->cart_ram);
+	free(priv->rom);
+	exit(EXIT_FAILURE);
 }
 
 #if ENABLE_LCD
