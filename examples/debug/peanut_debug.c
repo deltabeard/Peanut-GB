@@ -14,6 +14,7 @@
 
 #include <SDL2/SDL.h>
 
+#define ENABLE_LCD 1
 #define ENABLE_SOUND 0
 
 #include "../../peanut_gb.h"
@@ -142,46 +143,27 @@ void write_cart_ram_file(const char *save_file_name, uint8_t **dest,
  */
 void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 {
-	struct priv_t *priv = gb->priv;
+	const char* gb_err_str[GB_INVALID_MAX] = {
+		"UNKNOWN",
+		"INVALID OPCODE",
+		"INVALID READ",
+		"INVALID WRITE",
+		"HALT FOREVER"
+	};
+	struct priv_t *priv = gb->direct.priv;
 
-	switch(gb_err)
-	{
-		case GB_INVALID_OPCODE:
-            /* We compensate for the post-increment in the __gb_step_cpu
-             * function. */
-			fprintf(stdout, "Invalid opcode %#04x at PC: %#06x, SP: %#06x\n",
-                    __gb_read(gb, gb->cpu_reg.pc - 1),
-                    gb->cpu_reg.pc - 1,
-                    gb->cpu_reg.sp);
-			break;
+	fprintf(stderr, "Error %d occurred: %s at %04X\n. Exiting.\n",
+			gb_err, gb_err_str[gb_err], addr);
 
-            /* Ignoring non fatal errors. */
-		case GB_INVALID_WRITE:
-		case GB_INVALID_READ:
-            return;
-
-		default:
-			printf("Unknown error");
-			break;
-	}
-
-	fprintf(stderr, "Error. Press q to exit, or any other key to continue.");
-	if(getchar() == 'q')
-	{
-        /* Record save file. */
-        write_cart_ram_file("recovery.sav", &priv->cart_ram, gb_get_save_size(gb));
-
-		free(priv->rom);
-		free(priv->cart_ram);
-		exit(EXIT_FAILURE);
-	}
-
-	return;
+	/* Free memory and then exit. */
+	free(priv->cart_ram);
+	free(priv->rom);
+	exit(EXIT_FAILURE);
 }
 
 int main(int argc, char **argv)
 {
-    struct gb_t gb;
+	struct gb_t gb;
 	struct priv_t priv;
 	const unsigned int height = 144;
 	const unsigned int width = 160;
@@ -194,8 +176,8 @@ int main(int argc, char **argv)
 	uint32_t new_ticks, old_ticks;
 	char *save_file_name;
 	enum gb_init_error_e ret;
-    unsigned int fast_mode = 0;
-    unsigned int debug_mode = 0;
+	unsigned int fast_mode = 0;
+	unsigned int debug_mode = 0;
 
 	/* Make sure a file name is given. */
 	if(argc < 2 || argc > 3)
