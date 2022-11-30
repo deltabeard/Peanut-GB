@@ -14,8 +14,14 @@
 #define WINDOW_WIDTH 1200
 #define WINDOW_HEIGHT 800
 
-#define VRAM_WIDTH 128
-#define VRAM_HEIGHT 256
+#define NUMBER_OF_SPRITES_IN_ROW 16
+#define NUMBER_OF_SPRITES_IN_COLUMN 8
+#define SPRITE_BLOCKS 3
+#define NUMBER_OF_SPRITES (NUMBER_OF_SPRITES_IN_ROW * NUMBER_OF_SPRITES_IN_COLUMN * SPRITE_BLOCKS)
+#define SPRITE_WIDTH 8
+#define SPRITE_HEIGHT 8
+#define VRAM_WIDTH (NUMBER_OF_SPRITES_IN_ROW * SPRITE_WIDTH)
+#define VRAM_HEIGHT (NUMBER_OF_SPRITES_IN_COLUMN * SPRITE_BLOCKS * SPRITE_WIDTH)
 
 /* ===============================================================
  *
@@ -117,59 +123,73 @@ static void gb_error(struct gb_s *ctx, const enum gb_error_e err,
 static void render_vram_tex(SDL_Texture *tex, const struct gb_s *const gb)
 {
 	int ret;
-	uint32_t tile_pixels[8*8];
-	SDL_Surface *s, *tile;
 	int pitch;
 	const uint32_t colour_lut[4] = {
-		0xFFFFFFFF, 0x7F7F7FFF, 0x2F2F2FFF, 0x00000000
+		0xFFFFFFFF, 0x7F7F7FFF, 0x2F2F2FFF, 0xFF000000
 	};
-	uint32_t *pixels, *tile_pixels_p;
+	uint32_t *pixels;
+	SDL_Surface *s, *tile;
 
-	tile_pixels_p = &tile_pixels[0];
 	ret = SDL_LockTexture(tex, NULL, (void**)&pixels, &pitch);
 	SDL_assert_always(ret == 0);
 
-	s = SDL_CreateRGBSurfaceFrom(pixels, VRAM_WIDTH, VRAM_HEIGHT, 32,
-			VRAM_WIDTH * sizeof(uint32_t), 0, 0, 0, 0);
-	//		0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF);
-	tile = SDL_CreateRGBSurfaceFrom(tile_pixels, 8, 8, 32,
-			8 * sizeof(uint32_t), 0, 0, 0, 0);
+	s = SDL_CreateRGBSurfaceWithFormatFrom(pixels,
+		VRAM_WIDTH, VRAM_HEIGHT, 32, pitch, SDL_PIXELFORMAT_RGBA32);
+	tile = SDL_CreateRGBSurfaceWithFormat(0, SPRITE_WIDTH, SPRITE_HEIGHT,
+		32, SDL_PIXELFORMAT_RGBA32);
 
-	uint8_t tile_line = 0;
+	for (unsigned sprite = 0; sprite < NUMBER_OF_SPRITES; sprite++)
+	{
+		int sprite_x = (sprite % NUMBER_OF_SPRITES_IN_ROW) * SPRITE_WIDTH;
+		int sprite_y = (sprite / NUMBER_OF_SPRITES_IN_ROW) * SPRITE_HEIGHT;
+		unsigned sprite_addr = sprite << 4;
+		uint32_t *pixels = tile->pixels;
+		SDL_Rect dstrect = {
+			.h = 8, .w = 8,
+			.x = sprite_x, .y = sprite_y
+		};
+
+		for (; sprite_addr < (sprite + 1) << 4; sprite_addr += 2)
+		{
+			for (int px = 7; px >= 0; px--)
+			{
+				uint8_t t1 = gb->vram[sprite_addr] >> px;
+				uint8_t t2 = gb->vram[sprite_addr + 1] >> px;
+				uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
+
+				*pixels = colour_lut[c];
+				pixels++;
+			}
+		}
+
+		SDL_BlitSurface(tile, NULL, s, &dstrect);
+	}
+
+#if 0
 	for(unsigned tile_num = 0; tile_num < VRAM_BANK_SIZE; tile_num += 2)
 	{
-		/* fetch first tile */
-		for(unsigned px = 0; px < 8; px++)
+		//int pitch_offset = ((tile_num / 2) % 8) * NUMBER_OF_SPRITES_IN_ROW * 8;
+		//((tile_num/2) % 8) * VRAM_WIDTH;
+		int pitch_offset = 0;
+
+		/* fetch first line of tile */
+		for(int px = 7; px >= 0; px--)
 		{
 			uint8_t t1 = gb->vram[tile_num] >> px;
 			uint8_t t2 = gb->vram[tile_num + 1] >> px;
 			uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
 
-			*tile_pixels_p = colour_lut[gb->display.bg_palette[c]];
-			tile_pixels_p++;
+			pixels[pitch_offset] = colour_lut[c];
+			pixels++;
 		}
-		continue;
 
-		tile_line++;
-		if(tile_line == 7)
-		{
-			SDL_Rect r;
-			const unsigned tiles_on_line = VRAM_WIDTH / 8;
-			tile_pixels_p = &tile_pixels[0];
-			tile_line = 0;
-
-			r.w = 8;
-			r.h = 8;
-			r.x = tile_num % VRAM_WIDTH;
-			r.y = tile_num / tiles_on_line;
-			SDL_BlitSurface(tile, NULL, s, &r);
-
-			printf("%dx%d\n", r.x, r.h);
-		}
+		//if(((tile_num) % 16) == 0)
+		//	pixels -= 16;
 	}
+#endif
 
-	SDL_FreeSurface(tile);
 	SDL_FreeSurface(s);
+	SDL_FreeSurface(tile);
 	SDL_UnlockTexture(tex);
 	return;
 }
@@ -240,8 +260,8 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 		SDL_assert_always(ret == 0);
 
 		gb_run_frame(gb);
-		//render_vram_tex(gb_priv->gb_vram_tex, gb);
 
+		render_vram_tex(gb_priv->gb_vram_tex, gb);
 		SDL_UnlockTexture(gb_priv->gb_lcd_tex);
 
 		frame_step = 0;
