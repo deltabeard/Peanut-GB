@@ -1,7 +1,6 @@
 #include <inttypes.h>
 #include <stdio.h>
 
-#define SDL_MAIN_HANDLED
 #include <SDL.h>
 
 #define ENABLE_LCD 1
@@ -165,29 +164,6 @@ static void render_vram_tex(SDL_Texture *tex, const struct gb_s *const gb)
 		SDL_BlitSurface(tile, NULL, s, &dstrect);
 	}
 
-#if 0
-	for(unsigned tile_num = 0; tile_num < VRAM_BANK_SIZE; tile_num += 2)
-	{
-		//int pitch_offset = ((tile_num / 2) % 8) * NUMBER_OF_SPRITES_IN_ROW * 8;
-		//((tile_num/2) % 8) * VRAM_WIDTH;
-		int pitch_offset = 0;
-
-		/* fetch first line of tile */
-		for(int px = 7; px >= 0; px--)
-		{
-			uint8_t t1 = gb->vram[tile_num] >> px;
-			uint8_t t2 = gb->vram[tile_num + 1] >> px;
-			uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
-
-			pixels[pitch_offset] = colour_lut[c];
-			pixels++;
-		}
-
-		//if(((tile_num) % 16) == 0)
-		//	pixels -= 16;
-	}
-#endif
-
 	SDL_FreeSurface(s);
 	SDL_FreeSurface(tile);
 	SDL_UnlockTexture(tex);
@@ -337,23 +313,23 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 				NK_WINDOW_MINIMIZABLE))
 	{
 		static const char reg_labels[6][3] = {
-			"AF", "BC", "DE", "HL", "SP", "PC"
+			"A", "BC", "DE", "HL", "SP", "PC"
 		};
 		static char reg_str[6][5];
 		int reg_str_len[6];
 
-		reg_str_len[0] = SDL_snprintf(reg_str[0], 5, "%02X%02X",
-				gb->cpu_reg.a, gb->cpu_reg.f);
-		reg_str_len[1] = SDL_snprintf(reg_str[1], 5, "%02X%02X",
-				gb->cpu_reg.b, gb->cpu_reg.c);
-		reg_str_len[2] = SDL_snprintf(reg_str[2], 5, "%02X%02X",
-				gb->cpu_reg.d, gb->cpu_reg.e);
-		reg_str_len[3] = SDL_snprintf(reg_str[3], 5, "%02X%02X",
-				gb->cpu_reg.h, gb->cpu_reg.l);
+		reg_str_len[0] = SDL_snprintf(reg_str[0], 5, "%02X",
+				gb->cpu_reg.a);
+		reg_str_len[1] = SDL_snprintf(reg_str[1], 5, "%04X",
+				gb->cpu_reg.bc.reg);
+		reg_str_len[2] = SDL_snprintf(reg_str[2], 5, "%04X",
+				gb->cpu_reg.de.reg);
+		reg_str_len[3] = SDL_snprintf(reg_str[3], 5, "%04X",
+				gb->cpu_reg.hl.reg);
 		reg_str_len[4] = SDL_snprintf(reg_str[4], 5, "%04X",
-				gb->cpu_reg.sp);
+				gb->cpu_reg.sp.reg);
 		reg_str_len[5] = SDL_snprintf(reg_str[5], 5, "%04X",
-				gb->cpu_reg.pc);
+				gb->cpu_reg.pc.reg);
 
 		nk_layout_row_dynamic(ctx, 60, 7);
 		for(unsigned i = 0; i < SDL_arraysize(reg_labels); i++)
@@ -396,7 +372,9 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 				"TIMA", "TMA", "DIV"
 			};
 			const uint8_t *timer_reg[3] = {
-				&gb->gb_reg.TIMA, &gb->gb_reg.TMA, &gb->gb_reg.DIV
+				&gb->hram_io[IO_TIMA],
+				&gb->hram_io[IO_TMA],
+				&gb->hram_io[IO_DIV]
 			};
 			static char timer_reg_str[3][3];
 
@@ -454,8 +432,8 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 				"IF", "IE"
 			};
 			const uint8_t *count_ptrs[2] = {
-				&gb->gb_reg.IF,
-				&gb->gb_reg.IE
+				&gb->hram_io[IO_IF],
+				&gb->hram_io[IO_IE]
 			};
 			static char timer_reg_str[2][3];
 
@@ -467,7 +445,7 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 				nk_layout_row_dynamic(ctx, 25, 1);
 				nk_label(ctx, count_str[i], NK_TEXT_CENTERED);
 				reg_str_len = SDL_snprintf(
-						timer_reg_str[i], 16,
+						timer_reg_str[i], 3,
 						"%" PRIu8, *count_ptrs[i]);
 				nk_text(ctx, timer_reg_str[i],
 						reg_str_len,
@@ -541,14 +519,16 @@ static uint8_t *read_rom_to_ram(const char *file_name)
 	rom_size = ftell(rom_file);
 	rewind(rom_file);
 	rom = malloc(rom_size);
+	if(rom == NULL)
+		goto out;
 
 	if(fread(rom, sizeof(uint8_t), rom_size, rom_file) != rom_size)
 	{
 		free(rom);
-		fclose(rom_file);
-		return NULL;
+		rom = NULL;
 	}
 
+out:
 	fclose(rom_file);
 	return rom;
 }
@@ -594,7 +574,7 @@ int main(int argc, char *argv[])
     struct nk_colorf bg;
 
     /* GB */
-    struct gb_s gb;
+    static struct gb_s gb;
     gb_priv_s gb_priv;
 
     /* Print application log. */
