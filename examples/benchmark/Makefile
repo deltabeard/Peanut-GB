@@ -7,13 +7,16 @@ OUTSWITCH	:= -o
 ifeq ($(CC),cl)
 	OUTSWITCH = /Fe
 	CFLAGS := /O2 /W2 /utf-8
+	RM := del
+	EXT := .exe
 endif
 
-all: peanut-benchmark peanut-benchmark-rom
-peanut-benchmark: peanut_benchmark.c ../../peanut_gb.h
-	$(CC) $(CFLAGS) $(LDFLAGS) $(OUTSWITCH)$@ $< $(LDLIBS)
-peanut-benchmark-rom: peanut_benchmark_rom.c ../../peanut_gb.h
+all: peanut-benchmark
+peanut-benchmark: peanut-benchmark.c ../../peanut_gb.h
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OUTSWITCH)$@ $< $(LDLIBS)
 
+peanut-benchmark.S: peanut-benchmark.c ../../peanut_gb.h
+	$(CC) -S $(CFLAGS) $(LDFLAGS) $(OUTSWITCH)$@ $< $(LDLIBS)
+
 clean:
-	rm -f peanut-benchmark peanut-benchmark-rom
+	$(RM) peanut-benchmark$(EXT)

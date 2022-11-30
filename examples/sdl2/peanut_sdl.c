@@ -151,49 +151,28 @@ void write_cart_ram_file(const char *save_file_name, uint8_t **dest,
  * Handles an error reported by the emulator. The emulator context may be used
  * to better understand why the error given in gb_err was reported.
  */
-void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
+void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t addr)
 {
+	const char* gb_err_str[GB_INVALID_MAX] = {
+		"UNKNOWN",
+		"INVALID OPCODE",
+		"INVALID READ",
+		"INVALID WRITE",
+		"HALT FOREVER"
+	};
 	struct priv_t *priv = gb->direct.priv;
 
-	switch(gb_err)
-	{
-	case GB_INVALID_OPCODE:
-		/* We compensate for the post-increment in the __gb_step_cpu
-		 * function. */
-		fprintf(stdout, "Invalid opcode %#04x at PC: %#06x, SP: %#06x\n",
-			val,
-			gb->cpu_reg.pc - 1,
-			gb->cpu_reg.sp);
-		break;
+	fprintf(stderr, "Error %d occurred: %s at %04X\n. Exiting.\n",
+			gb_err, gb_err_str[gb_err], addr);
 
-	/* Ignoring non fatal errors. */
-	case GB_INVALID_WRITE:
-	case GB_INVALID_READ:
-		return;
+	/* Record save file. */
+	write_cart_ram_file("recovery.sav", &priv->cart_ram, gb_get_save_size(gb));
+	fprintf(stderr, "Cart RAM saved to recovery.sav\n");
 
-	case GB_HALT_FOREVER:
-		fprintf(stdout, "Game Boy halted forever at PC: %#06x\n", val);
-		break;
-
-	default:
-		printf("Unknown error");
-		break;
-	}
-
-	fprintf(stderr, "Error. Press q to exit, or any other key to continue.");
-
-	if(getchar() == 'q')
-	{
-		/* Record save file. */
-		write_cart_ram_file("recovery.sav", &priv->cart_ram,
-				    gb_get_save_size(gb));
-
-		free(priv->rom);
-		free(priv->cart_ram);
-		exit(EXIT_FAILURE);
-	}
-
-	return;
+	/* Free memory and then exit. */
+	free(priv->cart_ram);
+	free(priv->rom);
+	exit(EXIT_FAILURE);
 }
 
 /**
@@ -930,7 +909,7 @@ int main(int argc, char **argv)
 	while(SDL_QuitRequested() == SDL_FALSE)
 	{
 		int delay;
-		static unsigned int rtc_timer = 0;
+		static double rtc_timer = 0;
 		static unsigned int selected_palette = 3;
 		static unsigned int dump_bmp = 0;
 
@@ -1162,11 +1141,11 @@ int main(int argc, char **argv)
 		gb_run_frame(&gb);
 
 		/* Tick the internal RTC when 1 second has passed. */
-		rtc_timer += target_speed_ms / fast_mode;
+		rtc_timer += target_speed_ms / (double) fast_mode;
 
-		if(rtc_timer >= 1000)
+		if(rtc_timer >= 1000.0)
 		{
-			rtc_timer -= 1000;
+			rtc_timer -= 1000.0;
 			gb_tick_rtc(&gb);
 		}
 
