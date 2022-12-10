@@ -343,10 +343,10 @@ struct cpu_registers_s
 	/* Define specific bits of Flag register. */
 	struct
 	{
-		unsigned c : 1; /* Carry flag. */
-		unsigned h : 1; /* Half carry flag. */
-		unsigned n : 1; /* Add/sub flag. */
-		unsigned z : 1; /* Zero flag. */
+		uint8_t c : 1; /* Carry flag. */
+		uint8_t h : 1; /* Half carry flag. */
+		uint8_t n : 1; /* Add/sub flag. */
+		uint8_t z : 1; /* Zero flag. */
 	} f_bits;
 	uint8_t a;
 
