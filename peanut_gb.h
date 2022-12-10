@@ -104,11 +104,6 @@
 # define PEANUT_GB_USE_INTRINSICS 1
 #endif
 
-/* Function definition for abort(). */
-#ifndef PEANUT_GB_ABORT
-# define PEANUT_GB_ABORT() abort()
-#endif
-
 /** Internal source code. **/
 /* Interrupt masks */
 #define VBLANK_INTR	0x01
@@ -226,11 +221,17 @@
 # define __has_builtin(x) 0
 #endif
 
-#if __has_builtin(__builtin_unreachable)
-# define PGB_UNREACHABLE() __builtin_unreachable()
-#else
-# define PGB_UNREACHABLE() PEANUT_GB_ABORT()
-#endif
+/* The PGB_UNREACHABLE() macro tells the compiler that the code path will never
+ * be reached, allowing for further optimisation. */
+#if !defined(PGB_UNREACHABLE)
+# if __has_builtin(__builtin_unreachable)
+#  define PGB_UNREACHABLE() __builtin_unreachable()
+# elif defined(_MSC_VER)
+#  define PGB_UNREACHABLE() __assume(0)
+# else
+#  define PGB_UNREACHABLE() abort()
+# endif
+#endif /* !defined(PGB_UNREACHABLE) */
 
 #if PEANUT_GB_USE_INTRINSICS
 /* If using MSVC, only enable intrinsics for x86 platforms*/
