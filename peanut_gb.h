@@ -1066,9 +1066,8 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 		}
 	}
 
-	/* Return address that caused write error. */
-	(gb->gb_error)(gb, GB_INVALID_WRITE, addr);
-	PGB_UNREACHABLE();
+	/* Invalid writes are ignored. */
+	return;
 }
 
 uint8_t __gb_execute_cb(struct gb_s *gb)
