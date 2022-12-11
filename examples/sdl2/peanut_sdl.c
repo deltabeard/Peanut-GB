@@ -24,6 +24,9 @@
 
 struct priv_t
 {
+	/* Window context used to generate message boxes. */
+	SDL_Window *win;
+
 	/* Pointer to allocated memory holding GB file. */
 	uint8_t *rom;
 	/* Pointer to allocated memory holding save file. */
@@ -161,13 +164,18 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t addr
 		"HALT FOREVER"
 	};
 	struct priv_t *priv = gb->direct.priv;
-
-	fprintf(stderr, "Error %d occurred: %s at %04X\n. Exiting.\n",
-			gb_err, gb_err_str[gb_err], addr);
+	char error_msg[256];
 
 	/* Record save file. */
 	write_cart_ram_file("recovery.sav", &priv->cart_ram, gb_get_save_size(gb));
-	fprintf(stderr, "Cart RAM saved to recovery.sav\n");
+
+	SDL_snprintf(error_msg, sizeof(error_msg), "Error %d occurred: %s at %04X\n. "
+		"Cart RAM saved to recovery.sav\n"
+		"Exiting.\n",
+		gb_err, gb_err_str[gb_err], addr);
+	fprintf(stderr, "%s", error_msg);
+
+	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error", error_msg, priv->win);
 
 	/* Free memory and then exit. */
 	free(priv->cart_ram);
@@ -628,6 +636,7 @@ int main(int argc, char **argv)
 		ret = EXIT_FAILURE;
 		goto out;
 	}
+	priv.win = window;
 
 	switch(argc)
 	{
@@ -1109,7 +1118,7 @@ int main(int argc, char **argv)
 					}
 					else
 					{
-						SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+						SDL_SetWindowFullscreen(window,		SDL_WINDOW_FULLSCREEN_DESKTOP);
 						fullscreen = SDL_WINDOW_FULLSCREEN_DESKTOP;
 						SDL_ShowCursor(SDL_DISABLE);
 					}
