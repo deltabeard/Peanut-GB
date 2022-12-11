@@ -10,7 +10,7 @@ set_property(TARGET peanutgb-debugger PROPERTY VS_DPI_AWARE "PerMonitor")
 INCLUDE(CPM.cmake)
 CPMADDPACKAGE(GITHUB_REPOSITORY libsdl-org/SDL
         NAME SDL2
-        GIT_TAG release-2.24.0
+        GIT_TAG release-2.26.1
         OPTIONS
         "SDL_SHARED_ENABLED_BY_DEFAULT OFF"
         "SDL_STATIC_ENABLED_BY_DEFAULT ON")
