@@ -104,11 +104,6 @@
 # define PEANUT_GB_USE_INTRINSICS 1
 #endif
 
-/* Function definition for abort(). */
-#ifndef PEANUT_GB_ABORT
-# define PEANUT_GB_ABORT() abort()
-#endif
-
 /** Internal source code. **/
 /* Interrupt masks */
 #define VBLANK_INTR	0x01
@@ -226,11 +221,17 @@
 # define __has_builtin(x) 0
 #endif
 
-#if __has_builtin(__builtin_unreachable)
-# define PGB_UNREACHABLE() __builtin_unreachable()
-#else
-# define PGB_UNREACHABLE() PEANUT_GB_ABORT()
-#endif
+/* The PGB_UNREACHABLE() macro tells the compiler that the code path will never
+ * be reached, allowing for further optimisation. */
+#if !defined(PGB_UNREACHABLE)
+# if __has_builtin(__builtin_unreachable)
+#  define PGB_UNREACHABLE() __builtin_unreachable()
+# elif defined(_MSC_VER)
+#  define PGB_UNREACHABLE() __assume(0)
+# else
+#  define PGB_UNREACHABLE() abort()
+# endif
+#endif /* !defined(PGB_UNREACHABLE) */
 
 #if PEANUT_GB_USE_INTRINSICS
 /* If using MSVC, only enable intrinsics for x86 platforms*/
@@ -342,10 +343,10 @@ struct cpu_registers_s
 	/* Define specific bits of Flag register. */
 	struct
 	{
-		unsigned c : 1; /* Carry flag. */
-		unsigned h : 1; /* Half carry flag. */
-		unsigned n : 1; /* Add/sub flag. */
-		unsigned z : 1; /* Zero flag. */
+		uint8_t c : 1; /* Carry flag. */
+		uint8_t h : 1; /* Half carry flag. */
+		uint8_t n : 1; /* Add/sub flag. */
+		uint8_t z : 1; /* Zero flag. */
 	} f_bits;
 	uint8_t a;
 
@@ -1065,9 +1066,8 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 		}
 	}
 
-	/* Return address that caused write error. */
-	(gb->gb_error)(gb, GB_INVALID_WRITE, addr);
-	PGB_UNREACHABLE();
+	/* Invalid writes are ignored. */
+	return;
 }
 
 uint8_t __gb_execute_cb(struct gb_s *gb)

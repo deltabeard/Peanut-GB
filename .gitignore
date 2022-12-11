@@ -6,3 +6,5 @@
 peanut-sdl
 peanut-debug
 tags
+build*/
+bin*/
