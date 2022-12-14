@@ -83,7 +83,6 @@ static const SDL_Color colour_lut[4] = {
 		{.r = 0x00, .g = 0x00, .b = 0x00, .a = SDL_ALPHA_OPAQUE }
 };
 
-
 static uint8_t gb_rom_read(struct gb_s *ctx, const uint_fast32_t addr)
 {
 	gb_priv_s *gb_priv;
@@ -200,6 +199,143 @@ static void lcd_draw_line(struct gb_s *gb, const uint8_t *pixels,
 	}
 
 	return;
+}
+
+static const char* const opstrs[0x100] = {
+	"NOP",       "LD BC, d16", "LD (BC), A",  "INC BC", "INC B",    "DEC B",    "LD B, d8",    "RLCA", "LD (a16) SP", "ADD HL, BC", "LD A, (BC)",  "DEC BC", "INC C", "DEC C", "LD C, d8", "RRCA",
+	"STOP d8",   "LD DE, d16", "LD (DE), A",  "INC DE", "INC D",    "DEC D",    "LD D, d8",    "RLA",  "JR r8",       "ADD HL, DE", "LD A, (DE)",  "DEC DE", "INC E", "DEC E", "LD E, d8", "RRA",
+	"JR NZ, r8", "LD HL, d16", "LD (HL+), A", "INC HL", "INC H",    "DEC H",    "LD H, d8",    "DAA",  "JR Z, r8",    "ADD HL, HL", "LD A, (HL+)", "DEC HL", "INC L", "DEC L", "LD L, d8", "CPL",
+	"JR NC, r8", "LD SP, d16", "LD (HL-), A", "INC SP", "INC (HL)", "DEC (HL)", "LD (HL), d8", "SCF",  "JR C, r8",    "ADD HL, SP", "LD A, (HL-)", "DEC SP", "INC A", "DEC A", "LD A, d8", "CCF",
+
+	"LD B, B",    "LD B, C",    "LD B, D",    "LD B, E",    "LD B, H",    "LD B, L",    "LD B, (HL)", "LD B, A",    "LD C, B", "LD C, C", "LD C, D", "LD C, E", "LD C, H", "LD C, L", "LD C, (HL)", "LD C, A",
+	"LD D, B",    "LD D, C",    "LD D, D",    "LD D, E",    "LD D, H",    "LD D, L",    "LD D, (HL)", "LD D, A",    "LD E, B", "LD E, C", "LD E, D", "LD E, E", "LD E, H", "LD E, L", "LD E, (HL)", "LD E, A",
+	"LD H, B",    "LD H, C",    "LD H, D",    "LD H, E",    "LD H, H",    "LD H, L",    "LD H, (HL)", "LD H, A",    "LD L, B", "LD L, C", "LD L, D", "LD L, E", "LD L, H", "LD L, L", "LD L, (HL)", "LD L, A",
+	"LD (HL), B", "LD (HL), C", "LD (HL), D", "LD (HL), E", "LD (HL), H", "LD (HL), L", "HALT",       "LD (HL), A", "LD A, B", "LD A, C", "LD A, D", "LD A, E", "LD A, H", "LD A, L", "LD A, (HL)", "LD A, A",
+
+	"ADD A, B", "ADD A, C", "ADD A, D", "ADD A, E", "ADD A, H", "ADD A, L", "ADD A, (HL)", "ADD A, A", "ADC A, B", "ADC A, C", "ADC A, D", "ADC A, E", "ADC A, H", "ADC A, L", "ADC A, (HL)", "ADC A, A",
+	"SUB B",    "SUB C",    "SUB D",    "SUB E",    "SUB H",    "SUB L",    "SUB (HL)",    "SUB A",    "SBC A, B", "SBC A, C", "SBC A, D", "SBC A, E", "SBC A, H", "SBC A, L", "SBC A, (HL)", "SBC A, A",
+	"AND B",    "AND C",    "AND D",    "AND E",    "AND H",    "AND L",    "AND (HL)",    "AND A",    "XOR B",    "XOR C",    "XOR D",    "XOR E",    "XOR H",    "XOR L",    "XOR (HL)",    "XOR A",
+	"OR B",     "OR C",     "OR D",     "OR E",     "OR H",     "OR L",     "OR (HL)",     "OR A",     "CP B",     "CP C",     "CP D",     "CP E",     "CP H",     "CP L",     "CP (HL)",     "CP A",
+
+	"RET NZ",      "POP BC", "JP NZ, a16", "JP a16", "CALL NZ, a16", "PUSH BC", "ADD A, d8", "RST $00", "RET Z",          "RET",       "JP Z, a16",   "CB", "CALL Z, a16", "CALL a16", "ADC A, d8", "RST $08",
+	"RET NC",      "POP DE", "JP NC, a16", "db",     "CALL NC, a16", "PUSH DE", "SUB d8",    "RST $10", "RET C",          "RETI",      "JP C, a16",   "db", "CALL C, a16", "db",       "SBC A, d8", "RST $18",
+	"LDH (a8), A", "POP HL", "LD (C), A",  "db",     "db",           "PUSH HL", "AND d8",    "RST $20", "ADD SP, r8",     "JP HL",     "LD (a16), A", "db", "db",          "db",       "XOR d8",    "RST $28",
+	"LDH A, (a8)", "POP AF", "LD A, (C)",  "DI",     "db",           "PUSH AF", "OR d8",     "RST $30", "LD HL, SP + r8", "LD SP, HL", "LD A, (a16)", "EI", "db",          "db",       "CP d8",     "RST $38"
+};
+
+static const uint8_t op_bytes[0x100] = {
+	//	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, A, B, C, D, E, F
+		1, 3, 1, 1, 1, 1, 2, 1, 3, 1, 1, 1, 1, 1, 2, 1,
+		2, 3, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1,
+		2, 3, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1,
+		2, 3, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 3, 3, 3, 1, 2, 1, 1, 1, 3, 2, 3, 3, 2, 1,
+		1, 1, 3, 1, 3, 1, 2, 1, 1, 1, 3, 1, 3, 1, 2, 1,
+		2, 1, 1, 1, 1, 1, 2, 1, 2, 1, 3, 1, 1, 1, 2, 1,
+		2, 1, 1, 1, 1, 1, 2, 1, 2, 1, 3, 1, 1, 1, 2, 1
+};
+
+struct sym {
+	union addr_u {
+		struct {
+			uint16_t addr;
+			uint8_t bank;
+			uint8_t unused;
+		};
+		uint32_t addr_all;
+	} addr_u;
+
+	const char* str;
+};
+
+struct sym_ctx {
+	struct sym* syms;
+	size_t sym_entries;
+	void* sym_file;
+	size_t sym_filesize;
+};
+
+typedef enum {
+	DISM_SYMBOL,
+	//DISM_INSTR,
+	//DISM_END
+} dism_type_e;
+struct dism_s {
+	/* The type of data in the string. */
+	//dism_type_e type;
+	char addr_str[8];
+	char opcode_bytes_str[16];
+	const char* opcode_or_symbol_str;
+};
+
+/**
+ * Disassemble Game Boy instructions.
+ * \param mem	Buffer of instructions to decode.
+ * \param mem_len Length of memory to decode in bytes.
+ * \param mem_bank Bank number
+ * \param dism	Output buffer to save disassembled instructions to.
+ * \param dism_nmemb Maximum number of instructions in output buffer.
+ * \return	Number of decoded instructions.
+ **/
+static size_t dism_mem(const void *mem,
+	size_t mem_len, const uint8_t mem_bank, const uint16_t bank_offset,
+	struct dism_s *disms, size_t dism_nmemb)
+{
+	const size_t len = mem_len;
+	const uint8_t *m = mem;
+	size_t number_of_disms = 0;
+
+	SDL_assert(mem != NULL);
+	SDL_assert(mem_len > 3);
+	SDL_assert(disms != NULL);
+	SDL_assert(dism_nmemb > 0);
+
+	for (size_t i = 0; i < mem_len && number_of_disms < dism_nmemb;
+		number_of_disms++)
+	{
+		const uint8_t opcode = m[i];
+		const char *opcode_str = opstrs[opcode];
+		uint8_t bytes = op_bytes[opcode];
+		struct dism_s *this = &disms[number_of_disms];
+
+		//this->type = DISM_INSTR;
+		this->opcode_or_symbol_str = opcode_str;
+		snprintf(this->addr_str, sizeof(this->addr_str),
+			"%02X:%04X", mem_bank, (uint16_t)(i + bank_offset));
+
+		switch (bytes)
+		{
+		case 1:
+			snprintf(this->opcode_bytes_str,
+				sizeof(this->opcode_bytes_str),
+				"%02X", opcode);
+			break;
+		case 2:
+			snprintf(this->opcode_bytes_str,
+				sizeof(this->opcode_bytes_str),
+				"%02X %02X",
+				opcode, m[i + 1]);
+			break;
+		case 3:
+			snprintf(this->opcode_bytes_str,
+				sizeof(this->opcode_bytes_str),
+				"%02X %02X %02X",
+				opcode, m[i + 1], m[i + 2]);
+			break;
+		}
+
+		i += bytes;
+	}
+
+	return number_of_disms;
 }
 
 typedef enum {
@@ -349,26 +485,68 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 	nk_end(ctx);
 
 	/* Dissassembler */
-	if(nk_begin(ctx, "Assembly",
+	while(nk_begin(ctx, "Assembly",
 		nk_rect(480, 210, 220, 430),
 		NK_WINDOW_BORDER | NK_WINDOW_MOVABLE |
 		NK_WINDOW_SCALABLE | NK_WINDOW_TITLE |
 		NK_WINDOW_MINIMIZABLE))
 	{
-		static nk_bool selected[2 * 1024] = { 0 };
-		nk_layout_row_dynamic(ctx, 18, 1);
-		for(unsigned i = 0; i < SDL_arraysize(selected); i++)
+		struct dism_s disms[32];
+		uint8_t bank;
+		uint8_t *mem;
+		size_t mem_len;
+		size_t disms_made;
+
+		nk_layout_row_dynamic(ctx, 18, 3);
+		if(gb_state != GB_STATE_CPU_STEP)
 		{
-			nk_selectable_label(ctx,
-				selected[i] ? "Selected" : "Unselected",
-				NK_TEXT_CENTERED, &selected[i]);
+			nk_label(ctx, "Use CPU Step Mode", NK_TEXT_CENTERED);
+			break;
 		}
+
+		if(gb->cpu_reg.pc.reg < 0x8000)
+		{
+			mem = gb_priv->rom;
+			bank = gb->selected_rom_bank;
+
+			if(gb->mbc == 1 && gb->cart_mode_select)
+				mem += gb->cpu_reg.pc.reg + ((gb->selected_rom_bank & 0x1F) - 1) * ROM_BANK_SIZE;
+			else
+				mem += gb->cpu_reg.pc.reg + (gb->selected_rom_bank - 1) * ROM_BANK_SIZE;
+		}
+		else
+		{
+			nk_label(ctx, "PC out of range", NK_TEXT_CENTERED);
+			break;
+		}
+
+		mem_len = (gb->cpu_reg.pc.reg + 64) & 0x3FFF;
+		disms_made = dism_mem(mem, mem_len, bank, (mem - gb_priv->rom) & 0x3FFF,
+			disms, SDL_arraysize(disms));
+		for(size_t i = 0; i < SDL_arraysize(disms); i++)
+		{
+			nk_text(ctx, disms[i].addr_str,
+				SDL_strlen(disms[i].addr_str), NK_TEXT_LEFT);
+			nk_text(ctx, disms[i].opcode_bytes_str,
+				SDL_strlen(disms[i].opcode_bytes_str), NK_TEXT_LEFT);
+			nk_text(ctx, disms[i].opcode_or_symbol_str,
+				SDL_strlen(disms[i].opcode_or_symbol_str), NK_TEXT_LEFT);
+		}
+
+		//for(unsigned i = 0; i < SDL_arraysize(selected); i++)
+		//{
+		//	nk_selectable_label(ctx,
+		//		selected[i] ? "Selected" : "Unselected",
+		//		NK_TEXT_CENTERED, &selected[i]);
+		//}
 		print_window_pos(ctx);
+
+		break;
 	}
 	nk_end(ctx);
 
 	/* Game Boy Registers */
-	if(nk_begin(ctx, "Registers", nk_rect(200, 15, 400, 46 + LCD_HEIGHT),
+	if(nk_begin(ctx, "Registers", nk_rect(200, 15, 490, 46 + LCD_HEIGHT),
 		NK_WINDOW_BORDER | NK_WINDOW_MOVABLE |
 		NK_WINDOW_SCALABLE | NK_WINDOW_TITLE |
 		NK_WINDOW_MINIMIZABLE))
@@ -392,7 +570,7 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 		reg_str_len[5] = SDL_snprintf(reg_str[5], 5, "%04X",
 			gb->cpu_reg.pc.reg);
 
-		nk_layout_row_dynamic(ctx, 60, 7);
+		nk_layout_row_dynamic(ctx, 60, 10);
 		for(unsigned i = 0; i < SDL_arraysize(reg_labels); i++)
 		{
 			if(nk_group_begin(ctx, reg_labels[i],
@@ -456,7 +634,7 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 			}
 		}
 
-#if 0
+#if 1
 		for(unsigned i = 0; i < 4; i++)
 		{
 			const char count_str[4][7] = {
@@ -514,6 +692,48 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 				nk_group_end(ctx);
 			}
 		}
+
+		print_window_pos(ctx);
+	}
+	nk_end(ctx);
+
+	/* Game Boy Control */
+	if (nk_begin(ctx, "ROM Info", nk_rect(15, 340, 20 + LCD_WIDTH, 140),
+		NK_WINDOW_BORDER | NK_WINDOW_MOVABLE |
+		NK_WINDOW_SCALABLE | NK_WINDOW_TITLE |
+		NK_WINDOW_MINIMIZABLE))
+	{
+		char str[32];
+		int str_len;
+
+		nk_layout_row_dynamic(ctx, 16, 1);
+
+		gb_get_rom_name(gb, str);
+		nk_text(ctx, str, 16, NK_TEXT_CENTERED);
+
+		str_len = SDL_snprintf(str, sizeof(str),
+			"MBC %u", gb->mbc);
+		nk_text(ctx, str, str_len, NK_TEXT_CENTERED);
+
+		str_len = SDL_snprintf(str, sizeof(str),
+			"ROM %u of %u", gb->selected_rom_bank,
+			gb->num_rom_banks_mask);
+		nk_text(ctx, str, str_len, NK_TEXT_CENTERED);
+
+		if(gb->cart_ram)
+		{
+			str_len = SDL_snprintf(str, sizeof(str),
+				"RAM %u of %u", gb->cart_ram_bank,
+				gb->num_ram_banks);
+			nk_text(ctx, str, str_len, NK_TEXT_CENTERED);
+		}
+		else
+		{
+			str_len = SDL_snprintf(str, sizeof(str),
+				"No RAM");
+			nk_text(ctx, str, str_len, NK_TEXT_CENTERED);
+		}
+
 		print_window_pos(ctx);
 	}
 	nk_end(ctx);
