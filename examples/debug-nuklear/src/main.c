@@ -190,7 +190,8 @@ static void lcd_draw_line(struct gb_s *gb, const uint8_t *pixels,
 typedef enum {
 	GB_STATE_PLAYING,
 	GB_STATE_PAUSED,
-	GB_STATE_STEP
+	GB_STATE_FRAME_STEP,
+	GB_STATE_CPU_STEP
 } gb_state_e;
 
 void print_window_pos(struct nk_context *ctx)
@@ -210,10 +211,11 @@ void print_window_pos(struct nk_context *ctx)
 static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 {
 	const char *const win_str_lut[] = {
-		"LCD: Playing", "LCD: Paused", "LCD: Frame Step"
+		"LCD: Playing", "LCD: Paused", "LCD: Frame Step",
+		"LCD: CPU Step"
 	};
 	gb_priv_s *gb_priv = gb->direct.priv;
-	static int frame_step = 0;
+	static int frame_step = 0, cpu_step = 0;
 	static gb_state_e gb_state = GB_STATE_PAUSED;
 
 	/* Game Boy Control */
@@ -226,7 +228,13 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 		if(nk_button_label(ctx, "Frame Step"))
 		{
 			frame_step++;
-			gb_state = GB_STATE_STEP;
+			gb_state = GB_STATE_FRAME_STEP;
+		}
+
+		if (nk_button_label(ctx, "CPU Step"))
+		{
+			cpu_step++;
+			gb_state = GB_STATE_CPU_STEP;
 		}
 
 		if(gb_state == GB_STATE_PLAYING)
@@ -243,7 +251,7 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 	nk_end(ctx);
 
 	if(gb_state == GB_STATE_PLAYING ||
-		(gb_state == GB_STATE_STEP && frame_step != 0))
+		(gb_state == GB_STATE_FRAME_STEP && frame_step != 0))
 	{
 		int ret;
 		ret = SDL_LockTexture(gb_priv->gb_lcd_tex, NULL,
@@ -256,6 +264,19 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 		SDL_UnlockTexture(gb_priv->gb_lcd_tex);
 
 		frame_step = 0;
+	}
+	else if(gb_state == GB_STATE_CPU_STEP && cpu_step != 0)
+	{
+		int ret;
+		ret = SDL_LockTexture(gb_priv->gb_lcd_tex, NULL,
+			&gb_priv->pixels, &gb_priv->pitch);
+		SDL_assert_always(ret == 0);
+
+		__gb_step_cpu(gb);
+
+		render_vram_tex(gb_priv->gb_vram_tex, gb);
+		SDL_UnlockTexture(gb_priv->gb_lcd_tex);
+		cpu_step = 0;
 	}
 
 	/* LCD */
