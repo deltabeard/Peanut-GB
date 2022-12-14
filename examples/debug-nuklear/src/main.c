@@ -76,6 +76,14 @@ typedef struct {
 	uint8_t *ram;
 } gb_priv_s;
 
+static const SDL_Color colour_lut[4] = {
+		{.r = 0xFF, .g = 0xFF, .b = 0xFF, .a = SDL_ALPHA_OPAQUE },
+		{.r = 0xFF, .g = 0xAD, .b = 0x63, .a = SDL_ALPHA_OPAQUE },
+		{.r = 0x84, .g = 0x31, .b = 0x00, .a = SDL_ALPHA_OPAQUE },
+		{.r = 0x00, .g = 0x00, .b = 0x00, .a = SDL_ALPHA_OPAQUE }
+};
+
+
 static uint8_t gb_rom_read(struct gb_s *ctx, const uint_fast32_t addr)
 {
 	gb_priv_s *gb_priv;
@@ -123,9 +131,6 @@ static void render_vram_tex(SDL_Texture *tex, const struct gb_s *const gb)
 {
 	int ret;
 	int pitch;
-	const uint32_t colour_lut[4] = {
-		0xFFFFFFFF, 0x7F7F7FFF, 0x2F2F2FFF, 0xFF000000
-	};
 	uint32_t *pixels;
 	SDL_Surface *s, *tile;
 
@@ -137,12 +142,15 @@ static void render_vram_tex(SDL_Texture *tex, const struct gb_s *const gb)
 	tile = SDL_CreateRGBSurfaceWithFormat(0, SPRITE_WIDTH, SPRITE_HEIGHT,
 		32, SDL_PIXELFORMAT_RGBA32);
 
+	SDL_SetSurfaceBlendMode(s, SDL_BLENDMODE_NONE);
+	SDL_SetSurfaceBlendMode(tile, SDL_BLENDMODE_NONE);
+
 	for(unsigned sprite = 0; sprite < NUMBER_OF_SPRITES; sprite++)
 	{
 		int sprite_x = (sprite % NUMBER_OF_SPRITES_IN_ROW) * SPRITE_WIDTH;
 		int sprite_y = (sprite / NUMBER_OF_SPRITES_IN_ROW) * SPRITE_HEIGHT;
 		unsigned sprite_addr = sprite << 4;
-		uint32_t *pixels = tile->pixels;
+		SDL_Color *pixels = tile->pixels;
 		SDL_Rect dstrect = {
 			.h = 8, .w = 8,
 			.x = sprite_x, .y = sprite_y
@@ -156,7 +164,10 @@ static void render_vram_tex(SDL_Texture *tex, const struct gb_s *const gb)
 				uint8_t t2 = gb->vram[sprite_addr + 1] >> px;
 				uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
 
-				*pixels = colour_lut[c];
+				pixels->r = colour_lut[c].r;
+				pixels->g = colour_lut[c].g;
+				pixels->b = colour_lut[c].b;
+				pixels->a = colour_lut[c].a;
 				pixels++;
 			}
 		}
@@ -173,15 +184,19 @@ static void render_vram_tex(SDL_Texture *tex, const struct gb_s *const gb)
 static void lcd_draw_line(struct gb_s *gb, const uint8_t *pixels,
 	const uint_fast8_t line)
 {
-	const uint32_t colour_lut[4] = {
-		0xFFFFFFFF, 0x7F7F7FFF, 0x2F2F2FFF, 0x00000000
-	};
 	gb_priv_s *priv = gb->direct.priv;
-	uint32_t *tex = priv->pixels;
+	SDL_Color *tex = priv->pixels;
 
 	for(unsigned int x = 0; x < LCD_WIDTH; x++)
 	{
-		tex[(line * LCD_WIDTH) + x] = colour_lut[pixels[x] & 3];
+		tex[(line * LCD_WIDTH) + x].r =
+			colour_lut[pixels[x] & 3].r;
+		tex[(line * LCD_WIDTH) + x].g =
+			colour_lut[pixels[x] & 3].g;
+		tex[(line * LCD_WIDTH) + x].b =
+			colour_lut[pixels[x] & 3].b;
+		tex[(line * LCD_WIDTH) + x].a =
+			colour_lut[pixels[x] & 3].a;
 	}
 
 	return;
@@ -219,7 +234,7 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 	static gb_state_e gb_state = GB_STATE_PAUSED;
 
 	/* Game Boy Control */
-	if(nk_begin(ctx, "Control", nk_rect(15, 210, 20 + LCD_WIDTH, 85),
+	if(nk_begin(ctx, "Control", nk_rect(15, 210, 20 + LCD_WIDTH, 120),
 		NK_WINDOW_BORDER | NK_WINDOW_MOVABLE |
 		NK_WINDOW_SCALABLE | NK_WINDOW_TITLE |
 		NK_WINDOW_MINIMIZABLE))
@@ -260,7 +275,11 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 
 		gb_run_frame(gb);
 
-		render_vram_tex(gb_priv->gb_vram_tex, gb);
+		if(!nk_window_is_collapsed(ctx, "VRAM Viewer"))
+		{
+			render_vram_tex(gb_priv->gb_vram_tex, gb);
+		}
+
 		SDL_UnlockTexture(gb_priv->gb_lcd_tex);
 
 		frame_step = 0;
@@ -274,7 +293,11 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 
 		__gb_step_cpu(gb);
 
-		render_vram_tex(gb_priv->gb_vram_tex, gb);
+		if(!nk_window_is_collapsed(ctx, "VRAM Viewer"))
+		{
+			render_vram_tex(gb_priv->gb_vram_tex, gb);
+		}
+		
 		SDL_UnlockTexture(gb_priv->gb_lcd_tex);
 		cpu_step = 0;
 	}
@@ -500,7 +523,7 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 		nk_rect(200, 210, 270, 430),
 		NK_WINDOW_BORDER | NK_WINDOW_MOVABLE |
 		NK_WINDOW_SCALABLE | NK_WINDOW_TITLE |
-		NK_WINDOW_NO_SCROLLBAR))
+		NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_MINIMIZABLE))
 	{
 		struct nk_image nk_gb_vram;
 		struct nk_command_buffer *canvas;
