@@ -980,8 +980,11 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 					return;
 				}
 
-				gb->hram_io[IO_STAT] = (gb->hram_io[IO_STAT] & ~0x03) | 1;
+				/* Set LCD to Mode 0. */
+				gb->hram_io[IO_STAT] = (gb->hram_io[IO_STAT] & ~0x03);
+				/* Set to line 0. */
 				gb->hram_io[IO_LY] = 0;
+				/* Reset LCD timer. */
 				gb->counter.lcd_count = 0;
 			}
 
@@ -3351,8 +3354,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		gb->counter.lcd_count += inst_cycles;
 
 		/* New Scanline */
-		if((gb->hram_io[IO_STAT] & STAT_MODE) & IO_STAT_MODE_VBLANK_OR_TRANSFER_MASK &&
-				gb->counter.lcd_count >= LCD_LINE_CYCLES)
+		if(gb->counter.lcd_count >= LCD_LINE_CYCLES)
 		{
 			gb->counter.lcd_count -= LCD_LINE_CYCLES;
 
