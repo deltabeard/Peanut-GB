@@ -55,7 +55,7 @@ jobs:
             ${{ env.CPM_SOURCE_CACHE }}
             ${{ github.workspace }}/build/_deps
             ${{ github.workspace }}/build/**/cmake_pch.*
-          key: ${{ matrix.os }}-${{ hashFiles('CMakeLists.txt','.github/workflows/build.yml') }}
+          key: ${{ matrix.os }}-${{ hashFiles('examples/sdl2/CMakeLists.txt','.github/workflows/peanut-sdl.yml') }}
 
       - name: Build
         run: |
