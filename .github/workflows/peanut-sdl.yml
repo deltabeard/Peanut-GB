@@ -70,7 +70,7 @@ jobs:
 
       - name: Get Short SHA
         id: vars
-        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Upload output
         uses: actions/upload-artifact@v3
