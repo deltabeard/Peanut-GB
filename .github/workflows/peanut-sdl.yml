@@ -23,10 +23,10 @@ jobs:
         generator: [Ninja]
         nice-arch: [x86_64]
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             nice-name: "Linux-glibc2.35"
           
-          - os: macos-latest
+          - os: macos-11
             nice-name: "macOS11"
             
           - os: windows-2022
