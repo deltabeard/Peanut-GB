@@ -18,20 +18,31 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-22.04, macos-11]
         build_type: [RelWithDebInfo]
         generator: [Ninja]
+        nice-arch: [x86_64]
         include:
+          - os: ubuntu-latest
+            nice-name: "Linux-glibc2.35"
+          
+          - os: macos-latest
+            nice-name: "macOS11"
+            
           - os: windows-2022
             build_type: RelWithDebInfo
             generator: "Visual Studio 17 2022"
             arch: amd64
             toolset: -T v143
+            nice-name: "Windows7"
+
           - os: windows-2019
             build_type: RelWithDebInfo
             generator: "Visual Studio 16 2019"
             arch: amd64_x86
             toolset: -T v141_xp
+            nice-arch: "i386"
+            nice-name: "WindowsXP"
 
     steps:
       - uses: actions/checkout@v3
@@ -75,7 +86,7 @@ jobs:
       - name: Upload output
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.os }}${{ matrix.arch}}-${{ matrix.build_type }}-${{ steps.vars.outputs.sha_short }}
+          name: ${{ matrix.nice-name }}-${{ matrix.nice-arch }}-${{ matrix.build_type }}-${{ steps.vars.outputs.sha_short }}
           path: |
             ${{ github.workspace }}/build/peanut-sdl.tar
             ${{ github.workspace }}/build/**/peanut-sdl.exe
