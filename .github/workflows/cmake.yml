@@ -1,0 +1,83 @@
+name: build
+
+on:
+  push:
+    branches-ignore:
+      - '**pages**'
+  pull_request:
+    branches-ignore:
+      - '**pages**'
+
+env:
+  CPM_SOURCE_CACHE: ${{ github.workspace }}/cpm-cache
+
+jobs:
+  build:
+    name: ${{ matrix.os }}-${{ matrix.build_type }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        build_type: [RelWithDebInfo]
+        generator: [Ninja]
+        include:
+          - os: windows-2022
+            build_type: RelWithDebInfo
+            generator: "Visual Studio 17 2022"
+            arch: amd64
+            toolset: -T v143
+          - os: windows-2019
+            build_type: RelWithDebInfo
+            generator: "Visual Studio 16 2019"
+            arch: amd64_x86
+            toolset: -T v141_xp
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          
+      - name: Initialise MSVC environment
+        if: "contains(matrix.os, 'windows')"
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.msvc_arch }}
+
+      - uses: lukka/get-cmake@latest
+
+      - run: mkdir ${{ env.CPM_SOURCE_CACHE }}
+
+      - name: Cache multiple paths
+        uses: actions/cache@v2
+        with:
+          path: |
+            ${{ env.CPM_SOURCE_CACHE }}
+            ${{ github.workspace }}/build/_deps
+            ${{ github.workspace }}/build/**/cmake_pch.*
+          key: ${{ matrix.os }}-${{ hashFiles('CMakeLists.txt','.github/workflows/build.yml') }}
+
+      - name: Build
+        run: |
+          cmake -S ./examples/SDL2/ -B ${{github.workspace}}/build -G "${{matrix.generator}}" -DCMAKE_BUILD_TYPE=${{matrix.build_type}} ${{matrix.toolset}}
+          cmake --build build --config ${{matrix.BUILD_TYPE}}
+          
+      - name: Tar output on Unix systems
+        if: "contains(matrix.os, 'windows') == false"
+        run: |
+          cd ${{github.workspace}}/build
+          tar cf peanut-sdl.tar peanut-sdl*
+
+      - name: Get Short SHA
+        id: vars
+        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+
+      - name: Upload output
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.os }}${{ matrix.arch}}-${{ matrix.build_type }}-${{ steps.vars.outputs.sha_short }}
+          path: |
+            ${{ github.workspace }}/build/peanut-sdl.tar
+            ${{ github.workspace }}/build/**/peanut-sdl.exe
+            ${{ github.workspace }}/build/**/peanut-sdl.pdb
+
