@@ -73,7 +73,7 @@ jobs:
         run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
 
       - name: Upload output
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.os }}${{ matrix.arch}}-${{ matrix.build_type }}-${{ steps.vars.outputs.sha_short }}
           path: |
