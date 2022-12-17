@@ -1292,7 +1292,6 @@ static int compare_sprites(const void *in1, const void *in2)
 void __gb_draw_line(struct gb_s *gb)
 {
 	uint8_t pixels[160] = {0};
-	uint8_t bg_priority[20];
 
 	/* If LCD not initialised by front-end, don't render anything. */
 	if(gb->display.lcd_draw_line == NULL)
@@ -1353,8 +1352,6 @@ void __gb_draw_line(struct gb_s *gb)
 
 		uint16_t tile;
 
-		bg_priority[disp_x/8] = idx;
-
 		/* Select addressing mode. */
 		if(gb->hram_io[IO_LCDC] & LCDC_TILE_SELECT)
 			tile = VRAM_TILES_1 + idx * 0x10;
@@ -1384,8 +1381,6 @@ void __gb_draw_line(struct gb_s *gb)
 				tile += 2 * py;
 				t1 = gb->vram[tile];
 				t2 = gb->vram[tile + 1];
-
-				bg_priority[disp_x / 8] = idx;
 			}
 
 			/* copy background */
@@ -1552,9 +1547,6 @@ void __gb_draw_line(struct gb_s *gb)
 			// handle x flip
 			uint8_t dir, start, end, shift;
 
-			uint8_t bg_priority_tile;
-			uint8_t tile_has_priority;
-
 			if(OF & OBJ_FLIP_X)
 			{
 				dir = 1;
@@ -1570,9 +1562,6 @@ void __gb_draw_line(struct gb_s *gb)
 				shift = OX - (start + 1);
 			}
 
-			bg_priority_tile = bg_priority[start / 8];
-			tile_has_priority = OT < bg_priority_tile;
-
 			// copy tile
 			t1 >>= shift;
 			t2 >>= shift;
@@ -1585,20 +1574,12 @@ void __gb_draw_line(struct gb_s *gb)
 				uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
 				// check transparency / sprite overlap / background overlap
 
-				if(c && (OF & OBJ_PRIORITY) && tile_has_priority)
-				{
-					/* Set pixel colour. */
-					pixels[disp_x] ^= (OF & OBJ_PALETTE)
-						? gb->display.sp_palette[c + 4]
-						: gb->display.sp_palette[c];
-					pixels[disp_x] = ((~pixels[disp_x]) & 0x3);
-				}
-				else if(c && !(OF & OBJ_PRIORITY && (pixels[disp_x] & 0x3)))
+				if(c && !(OF & OBJ_PRIORITY && !((pixels[disp_x] & 0x3) == gb->display.bg_palette[0])))
 				{
 					/* Set pixel colour. */
 					pixels[disp_x] = (OF & OBJ_PALETTE)
-							 ? gb->display.sp_palette[c + 4]
-							 : gb->display.sp_palette[c];
+						? gb->display.sp_palette[c + 4]
+						: gb->display.sp_palette[c];
 					/* Set pixel palette (OBJ0 or OBJ1). */
 					pixels[disp_x] |= (OF & OBJ_PALETTE);
 				}
