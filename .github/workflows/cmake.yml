@@ -2,8 +2,8 @@ name: build
 
 on:
   push:
-    branches-ignore:
-      - '**pages**'
+    branches:
+      - master
   pull_request:
     branches-ignore:
       - '**pages**'
@@ -59,7 +59,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake -S ./examples/sdl2/ -B ${{github.workspace}}/build -G "${{matrix.generator}}" -DCMAKE_BUILD_TYPE=${{matrix.build_type}} ${{matrix.toolset}}
+          cmake -S ./examples/sdl2/ -B ${{github.workspace}}/build -G "${{matrix.generator}}" -DCMAKE_BUILD_TYPE=${{matrix.build_type}} -DLIBRARY_DISCOVER_METHOD=CPM ${{matrix.toolset}}
           cmake --build build --config ${{matrix.BUILD_TYPE}}
           
       - name: Tar output on Unix systems
