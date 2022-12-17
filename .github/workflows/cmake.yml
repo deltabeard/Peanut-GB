@@ -49,7 +49,7 @@ jobs:
       - run: mkdir ${{ env.CPM_SOURCE_CACHE }}
 
       - name: Cache multiple paths
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             ${{ env.CPM_SOURCE_CACHE }}
@@ -59,7 +59,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake -S ./examples/SDL2/ -B ${{github.workspace}}/build -G "${{matrix.generator}}" -DCMAKE_BUILD_TYPE=${{matrix.build_type}} ${{matrix.toolset}}
+          cmake -S ./examples/sdl2/ -B ${{github.workspace}}/build -G "${{matrix.generator}}" -DCMAKE_BUILD_TYPE=${{matrix.build_type}} ${{matrix.toolset}}
           cmake --build build --config ${{matrix.BUILD_TYPE}}
           
       - name: Tar output on Unix systems
