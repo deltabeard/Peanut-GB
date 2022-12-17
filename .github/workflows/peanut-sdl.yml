@@ -34,6 +34,7 @@ jobs:
             generator: "Visual Studio 17 2022"
             arch: amd64
             toolset: -T v143
+            nice-arch: "x86_64"
             nice-name: "Windows7"
 
           - os: windows-2019
@@ -81,6 +82,7 @@ jobs:
 
       - name: Get Short SHA
         id: vars
+        shell: bash
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Upload output
