@@ -33,7 +33,6 @@ jobs:
             build_type: RelWithDebInfo
             generator: "Visual Studio 17 2022"
             arch: amd64
-            toolset: "14.XX"
             additional-cmake-args: -T v143
             nice-arch: "x86_64"
             nice-name: "Windows7"
@@ -42,7 +41,6 @@ jobs:
             build_type: RelWithDebInfo
             generator: "Visual Studio 16 2019"
             arch: amd64_x86
-            toolset: "14.27"
             additional-cmake-args: -T v141_xp
             nice-arch: "i386"
             nice-name: "WindowsXP"
@@ -57,7 +55,6 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: ${{ matrix.arch }}
-          toolset: ${{ matrix.toolset }}
 
       - uses: lukka/get-cmake@latest
 
