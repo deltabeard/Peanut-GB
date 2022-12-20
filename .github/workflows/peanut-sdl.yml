@@ -33,7 +33,8 @@ jobs:
             build_type: RelWithDebInfo
             generator: "Visual Studio 17 2022"
             arch: amd64
-            toolset: -T v143
+            toolset: "14.XX"
+            additional-cmake-args: -T v143
             nice-arch: "x86_64"
             nice-name: "Windows7"
 
@@ -41,7 +42,8 @@ jobs:
             build_type: RelWithDebInfo
             generator: "Visual Studio 16 2019"
             arch: amd64_x86
-            toolset: -T v141_xp
+            toolset: "14.27"
+            additional-cmake-args: -T v141_xp
             nice-arch: "i386"
             nice-name: "WindowsXP"
 
@@ -54,7 +56,8 @@ jobs:
         if: "contains(matrix.os, 'windows')"
         uses: ilammy/msvc-dev-cmd@v1
         with:
-          arch: ${{ matrix.msvc_arch }}
+          arch: ${{ matrix.arch }}
+          toolset: ${{ matrix.toolset }}
 
       - uses: lukka/get-cmake@latest
 
@@ -71,7 +74,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake -S ./examples/sdl2/ -B ${{github.workspace}}/build -G "${{matrix.generator}}" -DCMAKE_BUILD_TYPE=${{matrix.build_type}} -DLIBRARY_DISCOVER_METHOD=CPM ${{matrix.toolset}}
+          cmake -S ./examples/sdl2/ -B ${{github.workspace}}/build -G "${{matrix.generator}}" -DCMAKE_BUILD_TYPE=${{matrix.build_type}} -DLIBRARY_DISCOVER_METHOD=CPM ${{matrix.additional-cmake-args}}
           cmake --build build --config ${{matrix.BUILD_TYPE}}
           
       - name: Tar output on Unix systems
