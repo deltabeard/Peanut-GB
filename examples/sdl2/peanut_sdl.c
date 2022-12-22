@@ -871,8 +871,27 @@ int main(int argc, char **argv)
 
 	SDL_SetWindowMinimumSize(window, LCD_WIDTH, LCD_HEIGHT);
 
-	renderer = SDL_CreateRenderer(window, -1,
-				      SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
+	{
+		SDL_RendererFlags rf[3] = {
+			SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED,
+			SDL_RENDERER_ACCELERATED,
+			SDL_RENDERER_SOFTWARE
+		};
+		const char *rf_str[3] = {
+			"Vsync and Accelerated",
+			"Accelerated",
+			"Software"
+		};
+		for(int i = 0; i < SDL_arraysize(rf); i++)
+		{
+			renderer = SDL_CreateRenderer(window, -1, rf[i]);
+			if(renderer)
+				break;
+
+			printf("Could not create renderer with %s\n",
+				rf_str[i]);
+		}
+	}
 
 	if(renderer == NULL)
 	{
