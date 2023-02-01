@@ -237,13 +237,13 @@
 /* If using MSVC, only enable intrinsics for x86 platforms*/
 # if defined(_MSC_VER) && __has_include("intrin.h") && \
 	(defined(_M_IX86_FP) || defined(_M_AMD64) || defined(_M_X64))
-/* Define instrinsic functions for MSVC. */
+/* Define intrinsic functions for MSVC. */
 #  include <intrin.h>
 #  define PGB_INTRIN_SBC(x,y,cin,res) _subborrow_u8(cin,x,y,&res)
 #  define PGB_INTRIN_ADC(x,y,cin,res) _addcarry_u8(cin,x,y,&res)
 # endif /* MSVC */
 
-/* Check for instrinsic functions in GCC and Clang. */
+/* Check for intrinsic functions in GCC and Clang. */
 # if __has_builtin(__builtin_sub_overflow)
 #  define PGB_INTRIN_SBC(x,y,cin,res) __builtin_sub_overflow(x,y+cin,&res)
 #  define PGB_INTRIN_ADC(x,y,cin,res) __builtin_add_overflow(x,y+cin,&res)
@@ -317,7 +317,7 @@
 	gb->cpu_reg.f_bits.h = ((r & 0x0F) == 0x0F);				\
 	gb->cpu_reg.f_bits.n = 1;						\
 	gb->cpu_reg.f_bits.z = (r == 0x00);
-	
+
 
 #if PEANUT_GB_IS_LITTLE_ENDIAN
 # define PEANUT_GB_GET_LSB16(x) (x & 0xFF)
@@ -533,7 +533,7 @@ struct gb_s
 	 *
 	 * \param gb_s			emulator context
 	 * \param gb_error_e	error code
-	 * \param addr			address of where error occured
+	 * \param addr			address of where error occurred
 	 */
 	void (*gb_error)(struct gb_s*, const enum gb_error_e, const uint16_t addr);
 
@@ -1278,7 +1278,7 @@ struct sprite_data {
 static int compare_sprites(const void *in1, const void *in2)
 {
 	const struct sprite_data *sd1, *sd2;
-       
+
 	sd1 = (struct sprite_data *)in1;
 	sd2 = (struct sprite_data *)in2;
 	int x_res = (int)sd1->x - (int)sd2->x;
@@ -3790,7 +3790,7 @@ void gb_init_lcd(struct gb_s *gb,
  * \param gb_serial_tx Pointer to function that transmits a byte of data over
  *		the serial connection. Must not be NULL.
  * \param gb_serial_rx Pointer to function that receives a byte of data over the
- *		serial connection. If no byte is recieved,
+ *		serial connection. If no byte is received,
  *		return GB_SERIAL_RX_NO_CONNECTION. Must not be NULL.
  */
 void gb_init_serial(struct gb_s *gb,
