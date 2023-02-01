@@ -80,10 +80,14 @@ void test_cpu_inst(void)
 	struct gb_s gb;
 	const unsigned short pc_end = 0x06F1; /* Test ends when PC is this value. */
 	struct priv p = { .count = 0 };
+	enum gb_init_error_e gb_err;
 
 	/* Run ROM test. */
-	gb_init(&gb, &gb_rom_read_cpu_instrs, &gb_cart_ram_read,
+	gb_err = gb_init(&gb, &gb_rom_read_cpu_instrs, &gb_cart_ram_read,
 			&gb_cart_ram_write, &gb_error, &p);
+	lok(gb_err == GB_INIT_NO_ERROR);
+	if(gb_err != GB_INIT_NO_ERROR)
+		return;
 
 	gb_init_serial(&gb, &gb_serial_tx, NULL);
 
@@ -106,10 +110,14 @@ void test_instr_timing(void)
 	struct gb_s gb;
 	const unsigned short pc_end = 0xC8B0; /* Test ends when PC is this value. */
 	struct priv p = { .count = 0 };
+	enum gb_init_error_e gb_err;
 
 	/* Run ROM test. */
-	gb_init(&gb, &gb_rom_read_instr_timing, &gb_cart_ram_read,
+	gb_err = gb_init(&gb, &gb_rom_read_instr_timing, &gb_cart_ram_read,
 			&gb_cart_ram_write, &gb_error, &p);
+	lok(gb_err == GB_INIT_NO_ERROR);
+	if(gb_err != GB_INIT_NO_ERROR)
+		return;
 
 	gb_init_serial(&gb, &gb_serial_tx, NULL);
 
