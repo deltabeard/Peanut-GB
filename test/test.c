@@ -50,11 +50,11 @@ uint8_t gb_cart_ram_read(struct gb_s *gb, const uint32_t addr)
 }
 
 /**
- * Ignore all errors.
+ * Abort on any error.
  */
 void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
 {
-	return;
+	abort();
 }
 
 void gb_serial_tx(struct gb_s *gb, const uint8_t tx)
