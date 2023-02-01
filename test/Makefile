@@ -1,6 +1,5 @@
-CC=gcc
-OPT=-s -O2
-CFLAGS=$(OPT) -Wall -Werror
+OPT=-g2 -O2
+override CFLAGS=$(OPT) -Wall -Werror
 
 all: test
 	$(CC) test.c -o test $(CFLAGS)

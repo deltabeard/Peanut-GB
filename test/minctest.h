@@ -92,9 +92,9 @@ static int lfails = 0;
     const int ts = ltests;\
     const int fs = lfails;\
     const clock_t start = clock();\
-    printf("\t%-14s\t", name);\
+    printf("%-14s\t", name);\
     test();\
-    printf("pass:%2d   fail:%2d   %4dms\n",\
+    printf("\npass:%2d   fail:%2d   %4dms\n",\
             (ltests-ts)-(lfails-fs), lfails-fs,\
             (int)((clock() - start) * 1000 / CLOCKS_PER_SEC));\
 } while (0)
