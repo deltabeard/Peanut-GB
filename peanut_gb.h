@@ -104,6 +104,10 @@
 # define PEANUT_GB_USE_INTRINSICS 1
 #endif
 
+/* Only include function prototypes. At least one file must *not* have this
+ * defined. */
+// #define PEANUT_GB_HEADER_ONLY
+
 /** Internal source code. **/
 /* Interrupt masks */
 #define VBLANK_INTR	0x01
@@ -665,6 +669,7 @@ struct gb_s
 	} direct;
 };
 
+#ifndef PEANUT_GB_HEADER_ONLY
 /**
  * Internal function used to read bytes.
  * addr is host platform endian.
@@ -3716,6 +3721,7 @@ void gb_set_rtc(struct gb_s *gb, const struct tm * const time)
 	gb->cart_rtc[3] = time->tm_yday & 0xFF; /* Low 8 bits of day counter. */
 	gb->cart_rtc[4] = time->tm_yday >> 8; /* High 1 bit of day counter. */
 }
+#endif // PEANUT_GB_HEADER_ONLY
 
 /** Function prototypes: Required functions **/
 /**
