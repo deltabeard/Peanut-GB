@@ -74,6 +74,7 @@ typedef struct {
 	int pitch;
 	uint8_t *rom;
 	uint8_t *ram;
+	uint8_t *bios;
 } gb_priv_s;
 
 static const SDL_Color colour_lut[4] = {
@@ -112,6 +113,12 @@ static void gb_cart_ram_write(struct gb_s *ctx, const uint_fast32_t addr,
 	gb_priv = ctx->direct.priv;
 	ram = gb_priv->ram;
 	ram[addr] = val;
+}
+
+static uint8_t gb_bios_read(struct gb_s *gb, const uint_fast16_t addr)
+{
+	const gb_priv_s * const p = gb->direct.priv;
+	return p->bios[addr];
 }
 
 static void gb_error(struct gb_s *ctx, const enum gb_error_e err,
@@ -493,6 +500,7 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 	{
 		struct dism_s disms[32];
 		uint8_t bank;
+		uint16_t bank_offset;
 		uint8_t *mem;
 		size_t mem_len;
 		size_t disms_made;
@@ -504,7 +512,14 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 			break;
 		}
 
-		if(gb->cpu_reg.pc.reg < 0x8000)
+		if(gb->cpu_reg.pc.reg < 0x0100 && gb->hram_io[IO_BR] == 0)
+		{
+			mem = gb_priv->bios;
+			mem_len = 0x100;
+			bank = 1;
+			bank_offset = 0;
+		}
+		else if(gb->cpu_reg.pc.reg < 0x8000)
 		{
 			mem = gb_priv->rom;
 			bank = gb->selected_rom_bank;
@@ -513,6 +528,9 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 				mem += gb->cpu_reg.pc.reg + ((gb->selected_rom_bank & 0x1F) - 1) * ROM_BANK_SIZE;
 			else
 				mem += gb->cpu_reg.pc.reg + (gb->selected_rom_bank - 1) * ROM_BANK_SIZE;
+
+			mem_len = (gb->cpu_reg.pc.reg + 64) & 0x3FFF;
+			bank_offset = (mem - gb_priv->rom) & 0x3FFF;
 		}
 		else
 		{
@@ -520,8 +538,7 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 			break;
 		}
 
-		mem_len = (gb->cpu_reg.pc.reg + 64) & 0x3FFF;
-		disms_made = dism_mem(mem, mem_len, bank, (mem - gb_priv->rom) & 0x3FFF,
+		disms_made = dism_mem(mem, mem_len, bank, bank_offset,
 			disms, SDL_arraysize(disms));
 		for(size_t i = 0; i < SDL_arraysize(disms); i++)
 		{
@@ -787,9 +804,9 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 }
 
 /**
- * Returns a pointer to the allocated space containing the ROM. Must be freed.
+ * Returns a pointer to the allocated space containing the file. Must be freed.
  */
-static uint8_t *read_rom_to_ram(const char *file_name)
+static uint8_t *file_alloc(const char *file_name)
 {
 	FILE *rom_file = fopen(file_name, "rb");
 	size_t rom_size;
@@ -873,7 +890,7 @@ int main(int argc, char *argv[])
 
 	/* Peanut-GB setup. */
 	/* Copy input ROM file to allocated memory. */
-	if((gb_priv.rom = read_rom_to_ram(argv[1])) == NULL)
+	if((gb_priv.rom = file_alloc(argv[1])) == NULL)
 	{
 		SDL_LogError(PGBDBG_LOG_APPLICATION,
 			"%d: %s\n", __LINE__, SDL_GetError());
@@ -886,6 +903,18 @@ int main(int argc, char *argv[])
 
 		gb_init(&gb, gb_rom_read, gb_cart_ram_read, gb_cart_ram_write,
 			gb_error, &gb_priv);
+
+		/* Copy dmg.bin BIOS file to allocated memory. */
+		if((gb_priv.bios = file_alloc("dmg_boot.bin")) == NULL)
+		{
+			printf("No dmg_boot.bin file found; disabling BIOS\n");
+		}
+		else
+		{
+			printf("BIOS enabled\n");
+			gb_set_bios(&gb, gb_bios_read);
+			gb_reset(&gb);
+		}
 
 		gb_init_lcd(&gb, lcd_draw_line);
 		ram_sz = gb_get_save_size(&gb);
