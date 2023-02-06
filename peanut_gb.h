@@ -432,6 +432,7 @@ struct count_s
 #define IO_OBP1	0x49
 #define IO_WY	0x4A
 #define IO_WX	0x4B
+#define IO_BR	0x50
 #define IO_IE	0xFF
 
 #define IO_TAC_RATE_MASK	0x3
@@ -545,13 +546,12 @@ struct gb_s
 	void (*gb_serial_tx)(struct gb_s*, const uint8_t tx);
 	enum gb_serial_rx_ret_e (*gb_serial_rx)(struct gb_s*, uint8_t* rx);
 
+	uint8_t (*gb_bios_read)(struct gb_s*, const uint_fast16_t);
+
 	struct
 	{
 		unsigned gb_halt	: 1;
 		unsigned gb_ime		: 1;
-#if PEANUT_GB_USE_BIOS
-		unsigned gb_bios_enable : 1;
-#endif
 		unsigned gb_frame	: 1; /* New frame drawn. */
 
 		unsigned lcd_blank	: 1;
@@ -679,8 +679,13 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 	switch(PEANUT_GB_GET_MSN16(addr))
 	{
 	case 0x0:
+		/* IO_BR is only set to 1 if gb->gb_bios_read was not NULL on
+		 * reset. */
+		if(gb->hram_io[IO_BR] == 0)
+		{
+			return gb->gb_bios_read(gb, addr);
+		}
 
-	/* TODO: BIOS support. */
 	case 0x1:
 	case 0x2:
 	case 0x3:
@@ -1062,9 +1067,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 
 		/* Turn off boot ROM */
 		case 0x50:
-#if PEANUT_GB_USE_BIOS
-			gb->gb_bios_enable = 0;
-#endif
+			gb->hram_io[IO_BR] = val;
 			return;
 
 		/* Interrupt Enable Register */
@@ -3496,9 +3499,6 @@ void gb_reset(struct gb_s *gb)
 {
 	gb->gb_halt = 0;
 	gb->gb_ime = 1;
-#if PEANUT_GB_USE_BIOS
-	gb->gb_bios_enable = 0;
-#endif
 
 	/* Initialise MBC values. */
 	gb->selected_rom_bank = 1;
@@ -3507,51 +3507,74 @@ void gb_reset(struct gb_s *gb)
 	gb->cart_mode_select = 0;
 
 	/* Initialise CPU registers as though a DMG. */
-	gb->cpu_reg.a = 0x01;
-	gb->cpu_reg.f_bits.z = 1;
-	gb->cpu_reg.f_bits.n = 0;
-	gb->cpu_reg.f_bits.h = 1;
-	gb->cpu_reg.f_bits.c = 1;
-	gb->cpu_reg.bc.reg = 0x0013;
-	gb->cpu_reg.de.reg = 0x00D8;
-	gb->cpu_reg.hl.reg = 0x014D;
-	gb->cpu_reg.sp.reg = 0xFFFE;
-	/* TODO: Add BIOS support. */
-	gb->cpu_reg.pc.reg = 0x0100;
+	if(gb->gb_bios_read == NULL)
+	{
+		gb->cpu_reg.a = 0x01;
+		gb->cpu_reg.f_bits.z = 1;
+		gb->cpu_reg.f_bits.n = 0;
+		gb->cpu_reg.f_bits.h = 1;
+		gb->cpu_reg.f_bits.c = 1;
+		gb->cpu_reg.bc.reg = 0x0013;
+		gb->cpu_reg.de.reg = 0x00D8;
+		gb->cpu_reg.hl.reg = 0x014D;
+		gb->cpu_reg.sp.reg = 0xFFFE;
+		gb->cpu_reg.pc.reg = 0x0100;
+		memset(gb->vram, 0x00, VRAM_SIZE);
+		gb->hram_io[IO_DIV ] = 0xBD;
+		gb->hram_io[IO_LCDC] = 0x91;
+		gb->hram_io[IO_STAT] = 0x81;
+		gb->hram_io[IO_LY  ] = 0x90;
+		gb->hram_io[IO_BR  ] = 0x01;
+
+		__gb_write(gb, 0xFF47, 0xFC);    // BGP
+		__gb_write(gb, 0xFF48, 0xFF);    // OBJP0
+		__gb_write(gb, 0xFF49, 0xFF);    // OBJP1
+	}
+	else
+	{
+		gb->cpu_reg.a = 0;
+		gb->cpu_reg.f_bits.z = 0;
+		gb->cpu_reg.f_bits.n = 0;
+		gb->cpu_reg.f_bits.h = 0;
+		gb->cpu_reg.f_bits.c = 0;
+		gb->cpu_reg.bc.reg = 0;
+		gb->cpu_reg.de.reg = 0;
+		gb->cpu_reg.hl.reg = 0;
+		gb->cpu_reg.sp.reg = 0;
+		gb->cpu_reg.pc.reg = 0;
+		gb->hram_io[IO_DIV ] = 0;
+		gb->hram_io[IO_LCDC] = 0x00;
+		gb->hram_io[IO_STAT] = 0x84;
+		gb->hram_io[IO_LY  ] = 0;
+		gb->hram_io[IO_BR  ] = 0x00;
+
+		__gb_write(gb, 0xFF47, 0xFC);    // BGP
+		__gb_write(gb, 0xFF48, 0xFF);    // OBJP0
+		__gb_write(gb, 0xFF49, 0xFF);    // OBJP1
+	}
 
 	gb->counter.lcd_count = 0;
 	gb->counter.div_count = 0;
 	gb->counter.tima_count = 0;
 	gb->counter.serial_count = 0;
 
-	memset(gb->hram_io, 0xFF, HRAM_IO_SIZE);
-
 	gb->hram_io[IO_TIMA] = 0x00;
 	gb->hram_io[IO_TMA ] = 0x00;
 	gb->hram_io[IO_TAC ] = 0xF8;
-	gb->hram_io[IO_DIV ] = 0xAC;
 	gb->hram_io[IO_IF  ] = 0xE1;
-	gb->hram_io[IO_LCDC] = 0x91;
-	gb->hram_io[IO_STAT] = STAT_MODE & IO_STAT_MODE_HBLANK;
 	gb->hram_io[IO_SCY ] = 0x00;
 	gb->hram_io[IO_SCX ] = 0x00;
 	gb->hram_io[IO_LYC ] = 0x00;
 
-	/* Appease valgrind for invalid reads and unconditional jumps. */
 	gb->hram_io[IO_SC] = 0x7E;
-	gb->hram_io[IO_LY] = 0;
 
-	__gb_write(gb, 0xFF47, 0xFC);    // BGP
-	__gb_write(gb, 0xFF48, 0xFF);    // OBJP0
-	__gb_write(gb, 0xFF49, 0x0F);    // OBJP1
 	gb->hram_io[IO_WY] = 0x00;
 	gb->hram_io[IO_WX] = 0x00;
 	gb->hram_io[IO_IE] = 0x00;
+	gb->hram_io[IO_IF] = 0xE1;
 
 	gb->direct.joypad = 0xFF;
 	gb->hram_io[IO_JOYP] = 0xCF;
-
-	memset(gb->vram, 0x00, VRAM_SIZE);
 }
 
 enum gb_init_error_e gb_init(struct gb_s *gb,
@@ -3601,6 +3624,8 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	 * automatically. */
 	gb->gb_serial_tx = NULL;
 	gb->gb_serial_rx = NULL;
+
+	gb->gb_bios_read = NULL;
 
 	/* Check valid ROM using checksum value. */
 	{
@@ -3677,6 +3702,12 @@ void gb_init_lcd(struct gb_s *gb,
 	return;
 }
 #endif
+
+void gb_set_bios(struct gb_s *gb,
+		 uint8_t (*gb_bios_read)(struct gb_s*, const uint_fast16_t))
+{
+	gb->gb_bios_read = gb_bios_read;
+}
 
 /**
  * This was taken from SameBoy, which is released under MIT Licence.
@@ -3849,6 +3880,14 @@ void gb_tick_rtc(struct gb_s *gb);
  * \param time	Time structure with date and time.
  */
 void gb_set_rtc(struct gb_s *gb, const struct tm * const time);
+
+/**
+ * Use BIOS on reset. gb_reset() must be called for this to take affect.
+ * \param gb 	An initialised emulator context. Must not be NULL.
+ * \param gb_bios_read Function pointer to read BIOS binary.
+ */
+void gb_set_bios(struct gb_s *gb,
+	uint8_t (*gb_bios_read)(struct gb_s*, const uint_fast16_t));
 
 /* Undefine CPU Flag helper functions. */
 #undef PEANUT_GB_CPUFLAG_MASK_CARRY
