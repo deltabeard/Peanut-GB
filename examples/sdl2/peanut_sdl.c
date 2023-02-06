@@ -32,6 +32,8 @@ struct priv_t
 	uint8_t *rom;
 	/* Pointer to allocated memory holding save file. */
 	uint8_t *cart_ram;
+	/* Pointer to BIOS binary. */
+	uint8_t *bios;
 
 	/* Colour palette for each BG, OBJ0, and OBJ1. */
 	uint16_t selected_palette[3][4];
@@ -64,6 +66,12 @@ void gb_cart_ram_write(struct gb_s *gb, const uint_fast32_t addr,
 {
 	const struct priv_t * const p = gb->direct.priv;
 	p->cart_ram[addr] = val;
+}
+
+uint8_t gb_bios_read(struct gb_s *gb, const uint_fast16_t addr)
+{
+	const struct priv_t * const p = gb->direct.priv;
+	return p->bios[addr];
 }
 
 void read_cart_ram_file(const char *save_file_name, uint8_t **dest,
@@ -772,6 +780,22 @@ int main(int argc, char **argv)
 				"Unknown error: %d", gb_ret);
 		ret = EXIT_FAILURE;
 		goto out;
+	}
+
+	/* Copy dmg.bin BIOS file to allocated memory. */
+	if((priv.bios = SDL_LoadFile("dmg_boot.bin", NULL)) == NULL)
+	{
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_INFO,
+				"No dmg_boot.bin file found; disabling BIOS");
+	}
+	else
+	{
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_INFO,
+				"BIOS enabled");
+		gb_set_bios(&gb, gb_bios_read);
+		gb_reset(&gb);
 	}
 
 	/* Load Save File. */
