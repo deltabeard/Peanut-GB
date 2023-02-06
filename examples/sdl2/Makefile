@@ -9,14 +9,15 @@ CPPFLAGS := -DCOMPANY=Deltabeard		\
 	-DDESCRIPTION="$(DESCRIPTION)"		\
 	-DLICENSE="$(LICENSE_SPDX)"		\
 	-DNAME="$(NAME)"			\
-	-DICON_FILE=./meta/icon.ico
+	-DICON_FILE=./meta/icon.ico		\
+	-DENABLE_SOUND -DENABLE_SOUND_MINIGB
 
 OPT := -O2 -Wall -Wextra
 CFLAGS := $(OPT) $(shell sdl2-config --cflags)
 LDLIBS := $(shell sdl2-config --libs)
 
-SOURCES := peanut_sdl.c
-OBJECTS := peanut_sdl.o
+SOURCES := peanut_sdl.c minigb_apu/minigb_apu.c
+OBJECTS := peanut_sdl.o minigb_apu/minigb_apu.o
 
 ifeq ($(OS),Windows_NT)
 	OBJECTS += meta/winres.o
