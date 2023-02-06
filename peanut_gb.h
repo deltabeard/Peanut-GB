@@ -681,7 +681,7 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 	case 0x0:
 		/* IO_BR is only set to 1 if gb->gb_bios_read was not NULL on
 		 * reset. */
-		if(gb->hram_io[IO_BR] == 0)
+		if(gb->hram_io[IO_BR] == 0 && addr < 0x0100)
 		{
 			return gb->gb_bios_read(gb, addr);
 		}
