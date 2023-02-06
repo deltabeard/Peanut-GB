@@ -43,6 +43,7 @@
 
 #include <stdlib.h>	/* Required for qsort and abort */
 #include <stdint.h>	/* Required for int types */
+#include <stdio.h>
 #include <string.h>	/* Required for memset */
 #include <time.h>	/* Required for tm struct */
 
@@ -927,7 +928,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 			/* Only bits 5 and 4 are R/W.
 			 * The lower bits are overwritten later, and the two most
 			 * significant bits are unused. */
-			gb->hram_io[IO_JOYP] = val;
+			gb->hram_io[IO_JOYP] = val | 0xC0;
 
 			/* Direction keys selected */
 			if((gb->hram_io[IO_JOYP] & 0b010000) == 0)
@@ -1651,6 +1652,8 @@ void __gb_step_cpu(struct gb_s *gb)
 			/* Push Program Counter */
 			__gb_write(gb, --gb->cpu_reg.sp.reg, gb->cpu_reg.pc.bytes.p);
 			__gb_write(gb, --gb->cpu_reg.sp.reg, gb->cpu_reg.pc.bytes.c);
+			
+			//fprintf(stdout, "Interrupt\n");
 
 			/* Call interrupt handler if required. */
 			if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & VBLANK_INTR)
@@ -1682,8 +1685,40 @@ void __gb_step_cpu(struct gb_s *gb)
 	}
 
 	/* Obtain opcode */
-	opcode = __gb_read(gb, gb->cpu_reg.pc.reg++);
+	opcode = __gb_read(gb, gb->cpu_reg.pc.reg);
 	inst_cycles = op_cycles[opcode];
+
+	fprintf(stdout, "PC: %02X:%04X\t"
+			"%c%c%c%c "
+			"A: %02X "
+			"BC: %04X "
+			"DE: %04X "
+			"HL: %04X "
+			"SP: %04X "
+			"LY: %04X "
+			"OP: %02X %02X %02X"
+			//"TIM: %04X "
+			//"TAC: %04X"
+			"\n",
+			gb->selected_rom_bank, gb->cpu_reg.pc.reg,
+			gb->cpu_reg.f_bits.c ? 'c' : '-',
+			gb->cpu_reg.f_bits.h ? 'h' : '-',
+			gb->cpu_reg.f_bits.n ? 'n' : '-',
+			gb->cpu_reg.f_bits.z ? 'z' : '-',
+			gb->cpu_reg.a,
+			gb->cpu_reg.bc.reg,
+			gb->cpu_reg.de.reg,
+			gb->cpu_reg.hl.reg,
+			gb->cpu_reg.sp.reg,
+			gb->hram_io[IO_LY],
+			opcode,
+			__gb_read(gb, gb->cpu_reg.pc.reg + 1),
+			__gb_read(gb, gb->cpu_reg.pc.reg + 2)
+			//gb->hram_io[IO_TIMA],
+			//gb->hram_io[IO_TAC ]
+			);
+
+	gb->cpu_reg.pc.reg++;
 
 	/* Execute opcode */
 	switch(opcode)
@@ -3554,7 +3589,7 @@ void gb_reset(struct gb_s *gb)
 		__gb_write(gb, 0xFF49, 0xFF);    // OBJP1
 	}
 
-	gb->counter.lcd_count = 0;
+	gb->counter.lcd_count = 372;
 	gb->counter.div_count = 0;
 	gb->counter.tima_count = 0;
 	gb->counter.serial_count = 0;
@@ -3575,7 +3610,7 @@ void gb_reset(struct gb_s *gb)
 	gb->hram_io[IO_IF] = 0xE1;
 
 	gb->direct.joypad = 0xFF;
-	gb->hram_io[IO_JOYP] = 0xCF;
+	gb->hram_io[IO_JOYP] = 0xFF;
 }
 
 enum gb_init_error_e gb_init(struct gb_s *gb,
