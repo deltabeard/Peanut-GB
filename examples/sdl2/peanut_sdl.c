@@ -31,6 +31,8 @@ struct priv_t
 	uint8_t *rom;
 	/* Pointer to allocated memory holding save file. */
 	uint8_t *cart_ram;
+	/* Pointer to BIOS binary. */
+	uint8_t *bios;
 
 	/* Colour palette for each BG, OBJ0, and OBJ1. */
 	uint16_t selected_palette[3][4];
@@ -65,10 +67,16 @@ void gb_cart_ram_write(struct gb_s *gb, const uint_fast32_t addr,
 	p->cart_ram[addr] = val;
 }
 
+uint8_t gb_bios_read(struct gb_s *gb, const uint_fast16_t addr)
+{
+	const struct priv_t * const p = gb->direct.priv;
+	return p->bios[addr];
+}
+
 /**
- * Returns a pointer to the allocated space containing the ROM. Must be freed.
+ * Returns a pointer to the allocated space containing the file. Must be freed.
  */
-uint8_t *read_rom_to_ram(const char *file_name)
+uint8_t *file_alloc(const char *file_name)
 {
 	FILE *rom_file = fopen(file_name, "rb");
 	size_t rom_size;
@@ -690,7 +698,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Copy input ROM file to allocated memory. */
-	if((priv.rom = read_rom_to_ram(rom_file_name)) == NULL)
+	if((priv.rom = file_alloc(rom_file_name)) == NULL)
 	{
 		printf("%d: %s\n", __LINE__, strerror(errno));
 		ret = EXIT_FAILURE;
@@ -756,6 +764,18 @@ int main(int argc, char **argv)
 		printf("Unknown error: %d\n", gb_ret);
 		ret = EXIT_FAILURE;
 		goto out;
+	}
+
+	/* Copy dmg.bin BIOS file to allocated memory. */
+	if((priv.bios = file_alloc("dmg_boot.bin")) == NULL)
+	{
+		printf("No dmg_boot.bin file found; disabling BIOS\n");
+	}
+	else
+	{
+		printf("BIOS enabled\n");
+		gb_set_bios(&gb, gb_bios_read);
+		gb_reset(&gb);
 	}
 
 	/* Load Save File. */
@@ -871,8 +891,27 @@ int main(int argc, char **argv)
 
 	SDL_SetWindowMinimumSize(window, LCD_WIDTH, LCD_HEIGHT);
 
-	renderer = SDL_CreateRenderer(window, -1,
-				      SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
+	{
+		SDL_RendererFlags rf[3] = {
+			SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED,
+			SDL_RENDERER_ACCELERATED,
+			SDL_RENDERER_SOFTWARE
+		};
+		const char *rf_str[3] = {
+			"Vsync and Accelerated",
+			"Accelerated",
+			"Software"
+		};
+		for(int i = 0; i < SDL_arraysize(rf); i++)
+		{
+			renderer = SDL_CreateRenderer(window, -1, rf[i]);
+			if(renderer)
+				break;
+
+			printf("Could not create renderer with %s\n",
+				rf_str[i]);
+		}
+	}
 
 	if(renderer == NULL)
 	{

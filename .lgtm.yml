@@ -1,4 +1,0 @@
-extraction:
-  cpp:
-    index:
-      build_command: "make -C ./examples/sdl2/ FILEGUI=no"

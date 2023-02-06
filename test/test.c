@@ -5,9 +5,7 @@
 #include "../peanut_gb.h"
 
 #include <assert.h>
-#include <string.h>
-#include <stdlib.h>
-#include <time.h>
+#include <stdio.h>
 
 struct priv
 {
@@ -18,7 +16,7 @@ struct priv
 /**
  * Return byte from blarrg test ROM.
  */
-uint8_t gb_rom_read_cpu_instrs(struct gb_t *gb, const uint32_t addr)
+uint8_t gb_rom_read_cpu_instrs(struct gb_s *gb, const uint_fast32_t addr)
 {
 #include "cpu_instrs.h"
 	assert(addr < cpu_instrs_gb_len);
@@ -28,7 +26,7 @@ uint8_t gb_rom_read_cpu_instrs(struct gb_t *gb, const uint32_t addr)
 /**
  * Return byte from blarrg test ROM.
  */
-uint8_t gb_rom_read_instr_timing(struct gb_t *gb, const uint32_t addr)
+uint8_t gb_rom_read_instr_timing(struct gb_s *gb, const uint_fast32_t addr)
 {
 #include "instr_timing.h"
 	assert(addr < instr_timing_gb_len);
@@ -38,7 +36,7 @@ uint8_t gb_rom_read_instr_timing(struct gb_t *gb, const uint32_t addr)
 /**
  * Ignore cart RAM writes, since the test doesn't require it.
  */
-void gb_cart_ram_write(struct gb_t *gb, const uint32_t addr, const uint8_t val)
+void gb_cart_ram_write(struct gb_s *gb, const uint_fast32_t addr, const uint8_t val)
 {
 	return;
 }
@@ -46,53 +44,57 @@ void gb_cart_ram_write(struct gb_t *gb, const uint32_t addr, const uint8_t val)
 /**
  * Ignore cart RAM reads, since the test doesn't require it.
  */
-uint8_t gb_cart_ram_read(struct gb_t *gb, const uint32_t addr)
+uint8_t gb_cart_ram_read(struct gb_s *gb, const uint_fast32_t addr)
 {
 	return 0xFF;
 }
 
 /**
- * Ignore all errors.
+ * Abort on any error.
  */
-void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
+void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
 {
-	return;
+	abort();
 }
 
-uint8_t gb_serial_transfer(struct gb_t *gb, const uint8_t tx)
+void gb_serial_tx(struct gb_s *gb, const uint8_t tx)
 {
-	struct priv *p = gb->priv;
+	struct priv *p = gb->direct.priv;
+	char c = tx;
+
+	/* Do not save any more characters if buffer does not have room for
+	 * nul character. */
+	if(p->count == (1023 - 1))
+		return;
 
 	/* Filter newlines to make test output cleaner. */
 	if(tx < 32)
-		return 0xFF;
+		c = ' ';
 
-	printf("%c", tx);
-	p->str[p->count++] = tx;
-
-	if(p->count == 1024)
-		abort();
-
-	/* No 2nd player connected. */
-	return 0xFF;
+	printf("%c", c);
+	p->str[p->count++] = c;
 }
 
 void test_cpu_inst(void)
 {
-	struct gb_t gb;
+	struct gb_s gb;
 	const unsigned short pc_end = 0x06F1; /* Test ends when PC is this value. */
 	struct priv p = { .count = 0 };
+	enum gb_init_error_e gb_err;
 
 	/* Run ROM test. */
-	gb_init(&gb, &gb_rom_read_cpu_instrs, &gb_cart_ram_read,
+	gb_err = gb_init(&gb, &gb_rom_read_cpu_instrs, &gb_cart_ram_read,
 			&gb_cart_ram_write, &gb_error, &p);
+	lok(gb_err == GB_INIT_NO_ERROR);
+	if(gb_err != GB_INIT_NO_ERROR)
+		return;
 
-	gb_init_serial(&gb, &gb_serial_transfer);
+	gb_init_serial(&gb, &gb_serial_tx, NULL);
 
 	printf("Serial: ");
 
 	/* Step CPU until test is complete. */
-	while(gb.cpu_reg.pc != pc_end)
+	while(gb.cpu_reg.pc.reg != pc_end)
 		__gb_step_cpu(&gb);
 
 	p.str[p.count++] = '\0';
@@ -105,20 +107,24 @@ void test_cpu_inst(void)
 
 void test_instr_timing(void)
 {
-	struct gb_t gb;
+	struct gb_s gb;
 	const unsigned short pc_end = 0xC8B0; /* Test ends when PC is this value. */
 	struct priv p = { .count = 0 };
+	enum gb_init_error_e gb_err;
 
 	/* Run ROM test. */
-	gb_init(&gb, &gb_rom_read_instr_timing, &gb_cart_ram_read,
+	gb_err = gb_init(&gb, &gb_rom_read_instr_timing, &gb_cart_ram_read,
 			&gb_cart_ram_write, &gb_error, &p);
+	lok(gb_err == GB_INIT_NO_ERROR);
+	if(gb_err != GB_INIT_NO_ERROR)
+		return;
 
-	gb_init_serial(&gb, &gb_serial_transfer);
+	gb_init_serial(&gb, &gb_serial_tx, NULL);
 
 	printf("Serial: ");
 
 	/* Step CPU until test is complete. */
-	while(gb.cpu_reg.pc != pc_end)
+	while(gb.cpu_reg.pc.reg != pc_end)
 		__gb_step_cpu(&gb);
 
 	p.str[p.count++] = '\0';
@@ -131,7 +137,7 @@ void test_instr_timing(void)
 
 int main(void)
 {
-	lrun("cpu_inst blarrg tests", test_cpu_inst);
+	lrun("cpu_inst blarrg tests    ", test_cpu_inst);
 	lrun("instr_timing blarrg tests", test_instr_timing);
 	return lfails != 0;
 }
