@@ -77,7 +77,7 @@ uint8_t gb_bios_read(struct gb_s *gb, const uint_fast16_t addr)
 void read_cart_ram_file(const char *save_file_name, uint8_t **dest,
 			const size_t len)
 {
-	FILE *f;
+	SDL_RWops *f;
 
 	/* If save file not required. */
 	if(len == 0)
@@ -95,7 +95,7 @@ void read_cart_ram_file(const char *save_file_name, uint8_t **dest,
 		exit(EXIT_FAILURE);
 	}
 
-	f = fopen(save_file_name, "rb");
+	f = SDL_RWFromFile(save_file_name, "rb");
 
 	/* It doesn't matter if the save file doesn't exist. We initialise the
 	 * save memory allocated above. The save file will be created on exit. */
@@ -106,30 +106,32 @@ void read_cart_ram_file(const char *save_file_name, uint8_t **dest,
 	}
 
 	/* Read save file to allocated memory. */
-	fread(*dest, sizeof(uint8_t), len, f);
-	fclose(f);
+	SDL_RWread(f, *dest, sizeof(uint8_t), len);
+	SDL_RWclose(f);
 }
 
 void write_cart_ram_file(const char *save_file_name, uint8_t **dest,
 			 const size_t len)
 {
-	FILE *f;
+	SDL_RWops *f;
 
 	if(len == 0 || *dest == NULL)
 		return;
 
-	if((f = fopen(save_file_name, "wb")) == NULL)
+	if((f = SDL_RWFromFile(save_file_name, "wb")) == NULL)
 	{
 		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
 				SDL_LOG_PRIORITY_CRITICAL,
 				"Unable to open save file: %s",
 				SDL_GetError());
-		exit(EXIT_FAILURE);
+		return;
 	}
 
 	/* Record save file. */
-	fwrite(*dest, sizeof(uint8_t), len, f);
-	fclose(f);
+	SDL_RWwrite(f, *dest, sizeof(uint8_t), len);
+	SDL_RWclose(f);
+
+	return;
 }
 
 /**
@@ -554,18 +556,21 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
 /**
  * Saves the LCD screen as a 15-bit BMP file.
  */
-void save_lcd_bmp(struct gb_s* gb, uint16_t fb[LCD_HEIGHT][LCD_WIDTH])
+int save_lcd_bmp(struct gb_s* gb, uint16_t fb[LCD_HEIGHT][LCD_WIDTH])
 {
 	/* Should be enough to record up to 828 days worth of frames. */
 	static uint_fast32_t file_num = 0;
 	char file_name[32];
 	char title_str[16];
-	FILE* f;
+	SDL_RWops *f;
+	int ret = -1;
 
 	SDL_snprintf(file_name, 32, "%.16s_%010ld.bmp",
 		 gb_get_rom_name(gb, title_str), file_num);
 
-	f = fopen(file_name, "wb");
+	f = SDL_RWFromFile(file_name, "wb");
+	if(f == NULL)
+		goto ret;
 
 	const uint8_t bmp_hdr_rgb555[] = {
 		0x42, 0x4d, 0x36, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -576,15 +581,14 @@ void save_lcd_bmp(struct gb_s* gb, uint16_t fb[LCD_HEIGHT][LCD_WIDTH])
 		0x00, 0x00, 0x00, 0x00
 	};
 
-	fwrite(bmp_hdr_rgb555, sizeof(uint8_t), sizeof(bmp_hdr_rgb555), f);
-	fwrite(fb, sizeof(uint16_t), LCD_HEIGHT * LCD_WIDTH, f);
-	fclose(f);
+	SDL_RWwrite(f, bmp_hdr_rgb555, sizeof(uint8_t), sizeof(bmp_hdr_rgb555));
+	SDL_RWwrite(f, fb, sizeof(uint16_t), LCD_HEIGHT * LCD_WIDTH);
+	ret = SDL_RWclose(f);
 
 	file_num++;
 
-	/* Each dot shows a new frame being saved. */
-	putc('.', stdout);
-	fflush(stdout);
+ret:
+	return ret;
 }
 
 int main(int argc, char **argv)
@@ -1251,7 +1255,19 @@ int main(int argc, char **argv)
 		SDL_RenderPresent(renderer);
 
 		if(dump_bmp)
-			save_lcd_bmp(&gb, priv.fb);
+		{
+			if(save_lcd_bmp(&gb, priv.fb) != 0)
+			{
+				SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+					       SDL_LOG_PRIORITY_ERROR,
+					       "Failure dumping frame: %s",
+					       SDL_GetError());
+				dump_bmp = 0;
+				SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+					       SDL_LOG_PRIORITY_INFO,
+					       "Stopped dumping frames");
+			}
+		}
 
 #endif
 
@@ -1304,8 +1320,8 @@ int main(int argc, char **argv)
 					SDL_LockAudioDevice(dev);
 #endif
 					write_cart_ram_file(save_file_name,
-							    &priv.cart_ram,
-							    gb_get_save_size(&gb));
+						&priv.cart_ram,
+						gb_get_save_size(&gb));
 #if ENABLE_SOUND_BLARGG
 					SDL_UnlockAudioDevice(dev);
 #endif
