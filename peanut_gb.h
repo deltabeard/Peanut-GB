@@ -180,7 +180,7 @@
 #define LCDC_BG_ENABLE      0x01
 
 /* LCD characteristics */
-#define LCD_LINE_CYCLES     456
+#define LCD_LINE_CYCLES     (456 + 4)
 #define LCD_MODE_0_CYCLES   0
 #define LCD_MODE_2_CYCLES   204
 #define LCD_MODE_3_CYCLES   284
