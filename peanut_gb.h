@@ -3529,7 +3529,7 @@ uint8_t gb_colour_hash(struct gb_s *gb)
 }
 
 /**
- * Resets the context, and initialises startup values.
+ * Resets the context, and initialises startup values for a DMG console.
  */
 void gb_reset(struct gb_s *gb)
 {
@@ -3542,51 +3542,39 @@ void gb_reset(struct gb_s *gb)
 	gb->enable_cart_ram = 0;
 	gb->cart_mode_select = 0;
 
-	/* Initialise CPU registers as though a DMG. */
+	/* Use values as though the bootrom was already executed. */
 	if(gb->gb_bios_read == NULL)
 	{
+		uint8_t hdr_chk;
+		hdr_chk = gb->gb_rom_read(gb, ROM_HEADER_CHECKSUM_LOC) != 0;
+
 		gb->cpu_reg.a = 0x01;
 		gb->cpu_reg.f_bits.z = 1;
 		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 1;
-		gb->cpu_reg.f_bits.c = 1;
+		gb->cpu_reg.f_bits.h = hdr_chk;
+		gb->cpu_reg.f_bits.c = hdr_chk;
 		gb->cpu_reg.bc.reg = 0x0013;
 		gb->cpu_reg.de.reg = 0x00D8;
 		gb->cpu_reg.hl.reg = 0x014D;
 		gb->cpu_reg.sp.reg = 0xFFFE;
 		gb->cpu_reg.pc.reg = 0x0100;
-		memset(gb->vram, 0x00, VRAM_SIZE);
-		gb->hram_io[IO_DIV ] = 0xBD;
+
+		gb->hram_io[IO_DIV ] = 0xAB;
 		gb->hram_io[IO_LCDC] = 0x91;
-		gb->hram_io[IO_STAT] = 0x81;
-		gb->hram_io[IO_LY  ] = 0x90;
+		gb->hram_io[IO_STAT] = 0x85;
 		gb->hram_io[IO_BR  ] = 0x01;
 
-		__gb_write(gb, 0xFF47, 0xFC);    // BGP
-		__gb_write(gb, 0xFF48, 0xFF);    // OBJP0
-		__gb_write(gb, 0xFF49, 0xFF);    // OBJP1
+		memset(gb->vram, 0x00, VRAM_SIZE);
 	}
 	else
 	{
-		gb->cpu_reg.a = 0;
-		gb->cpu_reg.f_bits.z = 0;
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
-		gb->cpu_reg.bc.reg = 0;
-		gb->cpu_reg.de.reg = 0;
-		gb->cpu_reg.hl.reg = 0;
-		gb->cpu_reg.sp.reg = 0;
-		gb->cpu_reg.pc.reg = 0;
-		gb->hram_io[IO_DIV ] = 0;
+		/* Set value as though the console was just switched on.
+		 * CPU registers are uninitialised. */
+		gb->cpu_reg.pc.reg = 0x0000;
+		gb->hram_io[IO_DIV ] = 0x00;
 		gb->hram_io[IO_LCDC] = 0x00;
 		gb->hram_io[IO_STAT] = 0x84;
-		gb->hram_io[IO_LY  ] = 0;
 		gb->hram_io[IO_BR  ] = 0x00;
-
-		__gb_write(gb, 0xFF47, 0xFC);    // BGP
-		__gb_write(gb, 0xFF48, 0xFF);    // OBJP0
-		__gb_write(gb, 0xFF49, 0xFF);    // OBJP1
 	}
 
 	gb->counter.lcd_count = 372;
@@ -3594,23 +3582,29 @@ void gb_reset(struct gb_s *gb)
 	gb->counter.tima_count = 0;
 	gb->counter.serial_count = 0;
 
+	gb->direct.joypad = 0xFF;
+	gb->hram_io[IO_JOYP] = 0xCF;
+	gb->hram_io[IO_SB  ] = 0x00;
+	gb->hram_io[IO_SC  ] = 0x7E;
+	/* DIV */
 	gb->hram_io[IO_TIMA] = 0x00;
 	gb->hram_io[IO_TMA ] = 0x00;
 	gb->hram_io[IO_TAC ] = 0xF8;
 	gb->hram_io[IO_IF  ] = 0xE1;
+
+	/* LCDC */
+	/* STAT */
 	gb->hram_io[IO_SCY ] = 0x00;
 	gb->hram_io[IO_SCX ] = 0x00;
+	gb->hram_io[IO_LY  ] = 0x00;
 	gb->hram_io[IO_LYC ] = 0x00;
-
-	gb->hram_io[IO_SC] = 0x7E;
-
+	__gb_write(gb, 0xFF47, 0xFC); // BGP
+	__gb_write(gb, 0xFF48, 0xFF); // OBJP0
+	__gb_write(gb, 0xFF49, 0xFF); // OBJP1
 	gb->hram_io[IO_WY] = 0x00;
 	gb->hram_io[IO_WX] = 0x00;
 	gb->hram_io[IO_IE] = 0x00;
 	gb->hram_io[IO_IF] = 0xE1;
-
-	gb->direct.joypad = 0xFF;
-	gb->hram_io[IO_JOYP] = 0xFF;
 }
 
 enum gb_init_error_e gb_init(struct gb_s *gb,
