@@ -93,12 +93,6 @@
 # define PEANUT_GB_HIGH_LCD_ACCURACY 1
 #endif
 
-/* Play BIOS before playing cartridge.
- * This setting is currently not implemented. */
-#ifndef PEANUT_GB_USE_BIOS
-# define PEANUT_GB_USE_BIOS 0
-#endif
-
 /* Use intrinsic functions. This may produce smaller and faster code. */
 #ifndef PEANUT_GB_USE_INTRINSICS
 # define PEANUT_GB_USE_INTRINSICS 1
@@ -546,14 +540,14 @@ struct gb_s
 	void (*gb_serial_tx)(struct gb_s*, const uint8_t tx);
 	enum gb_serial_rx_ret_e (*gb_serial_rx)(struct gb_s*, uint8_t* rx);
 
-	uint8_t (*gb_bios_read)(struct gb_s*, const uint_fast16_t);
+	/* Read byte from boot ROM at given address. */
+	uint8_t (*gb_bootrom_read)(struct gb_s*, const uint_fast16_t addr);
 
 	struct
 	{
 		unsigned gb_halt	: 1;
 		unsigned gb_ime		: 1;
 		unsigned gb_frame	: 1; /* New frame drawn. */
-
 		unsigned lcd_blank	: 1;
 	};
 
@@ -679,11 +673,11 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 	switch(PEANUT_GB_GET_MSN16(addr))
 	{
 	case 0x0:
-		/* IO_BR is only set to 1 if gb->gb_bios_read was not NULL on
+		/* IO_BR is only set to 1 if gb->gb_bootrom_read was not NULL on
 		 * reset. */
 		if(gb->hram_io[IO_BR] == 0 && addr < 0x0100)
 		{
-			return gb->gb_bios_read(gb, addr);
+			return gb->gb_bootrom_read(gb, addr);
 		}
 
 		/* Fallthrough */
@@ -3507,8 +3501,8 @@ void gb_reset(struct gb_s *gb)
 	gb->enable_cart_ram = 0;
 	gb->cart_mode_select = 0;
 
-	/* Use values as though the bootrom was already executed. */
-	if(gb->gb_bios_read == NULL)
+	/* Use values as though the boot ROM was already executed. */
+	if(gb->gb_bootrom_read == NULL)
 	{
 		uint8_t hdr_chk;
 		hdr_chk = gb->gb_rom_read(gb, ROM_HEADER_CHECKSUM_LOC) != 0;
@@ -3620,7 +3614,7 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	gb->gb_serial_tx = NULL;
 	gb->gb_serial_rx = NULL;
 
-	gb->gb_bios_read = NULL;
+	gb->gb_bootrom_read = NULL;
 
 	/* Check valid ROM using checksum value. */
 	{
@@ -3698,10 +3692,10 @@ void gb_init_lcd(struct gb_s *gb,
 }
 #endif
 
-void gb_set_bios(struct gb_s *gb,
-		 uint8_t (*gb_bios_read)(struct gb_s*, const uint_fast16_t))
+void gb_set_bootrom(struct gb_s *gb,
+		 uint8_t (*gb_bootrom_read)(struct gb_s*, const uint_fast16_t))
 {
-	gb->gb_bios_read = gb_bios_read;
+	gb->gb_bootrom_read = gb_bootrom_read;
 }
 
 /**
@@ -3877,12 +3871,12 @@ void gb_tick_rtc(struct gb_s *gb);
 void gb_set_rtc(struct gb_s *gb, const struct tm * const time);
 
 /**
- * Use BIOS on reset. gb_reset() must be called for this to take affect.
+ * Use boot ROM on reset. gb_reset() must be called for this to take affect.
  * \param gb 	An initialised emulator context. Must not be NULL.
- * \param gb_bios_read Function pointer to read BIOS binary.
+ * \param gb_bootrom_read Function pointer to read boot ROM binary.
  */
-void gb_set_bios(struct gb_s *gb,
-	uint8_t (*gb_bios_read)(struct gb_s*, const uint_fast16_t));
+void gb_set_bootrom(struct gb_s *gb,
+	uint8_t (*gb_bootrom_read)(struct gb_s*, const uint_fast16_t));
 
 /* Undefine CPU Flag helper functions. */
 #undef PEANUT_GB_CPUFLAG_MASK_CARRY
