@@ -316,6 +316,12 @@
 	gb->cpu_reg.f_bits.n = 1;						\
 	gb->cpu_reg.f_bits.z = (r == 0x00);
 
+#define PGB_INSTR_XOR_R8(r)							\
+	gb->cpu_reg.a = gb->cpu_reg.a ^ r;					\
+	gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);				\
+	gb->cpu_reg.f_bits.n = 0;						\
+	gb->cpu_reg.f_bits.h = 0;						\
+	gb->cpu_reg.f_bits.c = 0;
 
 #if PEANUT_GB_IS_LITTLE_ENDIAN
 # define PEANUT_GB_GET_LSB16(x) (x & 0xFF)
@@ -2628,59 +2634,31 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0xA8: /* XOR B */
-		gb->cpu_reg.a = gb->cpu_reg.a ^ gb->cpu_reg.bc.bytes.b;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_XOR_R8(gb->cpu_reg.bc.bytes.b);
 		break;
 
 	case 0xA9: /* XOR C */
-		gb->cpu_reg.a = gb->cpu_reg.a ^ gb->cpu_reg.bc.bytes.c;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_XOR_R8(gb->cpu_reg.bc.bytes.c);
 		break;
 
 	case 0xAA: /* XOR D */
-		gb->cpu_reg.a = gb->cpu_reg.a ^ gb->cpu_reg.de.bytes.d;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_XOR_R8(gb->cpu_reg.de.bytes.d);
 		break;
 
 	case 0xAB: /* XOR E */
-		gb->cpu_reg.a = gb->cpu_reg.a ^ gb->cpu_reg.de.bytes.e;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_XOR_R8(gb->cpu_reg.de.bytes.e);
 		break;
 
 	case 0xAC: /* XOR H */
-		gb->cpu_reg.a = gb->cpu_reg.a ^ gb->cpu_reg.hl.bytes.h;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_XOR_R8(gb->cpu_reg.hl.bytes.h);
 		break;
 
 	case 0xAD: /* XOR L */
-		gb->cpu_reg.a = gb->cpu_reg.a ^ gb->cpu_reg.hl.bytes.l;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_XOR_R8(gb->cpu_reg.hl.bytes.l);
 		break;
 
 	case 0xAE: /* XOR (HL) */
-		gb->cpu_reg.a = gb->cpu_reg.a ^ __gb_read(gb, gb->cpu_reg.hl.reg);
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_XOR_R8(__gb_read(gb, gb->cpu_reg.hl.reg));
 		break;
 
 	case 0xAF: /* XOR A */
@@ -3139,11 +3117,7 @@ void __gb_step_cpu(struct gb_s *gb)
 	}
 
 	case 0xEE: /* XOR imm */
-		gb->cpu_reg.a = gb->cpu_reg.a ^ __gb_read(gb, gb->cpu_reg.pc.reg++);
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_XOR_R8(__gb_read(gb, gb->cpu_reg.pc.reg++));
 		break;
 
 	case 0xEF: /* RST 0x0028 */
