@@ -1,6 +1,6 @@
 /**
  * MIT License
- * Copyright (c) 2018 Mahyar Koshkouei
+ * Copyright (c) 2018-2023 Mahyar Koshkouei
  *
  * An example of using the peanut_gb.h library. This example application uses
  * SDL2 to draw the screen and get input.

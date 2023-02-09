@@ -1,6 +1,6 @@
 /**
  * MIT License
- * Copyright (c) 2018 Mahyar Koshkouei
+ * Copyright (c) 2018-2023 Mahyar Koshkouei
  *
  * A more bare-bones application to help with debugging.
  */
