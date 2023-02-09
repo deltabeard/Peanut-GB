@@ -426,7 +426,7 @@ struct count_s
 #define IO_OBP1	0x49
 #define IO_WY	0x4A
 #define IO_WX	0x4B
-#define IO_BR	0x50
+#define IO_BANK	0x50
 #define IO_IE	0xFF
 
 #define IO_TAC_RATE_MASK	0x3
@@ -673,9 +673,9 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 	switch(PEANUT_GB_GET_MSN16(addr))
 	{
 	case 0x0:
-		/* IO_BR is only set to 1 if gb->gb_bootrom_read was not NULL on
-		 * reset. */
-		if(gb->hram_io[IO_BR] == 0 && addr < 0x0100)
+		/* IO_BANK is only set to 1 if gb->gb_bootrom_read was not NULL
+		 * on reset. */
+		if(gb->hram_io[IO_BANK] == 0 && addr < 0x0100)
 		{
 			return gb->gb_bootrom_read(gb, addr);
 		}
@@ -1062,7 +1062,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 
 		/* Turn off boot ROM */
 		case 0x50:
-			gb->hram_io[IO_BR] = val;
+			gb->hram_io[IO_BANK] = val;
 			return;
 
 		/* Interrupt Enable Register */
@@ -3521,7 +3521,7 @@ void gb_reset(struct gb_s *gb)
 		gb->hram_io[IO_DIV ] = 0xAB;
 		gb->hram_io[IO_LCDC] = 0x91;
 		gb->hram_io[IO_STAT] = 0x85;
-		gb->hram_io[IO_BR  ] = 0x01;
+		gb->hram_io[IO_BANK] = 0x01;
 
 		memset(gb->vram, 0x00, VRAM_SIZE);
 	}
@@ -3533,7 +3533,7 @@ void gb_reset(struct gb_s *gb)
 		gb->hram_io[IO_DIV ] = 0x00;
 		gb->hram_io[IO_LCDC] = 0x00;
 		gb->hram_io[IO_STAT] = 0x84;
-		gb->hram_io[IO_BR  ] = 0x00;
+		gb->hram_io[IO_BANK] = 0x00;
 	}
 
 	gb->counter.lcd_count = 0;
