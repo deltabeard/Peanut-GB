@@ -148,6 +148,13 @@ Set the time of the real time clock (RTC). Some games use this RTC data.
 
 Increment the real time clock by one second.
 
+#### gb_set_bios
+
+Execute a bootrom image on reset. A reset must be performed after calling
+gb_set_bios for these changes to take effect. This is because gb_init calls
+gb_reset, but gb_set_bios must be called after gb_init.
+The bootrom must be either a DMG or a MGB bootrom.
+
 ## License
 
 This project is licensed under the MIT License.
