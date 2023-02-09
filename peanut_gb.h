@@ -405,40 +405,6 @@ struct count_s
 	uint_fast16_t serial_count;	/* Serial Counter */
 };
 
-#define IO_JOYP	0x00
-#define IO_SB	0x01
-#define IO_SC	0x02
-#define IO_DIV	0x04
-#define IO_TIMA	0x05
-#define IO_TMA	0x06
-#define IO_TAC	0x07
-#define IO_IF	0x0F
-#define IO_BOOT	0x50
-#define IO_LCDC	0x40
-#define IO_STAT	0x41
-#define IO_SCY	0x42
-#define IO_SCX	0x43
-#define IO_LY	0x44
-#define IO_LYC	0x45
-#define	IO_DMA	0x46
-#define	IO_BGP	0x47
-#define	IO_OBP0	0x48
-#define IO_OBP1	0x49
-#define IO_WY	0x4A
-#define IO_WX	0x4B
-#define IO_BANK	0x50
-#define IO_IE	0xFF
-
-#define IO_TAC_RATE_MASK	0x3
-#define IO_TAC_ENABLE_MASK	0x4
-
-/* LCD Mode defines. */
-#define IO_STAT_MODE_HBLANK		0
-#define IO_STAT_MODE_VBLANK		1
-#define IO_STAT_MODE_SEARCH_OAM		2
-#define IO_STAT_MODE_SEARCH_TRANSFER	3
-#define IO_STAT_MODE_VBLANK_OR_TRANSFER_MASK 0x1
-
 #if ENABLE_LCD
 	/* Bit mask for the shade of pixel to display */
 	#define LCD_COLOUR	0x03
@@ -664,6 +630,41 @@ struct gb_s
 };
 
 #ifndef PEANUT_GB_HEADER_ONLY
+
+#define IO_JOYP	0x00
+#define IO_SB	0x01
+#define IO_SC	0x02
+#define IO_DIV	0x04
+#define IO_TIMA	0x05
+#define IO_TMA	0x06
+#define IO_TAC	0x07
+#define IO_IF	0x0F
+#define IO_BOOT	0x50
+#define IO_LCDC	0x40
+#define IO_STAT	0x41
+#define IO_SCY	0x42
+#define IO_SCX	0x43
+#define IO_LY	0x44
+#define IO_LYC	0x45
+#define	IO_DMA	0x46
+#define	IO_BGP	0x47
+#define	IO_OBP0	0x48
+#define IO_OBP1	0x49
+#define IO_WY	0x4A
+#define IO_WX	0x4B
+#define IO_BANK	0x50
+#define IO_IE	0xFF
+
+#define IO_TAC_RATE_MASK	0x3
+#define IO_TAC_ENABLE_MASK	0x4
+
+/* LCD Mode defines. */
+#define IO_STAT_MODE_HBLANK		0
+#define IO_STAT_MODE_VBLANK		1
+#define IO_STAT_MODE_SEARCH_OAM		2
+#define IO_STAT_MODE_SEARCH_TRANSFER	3
+#define IO_STAT_MODE_VBLANK_OR_TRANSFER_MASK 0x1
+
 /**
  * Internal function used to read bytes.
  * addr is host platform endian.
