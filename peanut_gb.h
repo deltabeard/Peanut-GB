@@ -1653,47 +1653,49 @@ void __gb_step_cpu(struct gb_s *gb)
 	/* If gb_halt is positive, then an interrupt must have occured by the
 	 * time we reach here, becuase on HALT, we jump to the next interrupt
 	 * immediately. */
-	if(gb->gb_halt || (gb->gb_ime &&
+	while(gb->gb_halt || (gb->gb_ime &&
 			gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & ANY_INTR))
 	{
 		gb->gb_halt = 0;
 
-		if(gb->gb_ime)
+		if(!gb->gb_ime)
+			break;
+
+		/* Disable interrupts */
+		gb->gb_ime = 0;
+
+		/* Push Program Counter */
+		__gb_write(gb, --gb->cpu_reg.sp.reg, gb->cpu_reg.pc.bytes.p);
+		__gb_write(gb, --gb->cpu_reg.sp.reg, gb->cpu_reg.pc.bytes.c);
+
+		/* Call interrupt handler if required. */
+		if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & VBLANK_INTR)
 		{
-			/* Disable interrupts */
-			gb->gb_ime = 0;
-
-			/* Push Program Counter */
-			__gb_write(gb, --gb->cpu_reg.sp.reg, gb->cpu_reg.pc.bytes.p);
-			__gb_write(gb, --gb->cpu_reg.sp.reg, gb->cpu_reg.pc.bytes.c);
-
-			/* Call interrupt handler if required. */
-			if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & VBLANK_INTR)
-			{
-				gb->cpu_reg.pc.reg = VBLANK_INTR_ADDR;
-				gb->hram_io[IO_IF] ^= VBLANK_INTR;
-			}
-			else if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & LCDC_INTR)
-			{
-				gb->cpu_reg.pc.reg = LCDC_INTR_ADDR;
-				gb->hram_io[IO_IF] ^= LCDC_INTR;
-			}
-			else if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & TIMER_INTR)
-			{
-				gb->cpu_reg.pc.reg = TIMER_INTR_ADDR;
-				gb->hram_io[IO_IF] ^= TIMER_INTR;
-			}
-			else if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & SERIAL_INTR)
-			{
-				gb->cpu_reg.pc.reg = SERIAL_INTR_ADDR;
-				gb->hram_io[IO_IF] ^= SERIAL_INTR;
-			}
-			else if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & CONTROL_INTR)
-			{
-				gb->cpu_reg.pc.reg = CONTROL_INTR_ADDR;
-				gb->hram_io[IO_IF] ^= CONTROL_INTR;
-			}
+			gb->cpu_reg.pc.reg = VBLANK_INTR_ADDR;
+			gb->hram_io[IO_IF] ^= VBLANK_INTR;
 		}
+		else if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & LCDC_INTR)
+		{
+			gb->cpu_reg.pc.reg = LCDC_INTR_ADDR;
+			gb->hram_io[IO_IF] ^= LCDC_INTR;
+		}
+		else if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & TIMER_INTR)
+		{
+			gb->cpu_reg.pc.reg = TIMER_INTR_ADDR;
+			gb->hram_io[IO_IF] ^= TIMER_INTR;
+		}
+		else if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & SERIAL_INTR)
+		{
+			gb->cpu_reg.pc.reg = SERIAL_INTR_ADDR;
+			gb->hram_io[IO_IF] ^= SERIAL_INTR;
+		}
+		else if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & CONTROL_INTR)
+		{
+			gb->cpu_reg.pc.reg = CONTROL_INTR_ADDR;
+			gb->hram_io[IO_IF] ^= CONTROL_INTR;
+		}
+
+		break;
 	}
 
 	/* Obtain opcode */
