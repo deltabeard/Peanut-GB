@@ -531,10 +531,11 @@ struct gb_s
 
 	struct
 	{
-		unsigned gb_halt	: 1;
-		unsigned gb_ime		: 1;
-		unsigned gb_frame	: 1; /* New frame drawn. */
-		unsigned lcd_blank	: 1;
+		uint8_t gb_halt		: 1;
+		uint8_t gb_halt_bug	: 1;
+		uint8_t gb_ime		: 1;
+		uint8_t gb_frame	: 1; /* New frame drawn. */
+		uint8_t lcd_blank	: 1;
 	};
 
 	/* Cartridge information:
@@ -1908,8 +1909,17 @@ void __gb_step_cpu(struct gb_s *gb)
 	}
 
 	/* Obtain opcode */
-	opcode = __gb_read(gb, gb->cpu_reg.pc.reg++);
+	opcode = __gb_read(gb, gb->cpu_reg.pc.reg);
 	inst_cycles = op_cycles[opcode];
+
+	if(!gb->gb_halt_bug)
+	{
+		gb->cpu_reg.pc.reg++;
+	}
+	else
+	{
+		gb->gb_halt_bug = 0;
+	}
 
 	/* Execute opcode */
 	switch(opcode)
@@ -2557,6 +2567,14 @@ void __gb_step_cpu(struct gb_s *gb)
 		int_fast16_t halt_cycles = INT_FAST16_MAX;
 
 		/* TODO: Emulate HALT bug? */
+
+		if((gb->hram_io[IO_IE] & gb->hram_io[IO_IF] & ANY_INTR) != 0)
+		{
+			/* Halt bug. */
+			gb->gb_halt_bug = 1;
+			break;
+		}
+
 		gb->gb_halt = 1;
 
 		if (gb->hram_io[IO_IE] == 0)
