@@ -1098,6 +1098,9 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 }
 
 static const uint_fast16_t TAC_CYCLES[4] = {1024, 16, 64, 256};
+#if ENABLE_LCD
+void __gb_draw_line(struct gb_s *gb);
+#endif
 void __gb_tick(struct gb_s *gb, uint_fast16_t inst_cycles)
 {
 	/* DIV register timing */
@@ -1305,17 +1308,21 @@ uint8_t __gb_execute_cb(struct gb_s *gb)
 
 	inst_cycles = 8;
 	/* Add an additional 8 cycles to these sets of instructions. */
+#if 0
 	switch(cbop & 0xC7)
 	{
 	case 0x06:
 	case 0x86:
     	case 0xC6:
 		inst_cycles += 8;
+		//__gb_tick(gb, 8);
     	break;
     	case 0x46:
 		inst_cycles += 4;
+		//__gb_tick(gb, 4);
     	break;
 	}
+#endif
 
 	switch(r)
 	{
@@ -1344,6 +1351,8 @@ uint8_t __gb_execute_cb(struct gb_s *gb)
 		break;
 
 	case 6:
+		__gb_tick(gb, 4);
+		//inst_cycles -= 4;
 		val = __gb_read(gb, gb->cpu_reg.hl.reg);
 		break;
 
@@ -1450,6 +1459,7 @@ uint8_t __gb_execute_cb(struct gb_s *gb)
 
 	if(writeback)
 	{
+		//__gb_tick(gb, 4);
 		switch(r)
 		{
 		case 0:
@@ -1477,6 +1487,8 @@ uint8_t __gb_execute_cb(struct gb_s *gb)
 			break;
 
 		case 6:
+			__gb_tick(gb, 4);
+			//inst_cycles -= 4;
 			__gb_write(gb, gb->cpu_reg.hl.reg, val);
 			break;
 
@@ -1821,6 +1833,8 @@ void __gb_step_cpu(struct gb_s *gb)
 {
 	uint8_t opcode;
 	uint_fast16_t inst_cycles;
+	/* op_cycles are the number of m-cycle the intructions takes to execute
+	 * before a read or write is performed. */
 	static const uint8_t op_cycles[0x100] =
 	{
 		/* *INDENT-OFF* */
@@ -1828,7 +1842,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		4,12, 8, 8, 4, 4, 8, 4,20, 8, 8, 8, 4, 4, 8, 4,	/* 0x00 */
 		4,12, 8, 8, 4, 4, 8, 4,12, 8, 8, 8, 4, 4, 8, 4,	/* 0x10 */
 		8,12, 8, 8, 4, 4, 8, 4, 8, 8, 8, 8, 4, 4, 8, 4,	/* 0x20 */
-		8,12, 8, 8,12,12,12, 4, 8, 8, 8, 8, 4, 4, 8, 4,	/* 0x30 */
+		8,12, 8, 8, 8, 8, 8, 4, 8, 8, 8, 8, 4, 4, 8, 4,	/* 0x30 */
 		4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,	/* 0x40 */
 		4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,	/* 0x50 */
 		4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,	/* 0x60 */
@@ -1839,8 +1853,8 @@ void __gb_step_cpu(struct gb_s *gb)
 		4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,	/* 0xB0 */
 		8,12,12,16,12,16, 8,16, 8,16,12, 8,12,24, 8,16,	/* 0xC0 */
 		8,12,12, 0,12,16, 8,16, 8,16,12, 0,12, 0, 8,16,	/* 0xD0 */
-		12,12,8, 0, 0,16, 8,16,16, 4,16, 0, 0, 0, 8,16,	/* 0xE0 */
-		8,12, 8, 4, 0,16, 8,16,12, 8,16, 4, 0, 0, 8,16	/* 0xF0 */
+		8,12, 8, 0, 0,16, 8,16,16, 4, 8, 0, 0, 0, 8,16,	/* 0xE0 */
+		8,12, 8, 4, 0,16, 8,16,12, 8, 8, 4, 0, 0, 8,16	/* 0xF0 */
 		/* *INDENT-ON* */
 	};
 
@@ -2243,6 +2257,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		gb->cpu_reg.f_bits.z = (temp == 0x00);
 		gb->cpu_reg.f_bits.n = 0;
 		gb->cpu_reg.f_bits.h = ((temp & 0x0F) == 0x00);
+		__gb_tick(gb, 4);
 		__gb_write(gb, gb->cpu_reg.hl.reg, temp);
 		break;
 	}
@@ -2253,13 +2268,18 @@ void __gb_step_cpu(struct gb_s *gb)
 		gb->cpu_reg.f_bits.z = (temp == 0x00);
 		gb->cpu_reg.f_bits.n = 1;
 		gb->cpu_reg.f_bits.h = ((temp & 0x0F) == 0x0F);
+		__gb_tick(gb, 4);
 		__gb_write(gb, gb->cpu_reg.hl.reg, temp);
 		break;
 	}
 
 	case 0x36: /* LD (HL), imm */
-		__gb_write(gb, gb->cpu_reg.hl.reg, __gb_read(gb, gb->cpu_reg.pc.reg++));
+	{
+		uint8_t temp_8 = __gb_read(gb, gb->cpu_reg.pc.reg++);
+		__gb_tick(gb, 4);
+		__gb_write(gb, gb->cpu_reg.hl.reg, temp_8);
 		break;
+	}
 
 	case 0x37: /* SCF */
 		gb->cpu_reg.f_bits.n = 0;
@@ -3187,9 +3207,12 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0xE0: /* LD (0xFF00+imm), A */
-		__gb_write(gb, 0xFF00 | __gb_read(gb, gb->cpu_reg.pc.reg++),
-			   gb->cpu_reg.a);
+	{
+		uint8_t temp_8 = __gb_read(gb, gb->cpu_reg.pc.reg++);
+		__gb_tick(gb, 4);
+		__gb_write(gb, 0xFF00 | temp_8, gb->cpu_reg.a);
 		break;
+	}
 
 	case 0xE1: /* POP HL */
 		gb->cpu_reg.hl.bytes.l = __gb_read(gb, gb->cpu_reg.sp.reg++);
@@ -3242,6 +3265,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		l = __gb_read(gb, gb->cpu_reg.pc.reg++);
 		h = __gb_read(gb, gb->cpu_reg.pc.reg++);
 		addr = PEANUT_GB_U8_TO_U16(h, l);
+		__gb_tick(gb, 8);
 		__gb_write(gb, addr, gb->cpu_reg.a);
 		break;
 	}
@@ -3324,6 +3348,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		l = __gb_read(gb, gb->cpu_reg.pc.reg++);
 		h = __gb_read(gb, gb->cpu_reg.pc.reg++);
 		addr = PEANUT_GB_U8_TO_U16(h, l);
+		__gb_tick(gb, 8);
 		gb->cpu_reg.a = __gb_read(gb, addr);
 		break;
 	}
