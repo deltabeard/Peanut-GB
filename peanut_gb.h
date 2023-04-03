@@ -3162,11 +3162,16 @@ void __gb_step_cpu(struct gb_s *gb)
 	{
 		/* DIV register timing */
 		gb->counter.div_count += inst_cycles;
+#if 0
+		gb->hram_io[IO_DIV] += gb->counter.div_count / DIV_CYCLES;
+		gb->counter.div_count = gb->counter.div_count % DIV_CYCLES;
+#else
 		while(gb->counter.div_count >= DIV_CYCLES)
 		{
 			gb->hram_io[IO_DIV]++;
 			gb->counter.div_count -= DIV_CYCLES;
 		}
+#endif
 
 		/* Check serial transmission. */
 		if(gb->hram_io[IO_SC] & SERIAL_SC_TX_START)
@@ -3244,42 +3249,77 @@ void __gb_step_cpu(struct gb_s *gb)
 		if((gb->hram_io[IO_LCDC] & LCDC_ENABLE) == 0)
 			continue;
 
-		/* LCD Timing */
+		/** LCD Timing **/
 		gb->counter.lcd_count += inst_cycles;
 
-		/* New Scanline */
+		/* Check for a new scanline (entering Mode 2 or Mode 1).  */
 		if(gb->counter.lcd_count >= LCD_LINE_CYCLES)
 		{
 			gb->counter.lcd_count -= LCD_LINE_CYCLES;
 
-			/* LYC Update */
+			/* Check if an LYC=LY coincidence and interrupt should
+			 * occur. */
 			if(gb->hram_io[IO_LY] == gb->hram_io[IO_LYC])
 			{
+				/* Set coincidence bit. */
 				gb->hram_io[IO_STAT] |= STAT_LYC_COINC;
 
+				/* If LYC=LY interrupt is enabled, set it. */
 				if(gb->hram_io[IO_STAT] & STAT_LYC_INTR)
 					gb->hram_io[IO_IF] |= LCDC_INTR;
 			}
 			else
-				gb->hram_io[IO_STAT] &= 0xFB;
-
-			/* Next line */
-			gb->hram_io[IO_LY] = (gb->hram_io[IO_LY] + 1) % LCD_VERT_LINES;
-
-			/* VBLANK Start */
-			if(gb->hram_io[IO_LY] == LCD_HEIGHT)
 			{
+				/* Clear LYC=LY flag. */
+				gb->hram_io[IO_STAT] &= ~STAT_LYC_COINC;
+			}
+
+			/* Increment LY to the next line and wrap if
+			 * neccessary. */
+			gb->hram_io[IO_LY]++;
+			if(gb->hram_io[IO_LY] >= LCD_VERT_LINES)
+				gb->hram_io[IO_LY] -= LCD_VERT_LINES;
+
+			/* Check if LCD is enterring OAM Search (Mode 2).
+			 * This is performed for each line displayed on the
+			 * screen. */
+			if(gb->hram_io[IO_LY] < LCD_HEIGHT)
+			{
+				if(gb->hram_io[IO_LY] == 0)
+				{
+					/* Clear Screen */
+					gb->display.WY = gb->hram_io[IO_WY];
+					gb->display.window_clear = 0;
+				}
+
+				gb->hram_io[IO_STAT] =
+					(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_HBLANK;
+
+				if(gb->hram_io[IO_STAT] & STAT_MODE_0_INTR)
+					gb->hram_io[IO_IF] |= LCDC_INTR;
+
+				/* If halted immediately jump to next LCD mode. */
+				if(gb->counter.lcd_count < LCD_MODE_2_CYCLES)
+					inst_cycles = LCD_MODE_2_CYCLES - gb->counter.lcd_count;
+			}
+			/* Check if LCD is entering VBLANK period (Mode 1).
+			 * This is only performed when first entering VBlank. */
+			else if(gb->hram_io[IO_LY] == LCD_HEIGHT)
+			{
+				/* Set STAT mode flag to VBlank (Mode 1). */
 				gb->hram_io[IO_STAT] =
 					(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_VBLANK;
 				gb->gb_frame = 1;
+				/* Set VBlank interrupt. */
 				gb->hram_io[IO_IF] |= VBLANK_INTR;
 				gb->lcd_blank = 0;
 
+				/* Set VBlank STAT interrupt only if it's
+				 * enabled. */
 				if(gb->hram_io[IO_STAT] & STAT_MODE_1_INTR)
 					gb->hram_io[IO_IF] |= LCDC_INTR;
 
 #if ENABLE_LCD
-
 				/* If frame skip is activated, check if we need to draw
 				 * the frame or skip it. */
 				if(gb->direct.frame_skip)
@@ -3299,26 +3339,6 @@ void __gb_step_cpu(struct gb_s *gb)
 						!gb->display.interlace_count;
 				}
 #endif
-			}
-				/* Normal Line */
-			else if(gb->hram_io[IO_LY] < LCD_HEIGHT)
-			{
-				if(gb->hram_io[IO_LY] == 0)
-				{
-					/* Clear Screen */
-					gb->display.WY = gb->hram_io[IO_WY];
-					gb->display.window_clear = 0;
-				}
-
-				gb->hram_io[IO_STAT] =
-					(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_HBLANK;
-
-				if(gb->hram_io[IO_STAT] & STAT_MODE_0_INTR)
-					gb->hram_io[IO_IF] |= LCDC_INTR;
-
-				/* If halted immediately jump to next LCD mode. */
-				if(gb->counter.lcd_count < LCD_MODE_2_CYCLES)
-					inst_cycles = LCD_MODE_2_CYCLES - gb->counter.lcd_count;
 			}
 		}
 			/* OAM access */
