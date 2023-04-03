@@ -176,12 +176,12 @@
 /** LCD characteristics **/
 /* PPU cycles through modes every 456 cycles. */
 #define LCD_LINE_CYCLES     456
-/* Mode 0 starts on cycle 0. */
-#define LCD_MODE_0_CYCLES   0
 /* Mode 2 starts on cycle 204. */
-#define LCD_MODE_2_CYCLES   204
+#define LCD_MODE_2_CYCLES   80
 /* Mode 3 starts on cycle 284. */
-#define LCD_MODE_3_CYCLES   284
+#define LCD_MODE_3_CYCLES   168
+/* Mode 0 starts on cycle 0. */
+#define LCD_MODE_0_CYCLES   (LCD_LINE_CYCLES - LCD_MODE_2_CYCLES - LCD_MODE_3_CYCLES)
 /* There are 154 scanlines. LY < 154. */
 #define LCD_VERT_LINES      154
 #define LCD_WIDTH           160
@@ -3252,13 +3252,14 @@ void __gb_step_cpu(struct gb_s *gb)
 		/** LCD Timing **/
 		gb->counter.lcd_count += inst_cycles;
 
-		/* Check for a new scanline (entering Mode 2 or Mode 1).  */
+		/* Check for a new scanline (entering Mode 2 or Mode 1, or
+		 * staying in mode 1).  */
 		if(gb->counter.lcd_count >= LCD_LINE_CYCLES)
 		{
 			gb->counter.lcd_count -= LCD_LINE_CYCLES;
 
-			/* Check if an LYC=LY coincidence and interrupt should
-			 * occur. */
+			/* Check for LYC=LY coincidence and whether an interrupt
+			 * should occur. */
 			if(gb->hram_io[IO_LY] == gb->hram_io[IO_LYC])
 			{
 				/* Set coincidence bit. */
@@ -3270,32 +3271,32 @@ void __gb_step_cpu(struct gb_s *gb)
 			}
 			else
 			{
-				/* Clear LYC=LY flag. */
+				/* Clear LYC=LY flag as it didn't occur. */
 				gb->hram_io[IO_STAT] &= ~STAT_LYC_COINC;
 			}
 
 			/* Increment LY to the next line and wrap if
 			 * neccessary. */
 			gb->hram_io[IO_LY]++;
-			if(gb->hram_io[IO_LY] >= LCD_VERT_LINES)
-				gb->hram_io[IO_LY] -= LCD_VERT_LINES;
-
 			/* Check if LCD is enterring OAM Search (Mode 2).
 			 * This is performed for each line displayed on the
 			 * screen. */
+			if(gb->hram_io[IO_LY] == LCD_VERT_LINES)
+			{
+				gb->hram_io[IO_LY] = 0;
+				/* Clear Screen */
+				/* TODO: If LY is 0 then the window is reset? */
+				gb->display.WY = gb->hram_io[IO_WY];
+				gb->display.window_clear = 0;
+			}
+
 			if(gb->hram_io[IO_LY] < LCD_HEIGHT)
 			{
-				if(gb->hram_io[IO_LY] == 0)
-				{
-					/* Clear Screen */
-					gb->display.WY = gb->hram_io[IO_WY];
-					gb->display.window_clear = 0;
-				}
-
+				/* Set STAT to Mode 2. */
 				gb->hram_io[IO_STAT] =
-					(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_HBLANK;
+					(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_SEARCH_OAM;
 
-				if(gb->hram_io[IO_STAT] & STAT_MODE_0_INTR)
+				if(gb->hram_io[IO_STAT] & STAT_MODE_2_INTR)
 					gb->hram_io[IO_IF] |= LCDC_INTR;
 
 				/* If halted immediately jump to next LCD mode. */
@@ -3303,7 +3304,10 @@ void __gb_step_cpu(struct gb_s *gb)
 					inst_cycles = LCD_MODE_2_CYCLES - gb->counter.lcd_count;
 			}
 			/* Check if LCD is entering VBLANK period (Mode 1).
-			 * This is only performed when first entering VBlank. */
+			 * This is only performed when first entering VBlank,
+			 * because the other checks of LY are for less than
+			 * LCD_HEIGHT, so these settings are persistent until
+			 * then. */
 			else if(gb->hram_io[IO_LY] == LCD_HEIGHT)
 			{
 				/* Set STAT mode flag to VBlank (Mode 1). */
@@ -3341,26 +3345,36 @@ void __gb_step_cpu(struct gb_s *gb)
 #endif
 			}
 		}
-			/* OAM access */
-		else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_HBLANK &&
-			gb->counter.lcd_count >= LCD_MODE_2_CYCLES)
+		else if(gb->hram_io[IO_LY] >= LCD_HEIGHT)
 		{
-			gb->hram_io[IO_STAT] =
-				(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_SEARCH_OAM;
-
-			if(gb->hram_io[IO_STAT] & STAT_MODE_2_INTR)
-				gb->hram_io[IO_IF] |= LCDC_INTR;
-
-			/* If halted immediately jump to next LCD mode. */
-			if (gb->counter.lcd_count < LCD_MODE_3_CYCLES)
-				inst_cycles = LCD_MODE_3_CYCLES - gb->counter.lcd_count;
+			/* Stay in VBlank and do nothing. */
 		}
-			/* Update LCD */
+		/* Check for OAM access (Mode 3). This doesn't occur on a new
+		 * scanline, but occurs after 80 dots in Mode 2. */
 		else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_SEARCH_OAM &&
-			gb->counter.lcd_count >= LCD_MODE_3_CYCLES)
+			gb->counter.lcd_count >= LCD_MODE_3_CYCLES) /* TODO: Magic number. */
 		{
 			gb->hram_io[IO_STAT] =
 				(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_SEARCH_TRANSFER;
+
+			//if(gb->hram_io[IO_STAT] & STAT_MODE_2_INTR)
+			//	gb->hram_io[IO_IF] |= LCDC_INTR;
+
+			/* If halted immediately jump to next LCD mode. */
+			// TODO: Check if this is correct.
+			if (gb->counter.lcd_count < LCD_MODE_3_CYCLES)
+				inst_cycles = LCD_MODE_3_CYCLES - gb->counter.lcd_count;
+		}
+		/* Check for HBlank (Mode 0). This occures after 168-291 dots in
+		 * Mode 3. */
+		else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_SEARCH_TRANSFER &&
+			gb->counter.lcd_count >= LCD_MODE_0_CYCLES)
+		{
+			gb->hram_io[IO_STAT] =
+				(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_HBLANK;
+
+			if(gb->hram_io[IO_STAT] & STAT_MODE_0_INTR)
+				gb->hram_io[IO_IF] |= LCDC_INTR;
 #if ENABLE_LCD
 			if(!gb->lcd_blank)
 				__gb_draw_line(gb);
@@ -3369,6 +3383,16 @@ void __gb_step_cpu(struct gb_s *gb)
 			if (gb->counter.lcd_count < LCD_LINE_CYCLES)
 				inst_cycles = LCD_LINE_CYCLES - gb->counter.lcd_count;
 		}
+
+		do{
+			const char *stat_mode[] = {
+				"HBlank (0)", "VBlank (1)",
+				"OAM_SEARCH (2)", "OAM_READ (3)"
+			};
+			printf("%s\n",
+				stat_mode[gb->hram_io[IO_STAT] & STAT_MODE]);
+		}while(0);
+
 	} while(gb->gb_halt && (gb->hram_io[IO_IF] & gb->hram_io[IO_IE]) == 0);
 	/* If halted, loop until an interrupt occurs. */
 }
