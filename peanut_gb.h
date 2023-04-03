@@ -173,11 +173,16 @@
 #define LCDC_OBJ_ENABLE     0x02
 #define LCDC_BG_ENABLE      0x01
 
-/* LCD characteristics */
+/** LCD characteristics **/
+/* PPU cycles through modes every 456 cycles. */
 #define LCD_LINE_CYCLES     456
+/* Mode 0 starts on cycle 0. */
 #define LCD_MODE_0_CYCLES   0
+/* Mode 2 starts on cycle 204. */
 #define LCD_MODE_2_CYCLES   204
+/* Mode 3 starts on cycle 284. */
 #define LCD_MODE_3_CYCLES   284
+/* There are 154 scanlines. LY < 154. */
 #define LCD_VERT_LINES      154
 #define LCD_WIDTH           160
 #define LCD_HEIGHT          144
@@ -3157,7 +3162,6 @@ void __gb_step_cpu(struct gb_s *gb)
 	{
 		/* DIV register timing */
 		gb->counter.div_count += inst_cycles;
-
 		while(gb->counter.div_count >= DIV_CYCLES)
 		{
 			gb->hram_io[IO_DIV]++;
