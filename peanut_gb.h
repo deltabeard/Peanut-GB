@@ -174,6 +174,8 @@
 #define LCDC_BG_ENABLE      0x01
 
 /** LCD characteristics **/
+#define LCD_WIDTH           160
+#define LCD_HEIGHT          144
 /* PPU cycles through modes every 456 cycles. */
 #define LCD_LINE_CYCLES     456
 /* Mode 2 starts on cycle 204. */
@@ -184,8 +186,31 @@
 #define LCD_MODE_0_CYCLES   (LCD_LINE_CYCLES - LCD_MODE_2_CYCLES - LCD_MODE_3_CYCLES)
 /* There are 154 scanlines. LY < 154. */
 #define LCD_VERT_LINES      154
-#define LCD_WIDTH           160
-#define LCD_HEIGHT          144
+
+/* Cycle and durations of modes on a single scanline. */
+/* Duration of cycles on a single scanline. */
+#define LCD_SCANLINE_CYCLES 456
+/* Mode 2: OAM Search. */
+#define LCD_MODE_2_CYCLE_START 0
+#define LCD_MODE_2_CYCLE_DUR 80
+/* Mode 3: OAM/VRAM Read.
+ * Duration changes depending on VRAM accesses required. */
+#define LCD_MODE_3_CYCLE_START (LCD_MODE_2_CYCLE_START + LCD_MODE_2_CYCLE_DUR)
+#define LCD_MODE_3_CYCLE_DUR_MIN 168
+#define LCD_MODE_3_CYCLE_DUR_MAX 291
+/* Mode 0: HBlank.
+ * Duration changed de*/
+#define LCD_MODE_0_CYCLE_DUR_MIN 85
+#define LCD_MODE_0_CYCLE_DUR_MAX 208
+#define LCD_MODE_0_CYCLE_START_MIN (LCD_MODE_3_CYCLE_START + LCD_MODE_0_CYCLE_DUR_MIN)
+#define LCD_MODE_0_CYCLE_START_MAX (LCD_MODE_3_CYCLE_START + LCD_MODE_0_CYCLE_DUR_MAX)
+/* Mode 1: VBlank. */
+#define LCD_MODE_1_CYCLE_DUR LCD_SCANLINE_CYCLES
+#define LCD_MODE_1_CYCLE_DUR_FULL_LCD (LCD_MODE_1_CYCLE_DUR * (LCD_VERT_LINES - LCD_HEIGHT))
+#define LCD_MODE_1_CYCLE_START_FULL_LCD (LCD_MODE_1_CYCLE_DUR * LCD_HEIGHT)
+_Static_assert(LCD_SCANLINE_CYCLES == (LCD_MODE_2_CYCLE_DUR + LCD_MODE_3_CYCLE_DUR_MIN + LCD_MODE_0_CYCLE_DUR_MAX), "Invalid scanline length");
+_Static_assert(LCD_SCANLINE_CYCLES == (LCD_MODE_2_CYCLE_DUR + LCD_MODE_3_CYCLE_DUR_MAX + LCD_MODE_0_CYCLE_DUR_MIN), "Invalid scanline length");
+_Static_assert(LCD_MODE_1_CYCLE_DUR_FULL_LCD == 4560, "Invalid VBLank length");
 
 /* VRAM Locations */
 #define VRAM_TILES_1        (0x8000 - VRAM_ADDR)
@@ -684,11 +709,11 @@ struct gb_s
 #define IO_TAC_ENABLE_MASK	0x4
 
 /* LCD Mode defines. */
-#define IO_STAT_MODE_HBLANK		0
-#define IO_STAT_MODE_VBLANK		1
-#define IO_STAT_MODE_SEARCH_OAM		2
-#define IO_STAT_MODE_SEARCH_TRANSFER	3
-#define IO_STAT_MODE_VBLANK_OR_TRANSFER_MASK 0x1
+#define IO_STAT_MODE_0_HBLANK		0
+#define IO_STAT_MODE_1_VBLANK		1
+#define IO_STAT_MODE_2_SEARCH_OAM	2
+#define IO_STAT_MODE_3_SEARCH_TRANSFER	3
+#define IO_STAT_MODE_1_VBLANK_OR_TRANSFER_MASK 0x1
 
 /**
  * Internal function used to read bytes.
@@ -1005,7 +1030,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 			{
 				/* Do not turn off LCD outside of VBLANK. This may
 				 * happen due to poor timing in this emulator. */
-				if((gb->hram_io[IO_STAT] & STAT_MODE) != IO_STAT_MODE_VBLANK)
+				if((gb->hram_io[IO_STAT] & STAT_MODE) != IO_STAT_MODE_1_VBLANK)
 				{
 					gb->hram_io[IO_LCDC] |= LCDC_ENABLE;
 					return;
@@ -1623,6 +1648,93 @@ void __gb_draw_line(struct gb_s *gb)
 }
 #endif
 
+static const uint_fast16_t TAC_CYCLES[4] = {1024, 16, 64, 256};
+
+/**
+ * Calculate the number of T-cycles until the next interrupt will trigger.
+ * This is useful when the CPU is halted, since we can then jump straight to
+ * when the next interrupt will occur.
+ * @param gb Peanut-GB context
+ * @return Number of T-cycles until next interrupt, or 0 if no interrupt
+ * 	enabled.
+ */
+static uint_fast16_t __gb_cycles_to_next_interrupt(struct gb_s *gb)
+{
+	uint_fast16_t cycles = 0;
+
+	/* Check for serial interrupt. */
+	if(gb->hram_io[IO_SC] & SERIAL_SC_TX_START)
+	{
+		int serial_cycles = SERIAL_CYCLES -
+				    gb->counter.serial_count;
+
+		if(serial_cycles < cycles)
+			cycles = serial_cycles;
+	}
+
+	if(gb->hram_io[IO_TAC] & IO_TAC_ENABLE_MASK)
+	{
+		int tac_cycles = TAC_CYCLES[gb->hram_io[IO_TAC] & IO_TAC_RATE_MASK] -
+				 gb->counter.tima_count;
+
+		if(tac_cycles < cycles)
+			cycles = tac_cycles;
+	}
+
+	if((gb->hram_io[IO_LCDC] & LCDC_ENABLE) != 0)
+	{
+		int lcd_cycles;
+
+		switch(gb->hram_io[IO_STAT] & STAT_MODE)
+		{
+		case IO_STAT_MODE_0_HBLANK:
+			/* If LCD is in HBLANK, the next interrupt might
+			 * either be Mode 2 or Mode 1.
+			 * Assume maximum duration. */
+			lcd_cycles = LCD_MODE_0_CYCLE_DUR_MAX -
+				     gb->counter.lcd_count;
+			break;
+
+		case IO_STAT_MODE_1_VBLANK:
+			/* If LCD is in VBlank, the next interrupt might
+			 * be Mode 2.
+			 * Skip to Mode 2. */
+			lcd_cycles = LCD_MODE_1_CYCLE_DUR_FULL_LCD -
+				     gb->counter.lcd_count;
+			break;
+
+		case IO_STAT_MODE_2_SEARCH_OAM:
+			/* If LCD is searching OAM, then the next
+			 * interrupt might be mode 3. */
+			lcd_cycles = LCD_MODE_2_CYCLE_DUR -
+				     gb->counter.lcd_count;
+			break;
+
+		case IO_STAT_MODE_3_SEARCH_TRANSFER:
+			/* If LCD is transfering image data, then the
+			 * next interrupt might be mode 0.
+			 * Assume minimum duration. */
+			lcd_cycles = LCD_MODE_3_CYCLE_DUR_MIN -
+				     gb->counter.lcd_count;
+			break;
+		}
+
+		/* If the LCD will trigger an interrupt or state change
+		 * before other interrupts, then reduce the number of
+		 * halted CPU cycles to the duration of cycles until the
+		 * LCD state change. */
+		if(lcd_cycles < cycles)
+			cycles = lcd_cycles;
+	}
+
+	/* Some halt cycles may already be very high, so make sure we
+	 * don't underflow here. */
+	//if(halt_cycles <= 0)
+	//	halt_cycles = 4;
+
+	return cycles;
+}
+
 /**
  * Internal function used to step the CPU.
  */
@@ -1652,7 +1764,6 @@ void __gb_step_cpu(struct gb_s *gb)
 		12,12,8, 4, 0,16, 8,16,12, 8,16, 4, 0, 0, 8,16	/* 0xF0 */
 		/* *INDENT-ON* */
 	};
-	static const uint_fast16_t TAC_CYCLES[4] = {1024, 16, 64, 256};
 
 	/* Handle interrupts */
 	/* If gb_halt is positive, then an interrupt must have occured by the
@@ -2358,50 +2469,12 @@ void __gb_step_cpu(struct gb_s *gb)
 			PGB_UNREACHABLE();
 		}
 
-		if(gb->hram_io[IO_SC] & SERIAL_SC_TX_START)
-		{
-			int serial_cycles = SERIAL_CYCLES -
-				gb->counter.serial_count;
-
-			if(serial_cycles < halt_cycles)
-				halt_cycles = serial_cycles;
-		}
-
-		if(gb->hram_io[IO_TAC] & IO_TAC_ENABLE_MASK)
-		{
-			int tac_cycles = TAC_CYCLES[gb->hram_io[IO_TAC] & IO_TAC_RATE_MASK] -
-				gb->counter.tima_count;
-
-			if(tac_cycles < halt_cycles)
-				halt_cycles = tac_cycles;
-		}
-
-		if((gb->hram_io[IO_LCDC] & LCDC_ENABLE) != 0)
-		{
-			int lcd_cycles;
-
-			if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_SEARCH_OAM)
-			{
-				lcd_cycles = LCD_MODE_3_CYCLES -
-					gb->counter.lcd_count;
-			}
-			else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_HBLANK)
-			{
-				lcd_cycles = LCD_MODE_2_CYCLES -
-					gb->counter.lcd_count;
-			}
-			else
-			{
-				lcd_cycles =
-					LCD_LINE_CYCLES - gb->counter.lcd_count;
-			}
-
-			if(lcd_cycles < halt_cycles)
-				halt_cycles = lcd_cycles;
-		}
+		/** When halted, we calculate the number of cycles until the
+		 * first interrupt is encountered. **/
+		halt_cycles = __gb_cycles_to_next_interrupt(gb);
 
 		/* Some halt cycles may already be very high, so make sure we
-		 * don't underflow here. */
+	 	* don't underflow here. */
 		if(halt_cycles <= 0)
 			halt_cycles = 4;
 
@@ -3294,7 +3367,7 @@ void __gb_step_cpu(struct gb_s *gb)
 			{
 				/* Set STAT to Mode 2. */
 				gb->hram_io[IO_STAT] =
-					(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_SEARCH_OAM;
+					(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_2_SEARCH_OAM;
 
 				if(gb->hram_io[IO_STAT] & STAT_MODE_2_INTR)
 					gb->hram_io[IO_IF] |= LCDC_INTR;
@@ -3312,7 +3385,7 @@ void __gb_step_cpu(struct gb_s *gb)
 			{
 				/* Set STAT mode flag to VBlank (Mode 1). */
 				gb->hram_io[IO_STAT] =
-					(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_VBLANK;
+					(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_1_VBLANK;
 				gb->gb_frame = 1;
 				/* Set VBlank interrupt. */
 				gb->hram_io[IO_IF] |= VBLANK_INTR;
@@ -3351,11 +3424,11 @@ void __gb_step_cpu(struct gb_s *gb)
 		}
 		/* Check for OAM access (Mode 3). This doesn't occur on a new
 		 * scanline, but occurs after 80 dots in Mode 2. */
-		else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_SEARCH_OAM &&
+		else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_2_SEARCH_OAM &&
 			gb->counter.lcd_count >= LCD_MODE_3_CYCLES) /* TODO: Magic number. */
 		{
 			gb->hram_io[IO_STAT] =
-				(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_SEARCH_TRANSFER;
+				(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_3_SEARCH_TRANSFER;
 
 			//if(gb->hram_io[IO_STAT] & STAT_MODE_2_INTR)
 			//	gb->hram_io[IO_IF] |= LCDC_INTR;
@@ -3367,11 +3440,11 @@ void __gb_step_cpu(struct gb_s *gb)
 		}
 		/* Check for HBlank (Mode 0). This occures after 168-291 dots in
 		 * Mode 3. */
-		else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_SEARCH_TRANSFER &&
+		else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_3_SEARCH_TRANSFER &&
 			gb->counter.lcd_count >= LCD_MODE_0_CYCLES)
 		{
 			gb->hram_io[IO_STAT] =
-				(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_HBLANK;
+				(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_0_HBLANK;
 
 			if(gb->hram_io[IO_STAT] & STAT_MODE_0_INTR)
 				gb->hram_io[IO_IF] |= LCDC_INTR;
@@ -3384,6 +3457,7 @@ void __gb_step_cpu(struct gb_s *gb)
 				inst_cycles = LCD_LINE_CYCLES - gb->counter.lcd_count;
 		}
 
+#if 0
 		do{
 			const char *stat_mode[] = {
 				"HBlank (0)", "VBlank (1)",
@@ -3392,6 +3466,7 @@ void __gb_step_cpu(struct gb_s *gb)
 			printf("%s\n",
 				stat_mode[gb->hram_io[IO_STAT] & STAT_MODE]);
 		}while(0);
+#endif
 
 	} while(gb->gb_halt && (gb->hram_io[IO_IF] & gb->hram_io[IO_IE]) == 0);
 	/* If halted, loop until an interrupt occurs. */
