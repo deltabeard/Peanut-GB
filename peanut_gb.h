@@ -343,6 +343,8 @@
 	gb->cpu_reg.f_bits.c = 0;
 
 #if PEANUT_GB_IS_LITTLE_ENDIAN
+/* LSB: Least Significant Byte (8 bits).
+ * MSN: Most Significant Nibble (4 bits). */
 # define PEANUT_GB_GET_LSB16(x) (x & 0xFF)
 # define PEANUT_GB_GET_MSB16(x) (x >> 8)
 # define PEANUT_GB_GET_MSN16(x) (x >> 12)
@@ -1042,9 +1044,21 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 			uint16_t dma_addr = (uint_fast16_t)val << 8;
 			gb->hram_io[IO_DMA] = val;
 
-			for(uint16_t i = 0; i < OAM_SIZE; i++)
+			switch(val >> 4)
 			{
-				gb->oam[i] = __gb_read(gb, dma_addr + i);
+			/* If shadow OAM is in WRAM, use memcpy and avoid the
+			 * slower byte-by-byte reading with __gb_read(). */
+			case 0xC:
+			case 0xD:
+				memcpy(gb->oam, &gb->wram[dma_addr - WRAM_0_ADDR], OAM_SIZE);
+				break;
+
+			default:
+				for(uint16_t i = 0; i < OAM_SIZE; i++)
+				{
+					gb->oam[i] = __gb_read(gb,
+							       dma_addr + i);
+				}
 			}
 
 			return;
