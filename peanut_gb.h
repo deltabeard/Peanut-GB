@@ -3252,6 +3252,9 @@ void __gb_step_cpu(struct gb_s *gb)
 		{
 			gb->counter.lcd_count -= LCD_LINE_CYCLES;
 
+			/* Next line */
+			gb->hram_io[IO_LY] = (gb->hram_io[IO_LY] + 1) % LCD_VERT_LINES;
+
 			/* LYC Update */
 			if(gb->hram_io[IO_LY] == gb->hram_io[IO_LYC])
 			{
@@ -3262,9 +3265,6 @@ void __gb_step_cpu(struct gb_s *gb)
 			}
 			else
 				gb->hram_io[IO_STAT] &= 0xFB;
-
-			/* Next line */
-			gb->hram_io[IO_LY] = (gb->hram_io[IO_LY] + 1) % LCD_VERT_LINES;
 
 			/* VBLANK Start */
 			if(gb->hram_io[IO_LY] == LCD_HEIGHT)
