@@ -1041,19 +1041,21 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 		/* DMA Register */
 		case 0x46:
 		{
-			uint16_t dma_addr = (uint_fast16_t)val << 8;
+			uint16_t dma_addr = (uint_fast16_t) val << 8;
+			uint8_t msn = val >> 4;
 			gb->hram_io[IO_DMA] = val;
 
-			switch(val >> 4)
-			{
 			/* If shadow OAM is in WRAM, use memcpy and avoid the
 			 * slower byte-by-byte reading with __gb_read(). */
-			case 0xC:
-			case 0xD:
-				memcpy(gb->oam, &gb->wram[dma_addr - WRAM_0_ADDR], OAM_SIZE);
-				break;
-
-			default:
+			if(msn == 0xC || msn == 0xD)
+			{
+				//memcpy(gb->oam, &gb->wram[dma_addr - WRAM_0_ADDR], OAM_SIZE);
+				for(uint16_t i = 0; i < OAM_SIZE; i++)
+					gb->oam[i] = gb->wram[
+						(dma_addr - WRAM_0_ADDR) + i];
+			}
+			else
+			{
 				for(uint16_t i = 0; i < OAM_SIZE; i++)
 				{
 					gb->oam[i] = __gb_read(gb,
