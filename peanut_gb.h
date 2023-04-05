@@ -3687,6 +3687,14 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
  */
 void gb_run_frame(struct gb_s *gb);
 
+/**
+ * Internal function used to step the CPU. Used mainly for testing.
+ * Use gb_run_frame() instead.
+ *
+ * \param	An initialised emulator context. Must not be NULL.
+ */
+void __gb_step_cpu(struct gb_s *gb);
+
 /** Function prototypes: Optional Functions **/
 /**
  * Reset the emulator, like turning the Game Boy off and on again.
