@@ -3320,7 +3320,7 @@ void __gb_step_cpu(struct gb_s *gb)
 					inst_cycles = LCD_MODE_2_CYCLES - gb->counter.lcd_count;
 			}
 		}
-			/* OAM access */
+		/* OAM access */
 		else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_HBLANK &&
 			gb->counter.lcd_count >= LCD_MODE_2_CYCLES)
 		{
@@ -3334,7 +3334,7 @@ void __gb_step_cpu(struct gb_s *gb)
 			if (gb->counter.lcd_count < LCD_MODE_3_CYCLES)
 				inst_cycles = LCD_MODE_3_CYCLES - gb->counter.lcd_count;
 		}
-			/* Update LCD */
+		/* Update LCD */
 		else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_SEARCH_OAM &&
 			gb->counter.lcd_count >= LCD_MODE_3_CYCLES)
 		{
