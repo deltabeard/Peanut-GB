@@ -3279,7 +3279,6 @@ void __gb_step_cpu(struct gb_s *gb)
 					gb->hram_io[IO_IF] |= LCDC_INTR;
 
 #if ENABLE_LCD
-
 				/* If frame skip is activated, check if we need to draw
 				 * the frame or skip it. */
 				if(gb->direct.frame_skip)
@@ -3300,7 +3299,7 @@ void __gb_step_cpu(struct gb_s *gb)
 				}
 #endif
 			}
-				/* Normal Line */
+			/* Normal Line */
 			else if(gb->hram_io[IO_LY] < LCD_HEIGHT)
 			{
 				if(gb->hram_io[IO_LY] == 0)
