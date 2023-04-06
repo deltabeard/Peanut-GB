@@ -745,10 +745,8 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 		return 0xFF;
 
 	case 0xC:
-		return gb->wram[addr - WRAM_0_ADDR];
-
 	case 0xD:
-		return gb->wram[addr - WRAM_1_ADDR + WRAM_BANK_SIZE];
+		return gb->wram[addr - WRAM_0_ADDR];
 
 	case 0xE:
 		return gb->wram[addr - ECHO_ADDR];
