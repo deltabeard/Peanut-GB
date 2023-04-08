@@ -176,8 +176,8 @@
 /** LCD characteristics **/
 /* PPU cycles through modes every 456 cycles. */
 #define LCD_LINE_CYCLES     456
-/* Mode 0 starts on cycle 0. */
-#define LCD_MODE_0_CYCLES   0
+/* Mode 0 starts on cycle 372. */
+#define LCD_MODE_0_CYCLES   372
 /* Mode 2 starts on cycle 204. */
 #define LCD_MODE_2_CYCLES   204
 /* Mode 3 starts on cycle 284. */
@@ -989,17 +989,21 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 
 		/* LCD Registers */
 		case 0x40:
-			if(((gb->hram_io[IO_LCDC] & LCDC_ENABLE) == 0) &&
-				(val & LCDC_ENABLE))
-			{
-				gb->counter.lcd_count = 0;
-				gb->lcd_blank = 1;
-			}
+		{
+			uint8_t lcd_enabled;
+
+			/* Check if LCD is already enabled. */
+			lcd_enabled = (gb->hram_io[IO_LCDC] & LCDC_ENABLE);
 
 			gb->hram_io[IO_LCDC] = val;
 
-			/* LY fixed to 0 when LCD turned off. */
-			if((gb->hram_io[IO_LCDC] & LCDC_ENABLE) == 0)
+			/* Check if LCD is going to be switched on. */
+			if (!lcd_enabled && (val & LCDC_ENABLE))
+			{
+				gb->lcd_blank = 1;
+			}
+			/* Check if LCD is being switched off. */
+			else if (lcd_enabled && !(val & LCDC_ENABLE))
 			{
 				/* Peanut-GB will happily turn off LCD outside
 				 * of VBLANK even though this damages real
@@ -1007,14 +1011,15 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 
 				/* Set LCD to Mode 0. */
 				gb->hram_io[IO_STAT] =
-					(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_HBLANK;
-				/* Set to line 0. */
+					(gb->hram_io[IO_STAT] & ~STAT_MODE) |
+					IO_STAT_MODE_HBLANK;
+				/* LY fixed to 0 when LCD turned off. */
 				gb->hram_io[IO_LY] = 0;
 				/* Reset LCD timer. */
 				gb->counter.lcd_count = 0;
 			}
-
 			return;
+		}
 
 		case 0x41:
 			gb->hram_io[IO_STAT] = (val & STAT_USER_BITS) | (gb->hram_io[IO_STAT] & STAT_MODE);
@@ -1618,7 +1623,16 @@ void __gb_draw_line(struct gb_s *gb)
 }
 #endif
 
-void __gb_lcd_tick(struct gb_s *gb, uint_fast16_t inst_cycles)
+/**
+ * Updates the state of the LCD and returns the number of ticks until the next
+ * LCD state change. This function should only be called when the LCD is
+ * switched on.
+ *
+ * @param gb Peanut-GB state.
+ * @param inst_cycles Number of cycles to progress the LCD.
+ * @return number of ticks until next LCD mode.
+ */
+static uint_fast16_t __gb_lcd_tick(struct gb_s *gb, uint_fast16_t inst_cycles)
 {
 	/* LCD Timing */
 	gb->counter.lcd_count += inst_cycles;
@@ -1721,9 +1735,11 @@ void __gb_lcd_tick(struct gb_s *gb, uint_fast16_t inst_cycles)
 			__gb_draw_line(gb);
 #endif
 		/* If halted immediately jump to next LCD mode. */
-		if (gb->counter.lcd_count < LCD_LINE_CYCLES)
-			inst_cycles = LCD_LINE_CYCLES - gb->counter.lcd_count;
+		if (gb->counter.lcd_count < LCD_MODE_0_CYCLES)
+			inst_cycles = LCD_MODE_0_CYCLES - gb->counter.lcd_count;
 	}
+
+	return inst_cycles;
 }
 
 /**
@@ -2479,22 +2495,31 @@ void __gb_step_cpu(struct gb_s *gb)
 				halt_cycles = tac_cycles;
 		}
 
-		if((gb->hram_io[IO_LCDC] & LCDC_ENABLE) != 0)
+		if((gb->hram_io[IO_LCDC] & LCDC_ENABLE))
 		{
 			int lcd_cycles;
 
-			if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_SEARCH_OAM)
+			/* If LCD is in HBlank, calculate the number of cycles
+			 * until the end of HBlank and the start of mode 2 or
+			 * mode 1. */
+			if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_HBLANK)
+			{
+				lcd_cycles = LCD_MODE_2_CYCLES -
+					     gb->counter.lcd_count;
+			}
+			else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_SEARCH_OAM)
 			{
 				lcd_cycles = LCD_MODE_3_CYCLES -
 					gb->counter.lcd_count;
 			}
-			else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_HBLANK)
+			else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_SEARCH_TRANSFER)
 			{
-				lcd_cycles = LCD_MODE_2_CYCLES -
+				lcd_cycles = LCD_MODE_0_CYCLES -
 					gb->counter.lcd_count;
 			}
 			else
 			{
+				/* VBlank */
 				lcd_cycles =
 					LCD_LINE_CYCLES - gb->counter.lcd_count;
 			}
@@ -3343,9 +3368,10 @@ void __gb_step_cpu(struct gb_s *gb)
 		}
 
 		/* TODO Check behaviour of LCD during LCD power off state. */
-		/* If LCD is off, don't update LCD state. */
+		/* If LCD is off, don't update LCD state or increase the LCD
+		 * ticks. */
 		if((gb->hram_io[IO_LCDC] & LCDC_ENABLE))
-			__gb_lcd_tick(gb, inst_cycles);
+			inst_cycles = __gb_lcd_tick(gb, inst_cycles);
 	} while(gb->gb_halt && (gb->hram_io[IO_IF] & gb->hram_io[IO_IE]) == 0);
 	/* If halted, loop until an interrupt occurs. */
 }
