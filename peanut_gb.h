@@ -1001,16 +1001,13 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 			/* LY fixed to 0 when LCD turned off. */
 			if((gb->hram_io[IO_LCDC] & LCDC_ENABLE) == 0)
 			{
-				/* Do not turn off LCD outside of VBLANK. This may
-				 * happen due to poor timing in this emulator. */
-				if((gb->hram_io[IO_STAT] & STAT_MODE) != IO_STAT_MODE_VBLANK)
-				{
-					gb->hram_io[IO_LCDC] |= LCDC_ENABLE;
-					return;
-				}
+				/* Peanut-GB will happily turn off LCD outside
+				 * of VBLANK even though this damages real
+				 * hardware. */
 
 				/* Set LCD to Mode 0. */
-				gb->hram_io[IO_STAT] = (gb->hram_io[IO_STAT] & ~0x03);
+				gb->hram_io[IO_STAT] =
+					(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_HBLANK;
 				/* Set to line 0. */
 				gb->hram_io[IO_LY] = 0;
 				/* Reset LCD timer. */
