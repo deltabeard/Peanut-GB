@@ -796,6 +796,75 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 }
 
 /**
+ * Internal function used to read bytes.
+ * addr is host platform endian.
+ */
+void __gb_oam_dma(struct gb_s *gb, uint16_t addr)
+{
+	uint16_t i = 0;
+
+	switch(PEANUT_GB_GET_MSN16(addr))
+	{
+	case 0x0:
+	case 0x1:
+	case 0x2:
+	case 0x3:
+		for(; i < OAM_SIZE; i++)
+			gb->oam[i] = gb->gb_rom_read(gb, addr + i);
+
+		break;
+	case 0x4:
+	case 0x5:
+	case 0x6:
+	case 0x7:
+		if(gb->mbc == 1 && gb->cart_mode_select)
+			addr = addr + ((gb->selected_rom_bank & 0x1F) - 1) * ROM_BANK_SIZE;
+		else
+			addr = addr + (gb->selected_rom_bank - 1) * ROM_BANK_SIZE;
+
+		for(; i < OAM_SIZE; i++)
+			gb->oam[i] = gb->gb_rom_read(gb, addr + i);
+
+		break;
+
+	case 0x8:
+	case 0x9:
+		addr -= VRAM_ADDR;
+
+		for(; i < OAM_SIZE; i++)
+			gb->oam[i] = gb->vram[addr + i];
+
+		break;
+
+	case 0xA:
+	case 0xB:
+		/* Ignore OAM DMA from Cart RTC. */
+		if(gb->cart_ram && gb->enable_cart_ram)
+		{
+			if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
+				break;
+			else if((gb->cart_mode_select || gb->mbc != 1) &&
+					gb->cart_ram_bank < gb->num_ram_banks)
+				addr = addr - CART_RAM_ADDR + (gb->cart_ram_bank * CRAM_BANK_SIZE);
+			else
+				addr = addr - CART_RAM_ADDR;
+
+			for(; i < OAM_SIZE; i++)
+				gb->oam[i] = gb->gb_cart_ram_read(gb, addr + i);
+		}
+
+		break;
+
+	case 0xC:
+	case 0xD:
+		addr -= WRAM_0_ADDR;
+		for(; i < OAM_SIZE; i++)
+			gb->oam[i] = gb->wram[addr + i];
+
+		break;
+	}
+}
+/**
  * Internal function used to write bytes.
  */
 void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
@@ -1045,8 +1114,10 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 			uint8_t msn = val >> 4;
 			gb->hram_io[IO_DMA] = val;
 
+			__gb_oam_dma(gb, dma_addr);
 			/* If shadow OAM is in WRAM, use memcpy and avoid the
 			 * slower byte-by-byte reading with __gb_read(). */
+#if 0
 			if(msn == 0xC || msn == 0xD)
 			{
 				//memcpy(gb->oam, &gb->wram[dma_addr - WRAM_0_ADDR], OAM_SIZE);
@@ -1062,6 +1133,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 							       dma_addr + i);
 				}
 			}
+#endif
 
 			return;
 		}
