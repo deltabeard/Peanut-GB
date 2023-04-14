@@ -796,72 +796,6 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 }
 
 /**
- * Internal function used to read bytes.
- * addr is host platform endian.
- */
-void __gb_oam_dma(struct gb_s *gb, uint_fast16_t addr)
-{
-	uint_fast8_t i = 0;
-
-	switch(addr >> 13)
-	{
-	case 0x0:
-	case 0x1:
-		for(; i < OAM_SIZE; i++)
-			gb->oam[i] = gb->gb_rom_read(gb, addr + i);
-
-		break;
-	case 0x2:
-	case 0x3:
-		if(gb->mbc == 1 && gb->cart_mode_select)
-			addr += ((gb->selected_rom_bank & 0x1F) - 1) *
-				ROM_BANK_SIZE;
-		else
-			addr += (gb->selected_rom_bank - 1) * ROM_BANK_SIZE;
-
-		for(; i < OAM_SIZE; i++)
-			gb->oam[i] = gb->gb_rom_read(gb, addr + i);
-
-		break;
-
-	case 0x4:
-		addr -= VRAM_ADDR;
-
-		for(; i < OAM_SIZE; i++)
-			gb->oam[i] = gb->vram[addr + i];
-
-		break;
-
-	case 0x5:
-		if(gb->cart_ram && gb->enable_cart_ram)
-		{
-			if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
-			{
-				/* Ignore OAM DMA from Cart RTC. */
-				return;
-			}
-
-			addr -= CART_RAM_ADDR;
-
-			if((gb->cart_mode_select || gb->mbc != 1) &&
-					gb->cart_ram_bank < gb->num_ram_banks)
-				addr += gb->cart_ram_bank * CRAM_BANK_SIZE;
-
-			for(; i < OAM_SIZE; i++)
-				gb->oam[i] = gb->gb_cart_ram_read(gb, addr + i);
-		}
-
-		break;
-
-	case 0x6:
-		addr -= WRAM_0_ADDR;
-		for(; i < OAM_SIZE; i++)
-			gb->oam[i] = gb->wram[addr + i];
-
-		break;
-	}
-}
-/**
  * Internal function used to write bytes.
  */
 void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
@@ -887,7 +821,6 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 		}
 
 	/* Intentional fall through. */
-
 	case 0x3:
 		if(gb->mbc == 1)
 		{
@@ -1105,9 +1038,75 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 		case 0x46:
 		{
 			uint_fast16_t dma_addr = (uint_fast16_t) val << 8;
+			uint_fast8_t i = 0;
+
 			gb->hram_io[IO_DMA] = val;
 
-			__gb_oam_dma(gb, dma_addr);
+			switch(dma_addr >> 13)
+			{
+			case 0x6:
+				dma_addr -= WRAM_0_ADDR;
+				for(; i < OAM_SIZE; i++)
+					gb->oam[i] = gb->wram[dma_addr + i];
+
+				break;
+
+			case 0x0:
+			case 0x1:
+				for(; i < OAM_SIZE; i++)
+					gb->oam[i] = gb->gb_rom_read(gb,
+						dma_addr + i);
+
+				break;
+			case 0x2:
+			case 0x3:
+				if(gb->mbc == 1 && gb->cart_mode_select)
+				{
+					dma_addr += ((gb->selected_rom_bank & 0x1F) - 1) *
+						    ROM_BANK_SIZE;
+				}
+				else
+				{
+					dma_addr += (gb->selected_rom_bank - 1) *
+						ROM_BANK_SIZE;
+				}
+
+				for(; i < OAM_SIZE; i++)
+					gb->oam[i] = gb->gb_rom_read(gb, dma_addr + i);
+
+				break;
+
+			case 0x4:
+				dma_addr -= VRAM_ADDR;
+
+				for(; i < OAM_SIZE; i++)
+					gb->oam[i] = gb->vram[dma_addr + i];
+
+				break;
+
+			case 0x5:
+				if(gb->cart_ram && gb->enable_cart_ram)
+				{
+					if(gb->mbc == 3 &&
+					   gb->cart_ram_bank >= 0x08)
+					{
+						/* Ignore OAM DMA from Cart RTC. */
+						return;
+					}
+
+					dma_addr -= CART_RAM_ADDR;
+
+					if((gb->cart_mode_select || gb->mbc != 1) &&
+							gb->cart_ram_bank < gb->num_ram_banks)
+						dma_addr += gb->cart_ram_bank * CRAM_BANK_SIZE;
+
+					for(; i < OAM_SIZE; i++)
+						gb->oam[i] = gb->gb_cart_ram_read(gb,
+							dma_addr + i);
+				}
+
+				break;
+			}
 
 			return;
 		}
