@@ -1,6 +1,6 @@
 .POSIX:
 CC		:= cc
-OPT		:= -s -Ofast
+OPT		:= -g2 -O2
 CFLAGS		= $(OPT) -std=c99 -Wall -Wextra
 OUTSWITCH	:= -o
 
@@ -11,12 +11,12 @@ ifeq ($(CC),cl)
 	EXT := .exe
 endif
 
-all: peanut-benchmark
+all: peanut-benchmark peanut-benchmark.S
 peanut-benchmark: peanut-benchmark.c ../../peanut_gb.h
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OUTSWITCH)$@ $< $(LDLIBS)
 
 peanut-benchmark.S: peanut-benchmark.c ../../peanut_gb.h
-	$(CC) -S $(CFLAGS) $(LDFLAGS) $(OUTSWITCH)$@ $< $(LDLIBS)
+	$(CC) -S -masm=intel $(CFLAGS) $(LDFLAGS) $(OUTSWITCH)$@ $< $(LDLIBS)
 
 clean:
 	$(RM) peanut-benchmark$(EXT)
