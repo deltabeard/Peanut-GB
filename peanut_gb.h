@@ -805,6 +805,13 @@ void __gb_oam_dma(struct gb_s *gb, uint16_t addr)
 
 	switch(PEANUT_GB_GET_MSN16(addr))
 	{
+	case 0xC:
+	case 0xD:
+		addr -= WRAM_0_ADDR;
+		for(; i < OAM_SIZE; i++)
+			gb->oam[i] = gb->wram[addr + i];
+
+		break;
 	case 0x0:
 	case 0x1:
 	case 0x2:
@@ -818,9 +825,10 @@ void __gb_oam_dma(struct gb_s *gb, uint16_t addr)
 	case 0x6:
 	case 0x7:
 		if(gb->mbc == 1 && gb->cart_mode_select)
-			addr = addr + ((gb->selected_rom_bank & 0x1F) - 1) * ROM_BANK_SIZE;
+			addr += ((gb->selected_rom_bank & 0x1F) - 1) *
+				ROM_BANK_SIZE;
 		else
-			addr = addr + (gb->selected_rom_bank - 1) * ROM_BANK_SIZE;
+			addr += (gb->selected_rom_bank - 1) * ROM_BANK_SIZE;
 
 		for(; i < OAM_SIZE; i++)
 			gb->oam[i] = gb->gb_rom_read(gb, addr + i);
@@ -838,28 +846,23 @@ void __gb_oam_dma(struct gb_s *gb, uint16_t addr)
 
 	case 0xA:
 	case 0xB:
-		/* Ignore OAM DMA from Cart RTC. */
 		if(gb->cart_ram && gb->enable_cart_ram)
 		{
 			if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
-				break;
-			else if((gb->cart_mode_select || gb->mbc != 1) &&
+			{
+				/* Ignore OAM DMA from Cart RTC. */
+				return;
+			}
+
+			addr -= CART_RAM_ADDR;
+
+			if((gb->cart_mode_select || gb->mbc != 1) &&
 					gb->cart_ram_bank < gb->num_ram_banks)
-				addr = addr - CART_RAM_ADDR + (gb->cart_ram_bank * CRAM_BANK_SIZE);
-			else
-				addr = addr - CART_RAM_ADDR;
+				addr += gb->cart_ram_bank * CRAM_BANK_SIZE;
 
 			for(; i < OAM_SIZE; i++)
 				gb->oam[i] = gb->gb_cart_ram_read(gb, addr + i);
 		}
-
-		break;
-
-	case 0xC:
-	case 0xD:
-		addr -= WRAM_0_ADDR;
-		for(; i < OAM_SIZE; i++)
-			gb->oam[i] = gb->wram[addr + i];
 
 		break;
 	}
