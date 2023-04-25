@@ -141,10 +141,10 @@ FENSTER_API int fenster_loop(struct fenster *f) {
   switch (evtype) {
   case 1: /* NSEventTypeMouseDown */
     f->mouse |= 1;
-    return 0;
+    break;
   case 2: /* NSEventTypeMouseUp*/
     f->mouse &= ~1;
-    return 0;
+    break;
   case 5:
   case 6: { /* NSEventTypeMouseMoved */
     CGPoint xy = msg(CGPoint, ev, "locationInWindow");
@@ -178,7 +178,7 @@ static LRESULT CALLBACK fenster_wndproc(HWND hwnd, UINT msg, WPARAM wParam,
     HDC memdc = CreateCompatibleDC(hdc);
     HBITMAP hbmp = CreateCompatibleBitmap(hdc, f->width, f->height);
     HBITMAP oldbmp = SelectObject(memdc, hbmp);
-    BITMAPINFO bi = {{sizeof(bi), f->width, -f->height, 1, 32, BI_BITFIELDS}};
+    BITMAPINFO bi = {{sizeof(bi), f->width, -f->height, 1, 32, BI_RGB}};
     bi.bmiColors[0].rgbRed = 0xff;
     bi.bmiColors[1].rgbGreen = 0xff;
     bi.bmiColors[2].rgbBlue = 0xff;
@@ -306,7 +306,7 @@ FENSTER_API int fenster_loop(struct fenster *f) {
 }
 #endif
 
-#ifdef WIN32
+#ifdef _WIN32
 FENSTER_API void fenster_sleep(int64_t ms) { Sleep(ms); }
 FENSTER_API int64_t fenster_time() {
   LARGE_INTEGER freq, count;
@@ -327,6 +327,41 @@ FENSTER_API int64_t fenster_time() {
   return time.tv_sec * 1000 + (time.tv_nsec / 1000000);
 }
 #endif
+
+#ifdef __cplusplus
+class Fenster {
+  struct fenster f;
+  int64_t now;
+
+public:
+  Fenster(const int w, const int h, const char *title)
+      : f{.title = title, .width = w, .height = h} {
+    this->f.buf = new uint32_t[w * h];
+    this->now = fenster_time();
+    fenster_open(&this->f);
+  }
+  ~Fenster() {
+    fenster_close(&this->f);
+    delete[] this->f.buf;
+  }
+  bool loop(const int fps) {
+    int64_t t = fenster_time();
+    if (t - this->now < 1000 / fps) {
+      fenster_sleep(t - now);
+    }
+    this->now = t;
+    return fenster_loop(&this->f) == 0;
+  }
+  inline uint32_t &px(const int x, const int y) {
+    return fenster_pixel(&this->f, x, y);
+  }
+  bool key(int c) { return c >= 0 && c < 128 ? this->f.keys[c] : false; }
+  int x() { return this->f.x; }
+  int y() { return this->f.y; }
+  int mouse() { return this->f.mouse; }
+  int mod() { return this->f.mod; }
+};
+#endif /* __cplusplus */
 
 #endif /* !FENSTER_HEADER */
 #endif /* FENSTER_H */
