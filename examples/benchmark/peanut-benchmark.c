@@ -1,6 +1,6 @@
 /**
  * MIT License
- * Copyright (c) 2018-2022 Mahyar Koshkouei
+ * Copyright (c) 2018-2023 Mahyar Koshkouei
  *
  * Performs a benchmark of Peanut-GB with a specified ROM.
  * Plays the ROM five times and prints the FPS for each play.
