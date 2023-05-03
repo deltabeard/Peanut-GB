@@ -505,9 +505,9 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 		size_t mem_len;
 		size_t disms_made;
 
-		nk_layout_row_dynamic(ctx, 18, 3);
 		if(gb_state != GB_STATE_CPU_STEP)
 		{
+			nk_layout_row_dynamic(ctx, 18, 1);
 			nk_label(ctx, "Use CPU Step Mode", NK_TEXT_CENTERED);
 			break;
 		}
@@ -534,10 +534,18 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 		}
 		else
 		{
-			nk_label(ctx, "PC out of range", NK_TEXT_CENTERED);
+			char str[32];
+			size_t str_len;
+			str_len = SDL_snprintf(
+					str, sizeof(str),
+					"PC %04X out of range",
+					gb->cpu_reg.pc.reg);
+			nk_layout_row_dynamic(ctx, 18, 1);
+			nk_text(ctx, str, str_len, NK_TEXT_CENTERED);
 			break;
 		}
 
+		nk_layout_row_dynamic(ctx, 18, 3);
 		disms_made = dism_mem(mem, mem_len, bank, bank_offset,
 			disms, SDL_arraysize(disms));
 		for(size_t i = 0; i < SDL_arraysize(disms); i++)
