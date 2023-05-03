@@ -512,7 +512,7 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 			break;
 		}
 
-		if(gb->cpu_reg.pc.reg < 0x0100 && gb->hram_io[IO_BR] == 0)
+		if(gb->cpu_reg.pc.reg < 0x0100 && gb->hram_io[IO_BOOT] == 0)
 		{
 			mem = gb_priv->bios;
 			mem_len = 0x100;
@@ -912,7 +912,7 @@ int main(int argc, char *argv[])
 		else
 		{
 			printf("BIOS enabled\n");
-			gb_set_bios(&gb, gb_bios_read);
+			gb_set_bootrom(&gb, gb_bios_read);
 			gb_reset(&gb);
 		}
 
