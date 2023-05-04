@@ -802,13 +802,14 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 	{
 	case 0x0:
 	case 0x1:
-		if(gb->mbc == 2 && addr & 0x10)
-			return;
-		else if(gb->mbc > 0 && gb->cart_ram)
+		/* Set RAM enable bit. MBC 2 is handled in fall-through. */
+		if(gb->mbc > 0 && gb->mbc != 2 && gb->cart_ram)
+		{
 			gb->enable_cart_ram = ((val & 0x0F) == 0x0A);
+			return;
+		}
 
-		return;
-
+	/* Intentional fall through. */
 	case 0x2:
 		if(gb->mbc == 5)
 		{
@@ -819,7 +820,6 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 		}
 
 	/* Intentional fall through. */
-
 	case 0x3:
 		if(gb->mbc == 1)
 		{
@@ -829,12 +829,22 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 			if((gb->selected_rom_bank & 0x1F) == 0x00)
 				gb->selected_rom_bank++;
 		}
-		else if(gb->mbc == 2 && addr & 0x10)
+		else if(gb->mbc == 2)
 		{
-			gb->selected_rom_bank = val & 0x0F;
-
-			if(!gb->selected_rom_bank)
-				gb->selected_rom_bank++;
+			/* If bit 8 is 1, then set ROM bank number. */
+			if(addr & 0x100)
+			{
+				gb->selected_rom_bank = val & 0x0F;
+				/* Setting ROM bank to 0, sets it to 1. */
+				if(!gb->selected_rom_bank)
+					gb->selected_rom_bank++;
+			}
+			/* Otherwise set whether RAM is enabled or not. */
+			else
+			{
+				gb->enable_cart_ram = ((val & 0x0F) == 0x0A);
+				return;
+			}
 		}
 		else if(gb->mbc == 3)
 		{
