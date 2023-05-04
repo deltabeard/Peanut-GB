@@ -3651,38 +3651,37 @@ void gb_set_bootrom(struct gb_s *gb,
 }
 
 /**
- * This was taken from SameBoy, which is released under MIT Licence.
+ * This was adapted from SameBoy, which is released under MIT Licence.
  */
 void gb_tick_rtc(struct gb_s *gb)
 {
-	/* is timer running? */
-	if((gb->cart_rtc[4] & 0x40) == 0)
-	{
-		if(++gb->rtc_bits.sec == 60)
-		{
-			gb->rtc_bits.sec = 0;
+	/* Check halt bit to see if timer is enabled. Return if disabled. */
+	if(gb->cart_rtc[4] & 0x40)
+		return;
 
-			if(++gb->rtc_bits.min == 60)
-			{
-				gb->rtc_bits.min = 0;
+	if(++gb->rtc_bits.sec < 60)
+		return;
 
-				if(++gb->rtc_bits.hour == 24)
-				{
-					gb->rtc_bits.hour = 0;
+	/* Assume that rtc_bits.sec will never exceed 60 (setting to 0 instead
+	 * subtracting by 60). */
+	gb->rtc_bits.sec = 0;
+	if(++gb->rtc_bits.min < 60)
+		return;
 
-					if(++gb->rtc_bits.yday == 0)
-					{
-						if(gb->rtc_bits.high & 1)  /* Bit 8 of days*/
-						{
-							gb->rtc_bits.high |= 0x80; /* Overflow bit */
-						}
+	gb->rtc_bits.min = 0;
+	if(++gb->rtc_bits.hour < 24)
+		return;
 
-						gb->rtc_bits.high ^= 1;
-					}
-				}
-			}
-		}
-	}
+	gb->rtc_bits.hour = 0;
+	if(++gb->rtc_bits.yday != 0)
+		return;
+
+	/* If bit 8 of days is already set, then set the overflow bit. */
+	if(gb->rtc_bits.high & 1)
+		gb->rtc_bits.high |= 0x80;
+
+	/* Toggle bit 8. */
+	gb->rtc_bits.high ^= 1;
 }
 
 void gb_set_rtc(struct gb_s *gb, const struct tm * const time)
