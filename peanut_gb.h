@@ -549,7 +549,7 @@ struct gb_s
 	uint8_t cart_ram;
 	/* Number of ROM banks in cartridge. */
 	uint16_t num_rom_banks_mask;
-	/* Number of RAM banks in cartridge. */
+	/* Number of RAM banks in cartridge. Ignore for MBC2. */
 	uint8_t num_ram_banks;
 
 	uint16_t selected_rom_bank;
@@ -694,7 +694,7 @@ struct gb_s
  * Internal function used to read bytes.
  * addr is host platform endian.
  */
-uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
+uint8_t __gb_read(struct gb_s *gb, uint16_t addr)
 {
 	switch(PEANUT_GB_GET_MSN16(addr))
 	{
@@ -732,6 +732,12 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 		{
 			if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
 				return gb->cart_rtc[gb->cart_ram_bank - 0x08];
+			else if(gb->mbc == 2)
+			{
+				/* Only 9 bits are available in address. */
+				addr &= 0x1FF;
+				return gb->gb_cart_ram_read(gb, addr);
+			}
 			else if((gb->cart_mode_select || gb->mbc != 1) &&
 					gb->cart_ram_bank < gb->num_ram_banks)
 			{
@@ -796,13 +802,13 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 /**
  * Internal function used to write bytes.
  */
-void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
+void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 {
 	switch(PEANUT_GB_GET_MSN16(addr))
 	{
 	case 0x0:
 	case 0x1:
-		/* Set RAM enable bit. MBC 2 is handled in fall-through. */
+		/* Set RAM enable bit. MBC2 is handled in fall-through. */
 		if(gb->mbc > 0 && gb->mbc != 2 && gb->cart_ram)
 		{
 			gb->enable_cart_ram = ((val & 0x0F) == 0x0A);
@@ -886,10 +892,19 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 
 	case 0xA:
 	case 0xB:
+		/* Do not write to RAM if unavailable or disabled. */
 		if(gb->cart_ram && gb->enable_cart_ram)
 		{
 			if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
 				gb->cart_rtc[gb->cart_ram_bank - 0x08] = val;
+			else if(gb->mbc == 2)
+			{
+				/* Only 9 bits are available in address. */
+				addr &= 0x1FF;
+				/* Data is only 4 bits wide in MBC2 RAM. */
+				val &= 0x0F;
+				gb->gb_cart_ram_write(gb, addr, val);
+			}
 			else if(gb->cart_mode_select &&
 					gb->cart_ram_bank < gb->num_ram_banks)
 			{
@@ -3390,6 +3405,11 @@ uint_fast32_t gb_get_save_size(struct gb_s *gb)
 		0x00, 0x800, 0x2000, 0x8000, 0x20000
 	};
 	uint8_t ram_size = gb->gb_rom_read(gb, ram_size_location);
+
+	/* MBC2 always has 512 half-bytes of cart RAM. */
+	if(gb->mbc == 2)
+		return 0x200;
+
 	return ram_sizes[ram_size];
 }
 
@@ -3521,7 +3541,7 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	};
 	const uint8_t cart_ram[] =
 	{
-		0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0,
+		0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0,
 		1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0
 	};
 	const uint16_t num_rom_banks_mask[] =
@@ -3567,6 +3587,10 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	gb->cart_ram = cart_ram[gb->gb_rom_read(gb, mbc_location)];
 	gb->num_rom_banks_mask = num_rom_banks_mask[gb->gb_rom_read(gb, bank_count_location)] - 1;
 	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(gb, ram_size_location)];
+
+	/* Note that MBC2 will appear to have no RAM banks, but it actually
+	 * always has 512 half-bytes of RAM. Hence, gb->num_ram_banks must be
+	 * ignored for MBC2. */
 
 	gb->lcd_blank = 0;
 	gb->display.lcd_draw_line = NULL;
