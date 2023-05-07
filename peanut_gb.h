@@ -139,11 +139,14 @@
 
 /* DIV Register is incremented at rate of 16384Hz.
  * 4194304 / 16384 = 256 clock cycles for one increment. */
-#define DIV_CYCLES          256
+#define DIV_CYCLES	256
 
 /* Serial clock locked to 8192Hz on DMG.
  * 4194304 / (8192 / 8) = 4096 clock cycles for sending 1 byte. */
-#define SERIAL_CYCLES       4096
+#define SERIAL_CYCLES	4096
+
+/* RTC clock locked to 1Hz. */
+#define RTC_CYCLES	4194304
 
 /* Calculating VSYNC. */
 #define DMG_CLOCK_FREQ      4194304.0
@@ -428,6 +431,7 @@ struct count_s
 	uint_fast16_t div_count;	/* Divider Register Counter */
 	uint_fast16_t tima_count;	/* Timer Counter */
 	uint_fast16_t serial_count;	/* Serial Counter */
+	uint_fast32_t rtc_count;	/* RTC Counter */
 };
 
 #if ENABLE_LCD
@@ -480,6 +484,19 @@ enum gb_serial_rx_ret_e
 {
 	GB_SERIAL_RX_SUCCESS = 0,
 	GB_SERIAL_RX_NO_CONNECTION = 1
+};
+
+union rtc
+{
+	struct
+	{
+		uint8_t sec;
+		uint8_t min;
+		uint8_t hour;
+		uint8_t yday;
+		uint8_t high;
+	} rtc_bits;
+	uint8_t cart_rtc[5];
 };
 
 /**
@@ -558,18 +575,9 @@ struct gb_s
 	uint8_t enable_cart_ram;
 	/* Cartridge ROM/RAM mode select. */
 	uint8_t cart_mode_select;
-	union
-	{
-		struct
-		{
-			uint8_t sec;
-			uint8_t min;
-			uint8_t hour;
-			uint8_t yday;
-			uint8_t high;
-		} rtc_bits;
-		uint8_t cart_rtc[5];
-	};
+
+	union rtc rtc_latched;
+	union rtc rtc_reg;
 
 	struct cpu_registers_s cpu_reg;
 	//struct gb_registers_s gb_reg;
@@ -656,6 +664,14 @@ struct gb_s
 
 #ifndef PEANUT_GB_HEADER_ONLY
 
+/**
+ * Tick the internal RTC by one second. This does not affect games with no RTC
+ * support.
+ *
+ * \param gb	An initialised emulator context. Must not be NULL.
+ */
+void gb_tick_rtc(struct gb_s *gb);
+
 #define IO_JOYP	0x00
 #define IO_SB	0x01
 #define IO_SC	0x02
@@ -728,11 +744,16 @@ uint8_t __gb_read(struct gb_s *gb, uint16_t addr)
 
 	case 0xA:
 	case 0xB:
-		if(gb->cart_ram && gb->enable_cart_ram)
+		if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
 		{
-			if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
-				return gb->cart_rtc[gb->cart_ram_bank - 0x08];
-			else if(gb->mbc == 2)
+			printf("RTC READ: %u %hu\n",
+					gb->cart_ram_bank - 0x08,
+					gb->rtc_latched.cart_rtc[gb->cart_ram_bank - 0x08]);
+			return gb->rtc_latched.cart_rtc[gb->cart_ram_bank - 0x08];
+		}
+		else if(gb->cart_ram && gb->enable_cart_ram)
+		{
+			if(gb->mbc == 2)
 			{
 				/* Only 9 bits are available in address. */
 				addr &= 0x1FF;
@@ -882,6 +903,12 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 
 	case 0x6:
 	case 0x7:
+		val &= 1;
+		if(gb->mbc == 3 && val == 1 && gb->cart_mode_select == 0)
+		{
+			memcpy(&gb->rtc_latched, &gb->rtc_reg, sizeof(gb->rtc_latched));
+			printf("LATCH %u\n", gb->cart_mode_select);
+		}
 		gb->cart_mode_select = (val & 1);
 		return;
 
@@ -893,11 +920,23 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 	case 0xA:
 	case 0xB:
 		/* Do not write to RAM if unavailable or disabled. */
-		if(gb->cart_ram && gb->enable_cart_ram)
+		if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
 		{
-			if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
-				gb->cart_rtc[gb->cart_ram_bank - 0x08] = val;
-			else if(gb->mbc == 2)
+			uint8_t rtc_mask_lut[5] = {
+				0x3F, 0x3F, 0x1F, 0xFF, 0xC1
+			};
+			uint8_t rtc_index = gb->cart_ram_bank - 0x08;
+			printf("RTC WRIT: %hu %02X\n",
+					rtc_index, val);
+			gb->rtc_reg.cart_rtc[rtc_index] = val & rtc_mask_lut[rtc_index];
+			if(rtc_index == 4 && (val & 0x40))
+			{
+				printf("RTC off\n");
+			}
+		}
+		else if(gb->cart_ram && gb->enable_cart_ram)
+		{
+			if(gb->mbc == 2)
 			{
 				/* Only 9 bits are available in address. */
 				addr &= 0x1FF;
@@ -913,6 +952,12 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 			}
 			else if(gb->num_ram_banks)
 				gb->gb_cart_ram_write(gb, addr - CART_RAM_ADDR, val);
+		}
+		else
+		{
+			printf("SPURIOS: %04X %02X %s %s\n", addr, val,
+					gb->cart_ram ? "RAM" : "NORAM",
+					gb->enable_cart_ram ? "EN" : "DIS");
 		}
 
 		return;
@@ -3202,6 +3247,20 @@ void __gb_step_cpu(struct gb_s *gb)
 			gb->counter.div_count -= DIV_CYCLES;
 		}
 
+		/* Is RTC timer running? */
+#if 1
+		if(gb->mbc == 3 && (gb->rtc_reg.cart_rtc[4] & 0x40) == 0)
+		{
+			gb->counter.rtc_count += inst_cycles;
+			if(gb->counter.rtc_count >= RTC_CYCLES)
+			{
+				gb->counter.rtc_count -= RTC_CYCLES;
+				gb_tick_rtc(gb);
+				printf("TICK\n");
+			}
+		}
+#endif
+
 		/* Check serial transmission. */
 		if(gb->hram_io[IO_SC] & SERIAL_SC_TX_START)
 		{
@@ -3488,6 +3547,14 @@ void gb_reset(struct gb_s *gb)
 	gb->counter.div_count = 0;
 	gb->counter.tima_count = 0;
 	gb->counter.serial_count = 0;
+	gb->counter.rtc_count = 0;
+
+	/* Stop RTC timer on init. */
+	//gb->cart_rtc[0] = 0;
+	//gb->cart_rtc[1] = 0;
+	//gb->cart_rtc[2] = 0;
+	//gb->cart_rtc[3] = 0;
+	//gb->cart_rtc[4] = 0;
 
 	gb->direct.joypad = 0xFF;
 	gb->hram_io[IO_JOYP] = 0xCF;
@@ -3656,28 +3723,28 @@ void gb_set_bootrom(struct gb_s *gb,
 void gb_tick_rtc(struct gb_s *gb)
 {
 	/* is timer running? */
-	if((gb->cart_rtc[4] & 0x40) == 0)
+	if((gb->rtc_reg.cart_rtc[4] & 0x40) == 0)
 	{
-		if(++gb->rtc_bits.sec == 60)
+		if(++gb->rtc_reg.rtc_bits.sec == 60)
 		{
-			gb->rtc_bits.sec = 0;
+			gb->rtc_reg.rtc_bits.sec = 0;
 
-			if(++gb->rtc_bits.min == 60)
+			if(++gb->rtc_reg.rtc_bits.min == 60)
 			{
-				gb->rtc_bits.min = 0;
+				gb->rtc_reg.rtc_bits.min = 0;
 
-				if(++gb->rtc_bits.hour == 24)
+				if(++gb->rtc_reg.rtc_bits.hour == 24)
 				{
-					gb->rtc_bits.hour = 0;
+					gb->rtc_reg.rtc_bits.hour = 0;
 
-					if(++gb->rtc_bits.yday == 0)
+					if(++gb->rtc_reg.rtc_bits.yday == 0)
 					{
-						if(gb->rtc_bits.high & 1)  /* Bit 8 of days*/
+						if(gb->rtc_reg.rtc_bits.high & 1)  /* Bit 8 of days*/
 						{
-							gb->rtc_bits.high |= 0x80; /* Overflow bit */
+							gb->rtc_reg.rtc_bits.high |= 0x80; /* Overflow bit */
 						}
 
-						gb->rtc_bits.high ^= 1;
+						gb->rtc_reg.rtc_bits.high ^= 1;
 					}
 				}
 			}
@@ -3687,11 +3754,11 @@ void gb_tick_rtc(struct gb_s *gb)
 
 void gb_set_rtc(struct gb_s *gb, const struct tm * const time)
 {
-	gb->cart_rtc[0] = time->tm_sec;
-	gb->cart_rtc[1] = time->tm_min;
-	gb->cart_rtc[2] = time->tm_hour;
-	gb->cart_rtc[3] = time->tm_yday & 0xFF; /* Low 8 bits of day counter. */
-	gb->cart_rtc[4] = time->tm_yday >> 8; /* High 1 bit of day counter. */
+	gb->rtc_reg.cart_rtc[0] = time->tm_sec;
+	gb->rtc_reg.cart_rtc[1] = time->tm_min;
+	gb->rtc_reg.cart_rtc[2] = time->tm_hour;
+	gb->rtc_reg.cart_rtc[3] = time->tm_yday & 0xFF; /* Low 8 bits of day counter. */
+	gb->rtc_reg.cart_rtc[4] = time->tm_yday >> 8; /* High 1 bit of day counter. */
 }
 #endif // PEANUT_GB_HEADER_ONLY
 
@@ -3812,14 +3879,6 @@ uint8_t gb_colour_hash(struct gb_s *gb);
  * \returns	Pointer to start of string, null terminated.
  */
 const char* gb_get_rom_name(struct gb_s* gb, char *title_str);
-
-/**
- * Tick the internal RTC by one second. This does not affect games with no RTC
- * support.
- *
- * \param gb	An initialised emulator context. Must not be NULL.
- */
-void gb_tick_rtc(struct gb_s *gb);
 
 /**
  * Set initial values in RTC.
