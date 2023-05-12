@@ -189,10 +189,8 @@ int main(int argc, char *argv[])
 	static uint32_t fbuf[LCD_WIDTH * LCD_HEIGHT];
 	static char title[128] = "Peanut-Fenster: ";
 	struct gb_s gb;
-	struct priv_t priv =
-	{
-		.f =
-		{
+	struct priv_t priv = {
+		.f = {
 			.title = title,
 			.width = LCD_WIDTH,
 			.height = LCD_HEIGHT,
@@ -295,38 +293,26 @@ int main(int argc, char *argv[])
 	}
 
 	/* Set the RTC of the game cartridge. Only used by games that support it. */
-	{
+	do {
 		time_t rawtime;
-		time(&rawtime);
+		rawtime = time(NULL);
+
+		if(rawtime == -1)
+		{
+			fprintf(stderr, "Wanring: Unable to obtain time.\n");
+			break;
+		}
+
 #ifdef _POSIX_C_SOURCE
 		struct tm timeinfo;
 		localtime_r(&rawtime, &timeinfo);
+		gb_set_rtc(&gb, &timeinfo);
 #else
 		struct tm *timeinfo;
 		timeinfo = localtime(&rawtime);
-#endif
-
-		/* You could potentially force the game to allow the player to
-		 * reset the time by setting the RTC to invalid values.
-		 *
-		 * Using memset(&gb->cart_rtc, 0xFF, sizeof(gb->cart_rtc)) for
-		 * example causes Pokemon Gold/Silver to say "TIME NOT SET",
-		 * allowing the player to set the time without having some dumb
-		 * password.
-		 *
-		 * The memset has to be done directly to gb->cart_rtc because
-		 * gb_set_rtc() processes the input values, which may cause
-		 * games to not detect invalid values.
-		 */
-
-		/* Set RTC. Only games that specify support for RTC will use
-		 * these values. */
-#ifdef _POSIX_C_SOURCE
-		gb_set_rtc(&gb, &timeinfo);
-#else
 		gb_set_rtc(&gb, timeinfo);
 #endif
-	}
+	} while(0);
 
 #if ENABLE_LCD
 	gb_init_lcd(&gb, &lcd_draw_line);
