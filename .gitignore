@@ -13,3 +13,9 @@ bin*/
 *.gch
 *.gcda
 *.gcno
+# Run items
+*.sav
+*.bmp
+*.gb
+*.gbc
+*.bin

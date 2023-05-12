@@ -5,15 +5,46 @@ gameboy emulator](https://github.com/gregtour/gameboy). The aim is to make a
 high speed and portable Game Boy (DMG) emulator library that may be used for any
 platform that has a C99 compiler.
 
+This emulator is *very fast*. So much so that it can run at
+[full speed on the Raspberry Pi Pico](https://github.com/deltabeard/RP2040-GB)!
 Check out [BENCHMARK.md](BENCHMARK.md) for benchmarks of Peanut-GB.
 
-Only the original Game Boy (DMG) is supported at this time.
+Only the original Game Boy (DMG) is supported at this time, but preliminary work
+has been completed to support Game Boy Color
+(see https://github.com/deltabeard/Peanut-GB/issues/50).
 
-This emulator is inaccurate and is very much a work in progress (although it
-does pass Blargg's CPU instructions test). As such, some games may run
-incorrectly or not run at all. High speed is important; changes that cause a
-significant loss of emulation speed but increase in accuracy, will be rejected.
-Please seek an alternative emulator if accuracy is important.
+This emulator is a work in progress and can be inaccurate (although it does pass
+Blargg's CPU instructions and instruction timing tests). As such, some games may
+run incorrectly or not run at all. Please seek an alternative emulator if
+accuracy is important.
+
+## Features
+
+- Game Boy (DMG) Support
+- Very fast; fast enough to run on a RP2040 ARM Cortex M0+ microcontroller at
+  full speed.
+- MBC1, MBC2, MBC3, and MBC5 support
+- Real Time Clock (RTC) support
+- Serial connection support
+- Can be used with or without a bootrom
+- Allows different palettes on background and sprites
+- Frame skip and interlacing modes (useful for slow LCDs)
+- Simple to use and comes with examples
+- LCD and sound can be disabled at compile time.
+- If sound is enabled, an external audio processing unit (APU) library is
+  required.
+  A fast audio processing unit (APU) library is included in this repository at
+  https://github.com/deltabeard/Peanut-GB/tree/master/examples/sdl2/minigb_apu .
+
+## Caveats
+
+- The LCD rendering is performed line by line, so certain animations will not
+  render properly (such as in Prehistorik Man).
+- Some games may not be playable due to emulation inaccuracy
+  (see https://github.com/deltabeard/Peanut-GB/issues/31).
+- MiniGB APU runs in a separate thread, and so the timing is not accurate. If
+  accurate APU timing and emulation is required, then Blargg's Gb_Snd_Emu
+  library (or an alternative) can be used instead.
 
 ## SDL2 Example
 
@@ -147,6 +178,13 @@ Set the time of the real time clock (RTC). Some games use this RTC data.
 #### gb_tick_rtc
 
 Increment the real time clock by one second.
+
+#### gb_set_bootrom
+
+Execute a bootrom image on reset. A reset must be performed after calling
+gb_set_bootrom for these changes to take effect. This is because gb_init calls
+gb_reset, but gb_set_bootrom must be called after gb_init.
+The bootrom must be either a DMG or a MGB bootrom.
 
 ## License
 

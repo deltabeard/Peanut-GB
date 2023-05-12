@@ -1,23 +1,30 @@
 /**
  * MIT License
- * Copyright (c) 2018 Mahyar Koshkouei
+ * Copyright (c) 2018-2023 Mahyar Koshkouei
  *
  * A more bare-bones application to help with debugging.
  */
 
 #include <errno.h>
-
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <SDL2/SDL.h>
+#include "SDL.h"
 
 #define ENABLE_LCD 1
 #define ENABLE_SOUND 0
 
 #include "../../peanut_gb.h"
+
+const uint16_t lcd_palette[3][4] =
+{
+	{ 0x7FFF, 0x5294, 0x294A, 0x0000 },
+	{ 0x7FFF, 0x5294, 0x294A, 0x0000 },
+	{ 0x7FFF, 0x5294, 0x294A, 0x0000 }
+};
 
 struct priv_t
 {
@@ -25,33 +32,34 @@ struct priv_t
 	uint8_t *rom;
 	/* Pointer to allocated memory holding save file. */
 	uint8_t *cart_ram;
+	uint16_t fb[LCD_HEIGHT][LCD_WIDTH];
 };
 
 /**
  * Returns a byte from the ROM file at the given address.
  */
-uint8_t gb_rom_read(struct gb_t *gb, const uint32_t addr)
+uint8_t gb_rom_read(struct gb_s *gb, const uint_fast32_t addr)
 {
-    const struct priv_t * const p = gb->priv;
-    return p->rom[addr];
+	const struct priv_t * const p = gb->direct.priv;
+	return p->rom[addr];
 }
 
 /**
  * Returns a byte from the cartridge RAM at the given address.
  */
-uint8_t gb_cart_ram_read(struct gb_t *gb, const uint32_t addr)
+uint8_t gb_cart_ram_read(struct gb_s *gb, const uint_fast32_t addr)
 {
-	const struct priv_t * const p = gb->priv;
+	const struct priv_t * const p = gb->direct.priv;
 	return p->cart_ram[addr];
 }
 
 /**
  * Writes a given byte to the cartridge RAM at the given address.
  */
-void gb_cart_ram_write(struct gb_t *gb, const uint32_t addr,
-	const uint8_t val)
+void gb_cart_ram_write(struct gb_s *gb, const uint_fast32_t addr,
+		const uint8_t val)
 {
-	const struct priv_t * const p = gb->priv;
+	const struct priv_t * const p = gb->direct.priv;
 	p->cart_ram[addr] = val;
 }
 
@@ -65,7 +73,7 @@ uint8_t *read_rom_to_ram(const char *file_name)
 	uint8_t *rom = NULL;
 
 	if(rom_file == NULL)
-        return NULL;
+		return NULL;
 
 	fseek(rom_file, 0, SEEK_END);
 	rom_size = ftell(rom_file);
@@ -73,7 +81,7 @@ uint8_t *read_rom_to_ram(const char *file_name)
 	rom = malloc(rom_size);
 
 	if(fread(rom, sizeof(uint8_t), rom_size, rom_file) != rom_size)
-    {
+	{
 		free(rom);
 		fclose(rom_file);
 		return NULL;
@@ -84,7 +92,7 @@ uint8_t *read_rom_to_ram(const char *file_name)
 }
 
 void read_cart_ram_file(const char *save_file_name, uint8_t **dest,
-	const size_t len)
+		const size_t len)
 {
 	FILE *f;
 
@@ -118,7 +126,7 @@ void read_cart_ram_file(const char *save_file_name, uint8_t **dest,
 }
 
 void write_cart_ram_file(const char *save_file_name, uint8_t **dest,
-	const size_t len)
+		const size_t len)
 {
 	FILE *f;
 
@@ -141,7 +149,7 @@ void write_cart_ram_file(const char *save_file_name, uint8_t **dest,
  * Handles an error reported by the emulator. The emulator context may be used
  * to better understand why the error given in gb_err was reported.
  */
-void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
+void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
 {
 	const char* gb_err_str[GB_INVALID_MAX] = {
 		"UNKNOWN",
@@ -153,7 +161,7 @@ void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 	struct priv_t *priv = gb->direct.priv;
 
 	fprintf(stderr, "Error %d occurred: %s at %04X\n. Exiting.\n",
-			gb_err, gb_err_str[gb_err], addr);
+			gb_err, gb_err_str[gb_err], val);
 
 	/* Free memory and then exit. */
 	free(priv->cart_ram);
@@ -161,9 +169,27 @@ void gb_error(struct gb_t *gb, const enum gb_error_e gb_err, const uint16_t val)
 	exit(EXIT_FAILURE);
 }
 
+#if ENABLE_LCD
+/**
+ * Draws scanline into framebuffer.
+ */
+void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
+		   const uint_least8_t line)
+{
+	struct priv_t *priv = gb->direct.priv;
+
+	for(unsigned int x = 0; x < LCD_WIDTH; x++)
+	{
+		priv->fb[line][x] = lcd_palette
+				    [(pixels[x] & LCD_PALETTE_ALL) >> 4]
+				    [pixels[x] & 3];
+	}
+}
+#endif
+
 int main(int argc, char **argv)
 {
-	struct gb_t gb;
+	struct gb_s gb;
 	struct priv_t priv;
 	const unsigned int height = 144;
 	const unsigned int width = 160;
@@ -172,18 +198,17 @@ int main(int argc, char **argv)
 	SDL_Renderer *renderer;
 	SDL_Texture *texture;
 	SDL_Event event;
-	uint16_t fb[height][width];
 	uint32_t new_ticks, old_ticks;
 	char *save_file_name;
 	enum gb_init_error_e ret;
 	unsigned int fast_mode = 0;
-	unsigned int debug_mode = 0;
+	unsigned int debug_mode = 1;
 
 	/* Make sure a file name is given. */
 	if(argc < 2 || argc > 3)
 	{
 		printf("Usage: %s FILE [SAVE]\n", argv[0]);
-        puts("SAVE is set by default if not provided.");
+		puts("SAVE is set by default if not provided.");
 		return EXIT_FAILURE;
 	}
 
@@ -227,10 +252,10 @@ int main(int argc, char **argv)
 	}
 	else
 		save_file_name = argv[2];
-	
+
 	/* TODO: Sanity check input GB file. */
 
-    /* Initialise emulator context. */
+	/* Initialise emulator context. */
 	ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write,
 			&gb_error, &priv);
 
@@ -243,6 +268,9 @@ int main(int argc, char **argv)
 	/* Load Save File. */
 	read_cart_ram_file(save_file_name, &priv.cart_ram, gb_get_save_size(&gb));
 
+#if ENABLE_LCD
+	gb_init_lcd(&gb, &lcd_draw_line);
+#endif
 	/* Initialise frontend implementation, in this case, SDL2. */
 	if(SDL_Init(SDL_INIT_VIDEO) < 0)
 	{
@@ -293,13 +321,13 @@ int main(int argc, char **argv)
 
 	new_ticks = SDL_GetTicks();
 
+	uint8_t pc_log[2] = { 0xFF, 0xFF };
+	bool pc_log_count = false;
+
 	while(running)
 	{
-		const uint16_t palette[4] = {
-			0xFFFF, 0x9CD3, 0x4228, 0x0000
-		};
 		int32_t delay;
-		
+
 		/* TODO: Get joypad input. */
 		while(SDL_PollEvent(&event))
 		{
@@ -308,18 +336,18 @@ int main(int argc, char **argv)
 				case SDL_QUIT:
 					running = 0;
 					break;
-				
+
 				case SDL_KEYDOWN:
 					switch(event.key.keysym.sym)
 					{
-						case SDLK_RETURN: gb.joypad_bits.start = 0; break;
-						case SDLK_BACKSPACE: gb.joypad_bits.select = 0; break;
-						case SDLK_z: gb.joypad_bits.a = 0; break;
-						case SDLK_x: gb.joypad_bits.b = 0; break;
-						case SDLK_UP: gb.joypad_bits.up = 0; break;
-						case SDLK_DOWN: gb.joypad_bits.down = 0; break;
-						case SDLK_LEFT: gb.joypad_bits.left = 0; break;
-						case SDLK_RIGHT: gb.joypad_bits.right = 0; break;
+						case SDLK_RETURN: gb.direct.joypad_bits.start = 0; break;
+						case SDLK_BACKSPACE: gb.direct.joypad_bits.select = 0; break;
+						case SDLK_z: gb.direct.joypad_bits.a = 0; break;
+						case SDLK_x: gb.direct.joypad_bits.b = 0; break;
+						case SDLK_UP: gb.direct.joypad_bits.up = 0; break;
+						case SDLK_DOWN: gb.direct.joypad_bits.down = 0; break;
+						case SDLK_LEFT: gb.direct.joypad_bits.left = 0; break;
+						case SDLK_RIGHT: gb.direct.joypad_bits.right = 0; break;
 						case SDLK_SPACE: fast_mode = !fast_mode; break;
 						case SDLK_d: debug_mode = !debug_mode; break;
 						default: break;
@@ -328,14 +356,14 @@ int main(int argc, char **argv)
 				case SDL_KEYUP:
 					switch(event.key.keysym.sym)
 					{
-						case SDLK_RETURN: gb.joypad_bits.start = 1; break;
-						case SDLK_BACKSPACE: gb.joypad_bits.select = 1; break;
-						case SDLK_z: gb.joypad_bits.a = 1; break;
-						case SDLK_x: gb.joypad_bits.b = 1; break;
-						case SDLK_UP: gb.joypad_bits.up = 1; break;
-						case SDLK_DOWN: gb.joypad_bits.down = 1; break;
-						case SDLK_LEFT: gb.joypad_bits.left = 1; break;
-						case SDLK_RIGHT: gb.joypad_bits.right = 1; break;
+						case SDLK_RETURN: gb.direct.joypad_bits.start = 1; break;
+						case SDLK_BACKSPACE: gb.direct.joypad_bits.select = 1; break;
+						case SDLK_z: gb.direct.joypad_bits.a = 1; break;
+						case SDLK_x: gb.direct.joypad_bits.b = 1; break;
+						case SDLK_UP: gb.direct.joypad_bits.up = 1; break;
+						case SDLK_DOWN: gb.direct.joypad_bits.down = 1; break;
+						case SDLK_LEFT: gb.direct.joypad_bits.left = 1; break;
+						case SDLK_RIGHT: gb.direct.joypad_bits.right = 1; break;
 						default: break;
 					}
 					break;
@@ -350,41 +378,45 @@ int main(int argc, char **argv)
 
 		/* Execute CPU cycles until the screen has to be redrawn. */
 		//gb_run_frame(&gb);
-
-	    gb.gb_frame = 0;
-        while(gb.gb_frame == 0)
-        {
-            const char *lcd_mode_str[4] = {
-                "HBLANK", "VBLANK", "OAM", "TRANSFER"
-            };
-            __gb_step_cpu(&gb);
-
-            if(debug_mode == 0)
-                continue;
-
-            /* Debugging */
-            printf("OP: %#04X%s  PC: %#06X  SP: %#06X  A: %#04X  HL: %#06X  ",
-                    __gb_read(&gb, gb.cpu_reg.pc),
-                    gb.gb_halt ? "(HALTED)" : "",
-                    gb.cpu_reg.pc,
-                    gb.cpu_reg.sp,
-                    gb.cpu_reg.a,
-                    gb.cpu_reg.hl);
-            printf("LCD Mode: %s, LCD Power: %s\n",
-                    lcd_mode_str[gb.lcd_mode],
-                    (gb.gb_reg.LCDC >> 7) ? "ON" : "OFF");
-        }
-
-		/* Copy frame buffer from emulator context, converting to colours
-		 * defined in the palette. */
-		for (unsigned int y = 0; y < height; y++)
+		
+		gb.gb_frame = 0;
+		while(gb.gb_frame == 0)
 		{
-			for (unsigned int x = 0; x < width; x++)
-				fb[y][x] = palette[gb.gb_fb[y][x] & 3];
+			const char *lcd_mode_str[4] = {
+				"HBLANK", "VBLANK", "OAM", "TRANSFER"
+			};
+			__gb_step_cpu(&gb);
+
+			if(debug_mode == 0)
+				continue;
+
+			/* Debugging */
+			printf("OP:%02X%s PC:%04X A:%02X BC:%04X DE:%04X SP:%04X HL:%04X ",
+					__gb_read(&gb, gb.cpu_reg.pc.reg),
+					gb.gb_halt ? "(HALTED)" : "",
+					gb.cpu_reg.pc.reg,
+					gb.cpu_reg.a,
+					gb.cpu_reg.bc.reg,
+					gb.cpu_reg.de.reg,
+					gb.cpu_reg.sp.reg,
+					gb.cpu_reg.hl.reg);
+			printf("LCD Mode: %s, LCD Power: %s ",
+					lcd_mode_str[gb.hram_io[IO_STAT] & STAT_MODE],
+					(gb.hram_io[IO_LCDC] >> 7) ? "ON" : "OFF");
+			printf("ROM%d", gb.selected_rom_bank);
+			printf("\n");
+
+			pc_log[pc_log_count] = __gb_read(&gb, gb.cpu_reg.pc.reg);
+			pc_log_count = !pc_log_count;
+			if(pc_log[0] == 0x00 && pc_log[1] == 0x00)
+			{
+				puts("NOP Slide detected.");
+				goto quit;
+			}
 		}
 
 		/* Copy frame buffer to SDL screen. */
-		SDL_UpdateTexture(texture, NULL, &fb, width * sizeof(uint16_t));
+		SDL_UpdateTexture(texture, NULL, priv.fb, width * sizeof(uint16_t));
 		SDL_RenderClear(renderer);
 		SDL_RenderCopy(renderer, texture, NULL, NULL);
 		SDL_RenderPresent(renderer);
@@ -392,13 +424,14 @@ int main(int argc, char **argv)
 		/* Use a delay that will draw the screen at a rate of 59.73 Hz. */
 		new_ticks = SDL_GetTicks();
 
-        if(fast_mode)
-            continue;
+		if(fast_mode)
+			continue;
 
 		delay = 17 - (new_ticks - old_ticks);
 		SDL_Delay(delay > 0 ? delay : 0);
 	}
 
+quit:
 	SDL_Quit();
 
 	/* Record save file. */

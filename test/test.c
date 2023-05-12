@@ -16,7 +16,7 @@ struct priv
 /**
  * Return byte from blarrg test ROM.
  */
-uint8_t gb_rom_read_cpu_instrs(struct gb_s *gb, const uint32_t addr)
+uint8_t gb_rom_read_cpu_instrs(struct gb_s *gb, const uint_fast32_t addr)
 {
 #include "cpu_instrs.h"
 	assert(addr < cpu_instrs_gb_len);
@@ -26,7 +26,7 @@ uint8_t gb_rom_read_cpu_instrs(struct gb_s *gb, const uint32_t addr)
 /**
  * Return byte from blarrg test ROM.
  */
-uint8_t gb_rom_read_instr_timing(struct gb_s *gb, const uint32_t addr)
+uint8_t gb_rom_read_instr_timing(struct gb_s *gb, const uint_fast32_t addr)
 {
 #include "instr_timing.h"
 	assert(addr < instr_timing_gb_len);
@@ -36,7 +36,7 @@ uint8_t gb_rom_read_instr_timing(struct gb_s *gb, const uint32_t addr)
 /**
  * Ignore cart RAM writes, since the test doesn't require it.
  */
-void gb_cart_ram_write(struct gb_s *gb, const uint32_t addr, const uint8_t val)
+void gb_cart_ram_write(struct gb_s *gb, const uint_fast32_t addr, const uint8_t val)
 {
 	return;
 }
@@ -44,7 +44,7 @@ void gb_cart_ram_write(struct gb_s *gb, const uint32_t addr, const uint8_t val)
 /**
  * Ignore cart RAM reads, since the test doesn't require it.
  */
-uint8_t gb_cart_ram_read(struct gb_s *gb, const uint32_t addr)
+uint8_t gb_cart_ram_read(struct gb_s *gb, const uint_fast32_t addr)
 {
 	return 0xFF;
 }
