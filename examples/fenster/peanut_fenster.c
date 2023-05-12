@@ -1,6 +1,7 @@
-#define ENABLE_LCD 1
-
+#define WIN32_LEAN_AND_MEAN
 #include "fenster.h"
+
+#define ENABLE_LCD 1
 #include "../../peanut_gb.h"
 
 #include <errno.h>
@@ -324,7 +325,12 @@ int main(int argc, char *argv[])
 	}
 
 	if(fenster_open(&priv.f) != 0)
-		goto out;
+	{
+		fprintf(stderr, "Error in fenster_open\n");
+		goto fenster_error;
+	}
+
+	puts("Fenster context created.");
 
 	tim_old = fenster_time();
 	while(fenster_loop(&priv.f) == 0)
@@ -343,12 +349,16 @@ int main(int argc, char *argv[])
 	}
 
 	fenster_close(&priv.f);
+	puts("Thank you for playing this Peanut-GB example with Fenster.");
+
+	ret = EXIT_SUCCESS;
+
+fenster_error:
 	free(priv.rom);
 	free(priv.cart_ram);
 	if(argc == 2)
 		free(save_file_name);
 
-	ret = EXIT_SUCCESS;
 out:
 	return ret;
 }
