@@ -337,6 +337,19 @@ int main(int argc, char *argv[])
 	{
 		int64_t delay;
 
+		gb.direct.joypad_bits.a      = !priv.f.keys['Z'];
+		gb.direct.joypad_bits.b      = !priv.f.keys['X'];
+		gb.direct.joypad_bits.select = !priv.f.keys[ 8];
+		gb.direct.joypad_bits.start  = !priv.f.keys[10];
+		gb.direct.joypad_bits.right  = !priv.f.keys[19];
+		gb.direct.joypad_bits.left   = !priv.f.keys[20];
+		gb.direct.joypad_bits.up     = !priv.f.keys[17];
+		gb.direct.joypad_bits.down   = !priv.f.keys[18];
+
+		/* ESC key quits program. */
+		if(priv.f.keys[27])
+			break;
+
 		/* Execute CPU cycles until the screen has to be redrawn. */
 		gb_run_frame(&gb);
 
