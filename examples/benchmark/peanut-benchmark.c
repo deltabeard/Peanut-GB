@@ -118,7 +118,7 @@ static void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16
  * Draws scanline into framebuffer.
  */
 static void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
-		const uint_least8_t line)
+		const uint_fast8_t line)
 {
 	struct priv_t *priv = gb->direct.priv;
 	const uint16_t palette[] = { 0x7FFF, 0x5294, 0x294A, 0x0000 };
