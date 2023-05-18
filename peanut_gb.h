@@ -521,9 +521,9 @@ struct gb_s
 	/**
 	 * Notify front-end of error.
 	 *
-	 * \param gb_s			emulator context
+	 * \param gb_s		emulator context
 	 * \param gb_error_e	error code
-	 * \param addr			address of where error occurred
+	 * \param addr		address of where error occurred
 	 */
 	void (*gb_error)(struct gb_s*, const enum gb_error_e, const uint16_t addr);
 
