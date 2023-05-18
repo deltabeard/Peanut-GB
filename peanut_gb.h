@@ -547,10 +547,10 @@ struct gb_s
 	int8_t mbc;
 	/* Whether the MBC has internal RAM. */
 	uint8_t cart_ram;
-	/* Number of ROM banks in cartridge. */
-	uint16_t num_rom_banks_mask;
 	/* Number of RAM banks in cartridge. Ignore for MBC2. */
 	uint8_t num_ram_banks;
+	/* Number of ROM banks in cartridge. */
+	uint16_t num_rom_banks_mask;
 
 	uint16_t selected_rom_bank;
 	/* WRAM and VRAM bank selection not available. */
@@ -572,14 +572,42 @@ struct gb_s
 	};
 
 	struct cpu_registers_s cpu_reg;
-	//struct gb_registers_s gb_reg;
 	struct count_s counter;
 
-	/* TODO: Allow implementation to allocate WRAM, VRAM and Frame Buffer. */
-	uint8_t wram[WRAM_SIZE];
-	uint8_t vram[VRAM_SIZE];
-	uint8_t oam[OAM_SIZE];
-	uint8_t hram_io[HRAM_IO_SIZE];
+	/**
+	 * Variables that may be modified directly by the front-end.
+	 * This method seems to be easier and possibly less overhead than
+	 * calling a function to modify these variables each time.
+	 *
+	 * None of this is thread-safe.
+	 */
+	struct
+	{
+		/* Set to enable interlacing. Interlacing will start immediately
+		 * (at the next line drawing).
+		 */
+		uint8_t interlace : 1;
+		uint8_t frame_skip : 1;
+
+		union
+		{
+			struct
+			{
+				uint8_t a : 1;
+				uint8_t b : 1;
+				uint8_t select : 1;
+				uint8_t start : 1;
+				uint8_t right : 1;
+				uint8_t left : 1;
+				uint8_t up : 1;
+				uint8_t down : 1;
+			} joypad_bits;
+			uint8_t joypad;
+		};
+
+		/* Implementation defined data. Set to NULL if not required. */
+		void* priv;
+	} direct;
 
 	struct
 	{
@@ -602,9 +630,9 @@ struct gb_s
 		 * \param line		Line to draw pixels on. This is
 		 * guaranteed to be between 0-144 inclusive.
 		 */
-		void (*lcd_draw_line)(struct gb_s *gb,
-				const uint8_t *pixels,
-				const uint_fast8_t line);
+		void (*lcd_draw_line)(struct gb_s* gb,
+			const uint8_t* pixels,
+			const uint_fast8_t line);
 
 		/* Palettes */
 		uint8_t bg_palette[4];
@@ -618,40 +646,11 @@ struct gb_s
 		uint8_t interlace_count : 1;
 	} display;
 
-	/**
-	 * Variables that may be modified directly by the front-end.
-	 * This method seems to be easier and possibly less overhead than
-	 * calling a function to modify these variables each time.
-	 *
-	 * None of this is thread-safe.
-	 */
-	struct
-	{
-		/* Set to enable interlacing. Interlacing will start immediately
-		 * (at the next line drawing).
-		 */
-		uint8_t interlace : 1;
-		uint8_t frame_skip : 1;
-
-		union
-		{
-			struct
-			{
-				uint8_t a	: 1;
-				uint8_t b	: 1;
-				uint8_t select	: 1;
-				uint8_t start	: 1;
-				uint8_t right	: 1;
-				uint8_t left	: 1;
-				uint8_t up	: 1;
-				uint8_t down	: 1;
-			} joypad_bits;
-			uint8_t joypad;
-		};
-
-		/* Implementation defined data. Set to NULL if not required. */
-		void *priv;
-	} direct;
+	/* TODO: Allow implementation to allocate WRAM, VRAM and Frame Buffer. */
+	uint8_t wram[WRAM_SIZE];
+	uint8_t vram[VRAM_SIZE];
+	uint8_t oam[OAM_SIZE];
+	uint8_t hram_io[HRAM_IO_SIZE];
 };
 
 #ifndef PEANUT_GB_HEADER_ONLY
