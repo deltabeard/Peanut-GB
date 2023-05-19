@@ -39,7 +39,7 @@ struct priv_t
  */
 static uint8_t gb_rom_read(struct gb_s *gb, const uint_fast32_t addr)
 {
-	const struct priv_t * const p = gb->direct.priv;
+	const struct priv_t * const p = gb->priv;
 	return p->rom[addr];
 }
 
@@ -48,7 +48,7 @@ static uint8_t gb_rom_read(struct gb_s *gb, const uint_fast32_t addr)
  */
 static uint8_t gb_cart_ram_read(struct gb_s *gb, const uint_fast32_t addr)
 {
-	const struct priv_t * const p = gb->direct.priv;
+	const struct priv_t * const p = gb->priv;
 	return p->cart_ram[addr];
 }
 
@@ -58,7 +58,7 @@ static uint8_t gb_cart_ram_read(struct gb_s *gb, const uint_fast32_t addr)
 static void gb_cart_ram_write(struct gb_s *gb, const uint_fast32_t addr,
 		const uint8_t val)
 {
-	const struct priv_t * const p = gb->direct.priv;
+	const struct priv_t * const p = gb->priv;
 	p->cart_ram[addr] = val;
 }
 
@@ -102,7 +102,7 @@ static void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16
 		"INVALID WRITE",
 		"HALT FOREVER"
 	};
-	struct priv_t *priv = gb->direct.priv;
+	struct priv_t *priv = gb->priv;
 
 	fprintf(stderr, "Error %d occurred: %s at %04X\n. Exiting.\n",
 			gb_err, gb_err_str[gb_err], addr);
@@ -120,7 +120,7 @@ static void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16
 static void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
 		const uint_fast8_t line)
 {
-	struct priv_t *priv = gb->direct.priv;
+	struct priv_t *priv = gb->priv;
 	const uint16_t palette[] = { 0x7FFF, 0x5294, 0x294A, 0x0000 };
 
 	for (unsigned int x = 0; x < LCD_WIDTH; x++)

@@ -527,6 +527,29 @@ struct gb_s
 	 */
 	void (*gb_error)(struct gb_s*, const enum gb_error_e, const uint16_t addr);
 
+	/**
+	 * Draw line on screen.
+	 *
+	 * \param gb_s		emulator context
+	 * \param pixels	The 160 pixels to draw.
+	 * 			Bits 1-0 are the colour to draw.
+	 * 			Bits 5-4 are the palette, where:
+	 * 				OBJ0 = 0b00,
+	 * 				OBJ1 = 0b01,
+	 * 				BG = 0b10
+	 * 			Other bits are undefined.
+	 * 			Bits 5-4 are only required by front-ends
+	 * 			which want to use a different colour for
+	 * 			different object palettes. This is what
+	 * 			the Game Boy Color (CGB) does to DMG
+	 * 			games.
+	 * \param line		Line to draw pixels on. This is
+	 * guaranteed to be between 0-144 inclusive.
+	 */
+	void (*lcd_draw_line)(struct gb_s* gb,
+		const uint8_t* pixels,
+		const uint_fast8_t line);
+
 	/* Transmit one byte and return the received byte. */
 	void (*gb_serial_tx)(struct gb_s*, const uint8_t tx);
 	enum gb_serial_rx_ret_e (*gb_serial_rx)(struct gb_s*, uint8_t* rx);
@@ -540,6 +563,16 @@ struct gb_s
 		uint8_t gb_ime		: 1;
 		uint8_t gb_frame	: 1; /* New frame drawn. */
 		uint8_t lcd_blank	: 1;
+
+		/* Set to enable interlacing. Interlacing will start immediately
+		 * (at the next line drawing).
+		 */
+		uint8_t interlace : 1;
+		uint8_t frame_skip : 1;
+
+		/* Only support 30fps frame skip. */
+		uint8_t frame_skip_count : 1;
+		uint8_t interlace_count : 1;
 	};
 
 	/* Cartridge information:
@@ -553,11 +586,7 @@ struct gb_s
 	uint16_t num_rom_banks_mask;
 
 	uint16_t selected_rom_bank;
-	/* WRAM and VRAM bank selection not available. */
-	uint8_t cart_ram_bank;
-	uint8_t enable_cart_ram;
-	/* Cartridge ROM/RAM mode select. */
-	uint8_t cart_mode_select;
+
 	union
 	{
 		struct
@@ -571,6 +600,12 @@ struct gb_s
 		uint8_t cart_rtc[5];
 	};
 
+	/* WRAM and VRAM bank selection not available. */
+	uint8_t cart_ram_bank;
+	uint8_t enable_cart_ram;
+	/* Cartridge ROM/RAM mode select. */
+	uint8_t cart_mode_select;
+
 	struct cpu_registers_s cpu_reg;
 	struct count_s counter;
 
@@ -581,14 +616,9 @@ struct gb_s
 	 *
 	 * None of this is thread-safe.
 	 */
-	struct
-	{
-		/* Set to enable interlacing. Interlacing will start immediately
-		 * (at the next line drawing).
-		 */
-		uint8_t interlace : 1;
-		uint8_t frame_skip : 1;
-
+		/* Palettes */
+		uint8_t sp_palette[8];
+		uint8_t bg_palette[4];
 		union
 		{
 			struct
@@ -605,52 +635,17 @@ struct gb_s
 			uint8_t joypad;
 		};
 
-		/* Implementation defined data. Set to NULL if not required. */
-		void* priv;
-	} direct;
-
-	struct
-	{
-		/**
-		 * Draw line on screen.
-		 *
-		 * \param gb_s		emulator context
-		 * \param pixels	The 160 pixels to draw.
-		 * 			Bits 1-0 are the colour to draw.
-		 * 			Bits 5-4 are the palette, where:
-		 * 				OBJ0 = 0b00,
-		 * 				OBJ1 = 0b01,
-		 * 				BG = 0b10
-		 * 			Other bits are undefined.
-		 * 			Bits 5-4 are only required by front-ends
-		 * 			which want to use a different colour for
-		 * 			different object palettes. This is what
-		 * 			the Game Boy Color (CGB) does to DMG
-		 * 			games.
-		 * \param line		Line to draw pixels on. This is
-		 * guaranteed to be between 0-144 inclusive.
-		 */
-		void (*lcd_draw_line)(struct gb_s* gb,
-			const uint8_t* pixels,
-			const uint_fast8_t line);
-
-		/* Palettes */
-		uint8_t bg_palette[4];
-		uint8_t sp_palette[8];
-
 		uint8_t window_clear;
 		uint8_t WY;
-
-		/* Only support 30fps frame skip. */
-		uint8_t frame_skip_count : 1;
-		uint8_t interlace_count : 1;
-	} display;
 
 	/* TODO: Allow implementation to allocate WRAM, VRAM and Frame Buffer. */
 	uint8_t wram[WRAM_SIZE];
 	uint8_t vram[VRAM_SIZE];
 	uint8_t oam[OAM_SIZE];
 	uint8_t hram_io[HRAM_IO_SIZE];
+
+	/* Implementation defined data. Set to NULL if not required. */
+	void* priv;
 };
 
 #ifndef PEANUT_GB_HEADER_ONLY
@@ -973,10 +968,10 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 
 			/* Direction keys selected */
 			if((gb->hram_io[IO_JOYP] & 0b010000) == 0)
-				gb->hram_io[IO_JOYP] |= (gb->direct.joypad >> 4);
+				gb->hram_io[IO_JOYP] |= (gb->joypad >> 4);
 			/* Button keys selected */
 			else
-				gb->hram_io[IO_JOYP] |= (gb->direct.joypad & 0x0F);
+				gb->hram_io[IO_JOYP] |= (gb->joypad & 0x0F);
 
 			return;
 
@@ -1079,26 +1074,26 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 		/* DMG Palette Registers */
 		case 0x47:
 			gb->hram_io[IO_BGP] = val;
-			gb->display.bg_palette[0] = (gb->hram_io[IO_BGP] & 0x03);
-			gb->display.bg_palette[1] = (gb->hram_io[IO_BGP] >> 2) & 0x03;
-			gb->display.bg_palette[2] = (gb->hram_io[IO_BGP] >> 4) & 0x03;
-			gb->display.bg_palette[3] = (gb->hram_io[IO_BGP] >> 6) & 0x03;
+			gb->bg_palette[0] = (gb->hram_io[IO_BGP] & 0x03);
+			gb->bg_palette[1] = (gb->hram_io[IO_BGP] >> 2) & 0x03;
+			gb->bg_palette[2] = (gb->hram_io[IO_BGP] >> 4) & 0x03;
+			gb->bg_palette[3] = (gb->hram_io[IO_BGP] >> 6) & 0x03;
 			return;
 
 		case 0x48:
 			gb->hram_io[IO_OBP0] = val;
-			gb->display.sp_palette[0] = (gb->hram_io[IO_OBP0] & 0x03);
-			gb->display.sp_palette[1] = (gb->hram_io[IO_OBP0] >> 2) & 0x03;
-			gb->display.sp_palette[2] = (gb->hram_io[IO_OBP0] >> 4) & 0x03;
-			gb->display.sp_palette[3] = (gb->hram_io[IO_OBP0] >> 6) & 0x03;
+			gb->sp_palette[0] = (gb->hram_io[IO_OBP0] & 0x03);
+			gb->sp_palette[1] = (gb->hram_io[IO_OBP0] >> 2) & 0x03;
+			gb->sp_palette[2] = (gb->hram_io[IO_OBP0] >> 4) & 0x03;
+			gb->sp_palette[3] = (gb->hram_io[IO_OBP0] >> 6) & 0x03;
 			return;
 
 		case 0x49:
 			gb->hram_io[IO_OBP1] = val;
-			gb->display.sp_palette[4] = (gb->hram_io[IO_OBP1] & 0x03);
-			gb->display.sp_palette[5] = (gb->hram_io[IO_OBP1] >> 2) & 0x03;
-			gb->display.sp_palette[6] = (gb->hram_io[IO_OBP1] >> 4) & 0x03;
-			gb->display.sp_palette[7] = (gb->hram_io[IO_OBP1] >> 6) & 0x03;
+			gb->sp_palette[4] = (gb->hram_io[IO_OBP1] & 0x03);
+			gb->sp_palette[5] = (gb->hram_io[IO_OBP1] >> 2) & 0x03;
+			gb->sp_palette[6] = (gb->hram_io[IO_OBP1] >> 4) & 0x03;
+			gb->sp_palette[7] = (gb->hram_io[IO_OBP1] >> 6) & 0x03;
 			return;
 
 		/* Window Position Registers */
@@ -1347,26 +1342,26 @@ void __gb_draw_line(struct gb_s *gb)
 	uint8_t pixels[160] = {0};
 
 	/* If LCD not initialised by front-end, don't render anything. */
-	if(gb->display.lcd_draw_line == NULL)
+	if(gb->lcd_draw_line == NULL)
 		return;
 
-	if(gb->direct.frame_skip && !gb->display.frame_skip_count)
+	if(gb->frame_skip && !gb->frame_skip_count)
 		return;
 
 	/* If interlaced mode is activated, check if we need to draw the current
 	 * line. */
-	if(gb->direct.interlace)
+	if(gb->interlace)
 	{
-		if((gb->display.interlace_count == 0
+		if((gb->interlace_count == 0
 				&& (gb->hram_io[IO_LY] & 1) == 0)
-				|| (gb->display.interlace_count == 1
+				|| (gb->interlace_count == 1
 				    && (gb->hram_io[IO_LY] & 1) == 1))
 		{
 			/* Compensate for missing window draw if required. */
 			if(gb->hram_io[IO_LCDC] & LCDC_WINDOW_ENABLE
-					&& gb->hram_io[IO_LY] >= gb->display.WY
+					&& gb->hram_io[IO_LY] >= gb->WY
 					&& gb->hram_io[IO_WX] <= 166)
-				gb->display.window_clear++;
+				gb->window_clear++;
 
 			return;
 		}
@@ -1438,7 +1433,7 @@ void __gb_draw_line(struct gb_s *gb)
 
 			/* copy background */
 			uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
-			pixels[disp_x] = gb->display.bg_palette[c];
+			pixels[disp_x] = gb->bg_palette[c];
 			pixels[disp_x] |= LCD_PALETTE_BG;
 			t1 = t1 >> 1;
 			t2 = t2 >> 1;
@@ -1448,19 +1443,19 @@ void __gb_draw_line(struct gb_s *gb)
 
 	/* draw window */
 	if(gb->hram_io[IO_LCDC] & LCDC_WINDOW_ENABLE
-			&& gb->hram_io[IO_LY] >= gb->display.WY
+			&& gb->hram_io[IO_LY] >= gb->WY
 			&& gb->hram_io[IO_WX] <= 166)
 	{
 		/* Calculate Window Map Address. */
 		uint16_t win_line = (gb->hram_io[IO_LCDC] & LCDC_WINDOW_MAP) ?
 				    VRAM_BMAP_2 : VRAM_BMAP_1;
-		win_line += (gb->display.window_clear >> 3) * 0x20;
+		win_line += (gb->window_clear >> 3) * 0x20;
 
 		uint8_t disp_x = LCD_WIDTH - 1;
 		uint8_t win_x = disp_x - gb->hram_io[IO_WX] + 7;
 
 		// look up tile
-		uint8_t py = gb->display.window_clear & 0x07;
+		uint8_t py = gb->window_clear & 0x07;
 		uint8_t px = 7 - (win_x & 0x07);
 		uint8_t idx = gb->vram[win_line + (win_x >> 3)];
 
@@ -1501,14 +1496,14 @@ void __gb_draw_line(struct gb_s *gb)
 
 			// copy window
 			uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
-			pixels[disp_x] = gb->display.bg_palette[c];
+			pixels[disp_x] = gb->bg_palette[c];
 			pixels[disp_x] |= LCD_PALETTE_BG;
 			t1 = t1 >> 1;
 			t2 = t2 >> 1;
 			px++;
 		}
 
-		gb->display.window_clear++; // advance window line
+		gb->window_clear++; // advance window line
 	}
 
 	// draw sprites
@@ -1627,12 +1622,12 @@ void __gb_draw_line(struct gb_s *gb)
 				uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
 				// check transparency / sprite overlap / background overlap
 
-				if(c && !(OF & OBJ_PRIORITY && !((pixels[disp_x] & 0x3) == gb->display.bg_palette[0])))
+				if(c && !(OF & OBJ_PRIORITY && !((pixels[disp_x] & 0x3) == gb->bg_palette[0])))
 				{
 					/* Set pixel colour. */
 					pixels[disp_x] = (OF & OBJ_PALETTE)
-						? gb->display.sp_palette[c + 4]
-						: gb->display.sp_palette[c];
+						? gb->sp_palette[c + 4]
+						: gb->sp_palette[c];
 					/* Set pixel palette (OBJ0 or OBJ1). */
 					pixels[disp_x] |= (OF & OBJ_PALETTE);
 				}
@@ -1643,7 +1638,7 @@ void __gb_draw_line(struct gb_s *gb)
 		}
 	}
 
-	gb->display.lcd_draw_line(gb, pixels, gb->hram_io[IO_LY]);
+	gb->lcd_draw_line(gb, pixels, gb->hram_io[IO_LY]);
 }
 #endif
 
@@ -3314,21 +3309,21 @@ void __gb_step_cpu(struct gb_s *gb)
 #if ENABLE_LCD
 				/* If frame skip is activated, check if we need to draw
 				 * the frame or skip it. */
-				if(gb->direct.frame_skip)
+				if(gb->frame_skip)
 				{
-					gb->display.frame_skip_count =
-						!gb->display.frame_skip_count;
+					gb->frame_skip_count =
+						!gb->frame_skip_count;
 				}
 
 				/* If interlaced is activated, change which lines get
 				 * updated. Also, only update lines on frames that are
 				 * actually drawn when frame skip is enabled. */
-				if(gb->direct.interlace &&
-						(!gb->direct.frame_skip ||
-						 gb->display.frame_skip_count))
+				if(gb->interlace &&
+						(!gb->frame_skip ||
+						 gb->frame_skip_count))
 				{
-					gb->display.interlace_count =
-						!gb->display.interlace_count;
+					gb->interlace_count =
+						!gb->interlace_count;
 				}
 #endif
 			}
@@ -3338,8 +3333,8 @@ void __gb_step_cpu(struct gb_s *gb)
 				if(gb->hram_io[IO_LY] == 0)
 				{
 					/* Clear Screen */
-					gb->display.WY = gb->hram_io[IO_WY];
-					gb->display.window_clear = 0;
+					gb->WY = gb->hram_io[IO_WY];
+					gb->window_clear = 0;
 				}
 
 				gb->hram_io[IO_STAT] =
@@ -3488,7 +3483,7 @@ void gb_reset(struct gb_s *gb)
 	gb->counter.tima_count = 0;
 	gb->counter.serial_count = 0;
 
-	gb->direct.joypad = 0xFF;
+	gb->joypad = 0xFF;
 	gb->hram_io[IO_JOYP] = 0xCF;
 	gb->hram_io[IO_SB  ] = 0x00;
 	gb->hram_io[IO_SC  ] = 0x7E;
@@ -3553,7 +3548,7 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	gb->gb_cart_ram_read = gb_cart_ram_read;
 	gb->gb_cart_ram_write = gb_cart_ram_write;
 	gb->gb_error = gb_error;
-	gb->direct.priv = priv;
+	gb->priv = priv;
 
 	/* Initialise serial transfer function to NULL. If the front-end does
 	 * not provide serial support, Peanut-GB will emulate no cable connected
@@ -3592,7 +3587,7 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	 * ignored for MBC2. */
 
 	gb->lcd_blank = 0;
-	gb->display.lcd_draw_line = NULL;
+	gb->lcd_draw_line = NULL;
 
 	gb_reset(gb);
 
@@ -3629,15 +3624,15 @@ void gb_init_lcd(struct gb_s *gb,
 			const uint8_t *pixels,
 			const uint_fast8_t line))
 {
-	gb->display.lcd_draw_line = lcd_draw_line;
+	gb->lcd_draw_line = lcd_draw_line;
 
-	gb->direct.interlace = 0;
-	gb->display.interlace_count = 0;
-	gb->direct.frame_skip = 0;
-	gb->display.frame_skip_count = 0;
+	gb->interlace = 0;
+	gb->interlace_count = 0;
+	gb->frame_skip = 0;
+	gb->frame_skip_count = 0;
 
-	gb->display.window_clear = 0;
-	gb->display.WY = 0;
+	gb->window_clear = 0;
+	gb->WY = 0;
 
 	return;
 }
