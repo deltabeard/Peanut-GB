@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>Peanut-GB Web</title>
+	  <script>
+function draw() {
+	const canvas = document.getElementById("canvas");
+	if (canvas.getContext) {
+		const ctx = canvas.getContext("2d", { alpha: false });
+
+		ctx.fillStyle = "green";
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
+	}
+}
+	</script>
+	<style>
+canvas {
+	border: 0px solid black;
+}
+    </style>
+  </head>
+  <body onload="draw();">
+    <p>This is my page</p>
+	<canvas id="canvas" width="160" height="144">Canvas not supported.</canvas>
+  </body>
+</html>
