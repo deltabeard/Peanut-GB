@@ -1303,12 +1303,10 @@ int main(int argc, char **argv)
 				gb_tick_rtc(&gb);
 
 				/* If 60 seconds has passed, record save file.
-				 * We do this because the external audio library
+				 * We do this because the blarrg audio library
 				 * used contains asserts that will abort the
 				 * program without save.
-				 * TODO: Remove use of assert in audio library
-				 * in release build. */
-				/* TODO: Remove all workarounds due to faulty
+				 * TODO: Remove all workarounds due to faulty
 				 * external libraries. */
 				--save_timer;
 
