@@ -930,7 +930,7 @@ int main(int argc, char **argv)
 
 	SDL_SetWindowMinimumSize(window, LCD_WIDTH, LCD_HEIGHT);
 
-	renderer = SDL_CreateRenderer(window, -1, 0);
+	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
 	if(renderer == NULL)
 	{
 		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
