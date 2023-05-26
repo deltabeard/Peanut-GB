@@ -728,11 +728,13 @@ uint8_t __gb_read(struct gb_s *gb, uint16_t addr)
 
 	case 0xA:
 	case 0xB:
-		if(gb->cart_ram && gb->enable_cart_ram)
+		if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
 		{
-			if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
-				return gb->cart_rtc[gb->cart_ram_bank - 0x08];
-			else if(gb->mbc == 2)
+			return gb->cart_rtc[gb->cart_ram_bank - 0x08];
+		}
+		else if(gb->cart_ram && gb->enable_cart_ram)
+		{
+			if(gb->mbc == 2)
 			{
 				/* Only 9 bits are available in address. */
 				addr &= 0x1FF;
@@ -892,12 +894,14 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 
 	case 0xA:
 	case 0xB:
-		/* Do not write to RAM if unavailable or disabled. */
-		if(gb->cart_ram && gb->enable_cart_ram)
+		if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
 		{
-			if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
-				gb->cart_rtc[gb->cart_ram_bank - 0x08] = val;
-			else if(gb->mbc == 2)
+			gb->cart_rtc[gb->cart_ram_bank - 0x08] = val;
+		}
+		/* Do not write to RAM if unavailable or disabled. */
+		else if(gb->cart_ram && gb->enable_cart_ram)
+		{
+			if(gb->mbc == 2)
 			{
 				/* Only 9 bits are available in address. */
 				addr &= 0x1FF;
