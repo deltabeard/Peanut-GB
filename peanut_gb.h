@@ -483,6 +483,19 @@ enum gb_serial_rx_ret_e
 	GB_SERIAL_RX_NO_CONNECTION = 1
 };
 
+union cart_rtc
+{
+	struct
+	{
+		uint8_t sec;
+		uint8_t min;
+		uint8_t hour;
+		uint8_t yday;
+		uint8_t high;
+	} reg;
+	uint8_t bytes[5];
+};
+
 /**
  * Emulator context.
  *
@@ -559,18 +572,8 @@ struct gb_s
 	uint8_t enable_cart_ram;
 	/* Cartridge ROM/RAM mode select. */
 	uint8_t cart_mode_select;
-	union
-	{
-		struct
-		{
-			uint8_t sec;
-			uint8_t min;
-			uint8_t hour;
-			uint8_t yday;
-			uint8_t high;
-		} rtc_bits;
-		uint8_t cart_rtc[5];
-	};
+
+	union cart_rtc rtc_latched, rtc_real;
 
 	struct cpu_registers_s cpu_reg;
 	//struct gb_registers_s gb_reg;
@@ -731,7 +734,7 @@ uint8_t __gb_read(struct gb_s *gb, uint16_t addr)
 	case 0xB:
 		if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
 		{
-			return gb->cart_rtc[gb->cart_ram_bank - 0x08];
+			return gb->rtc_latched.bytes[gb->cart_ram_bank - 0x08];
 		}
 		else if(gb->cart_ram && gb->enable_cart_ram)
 		{
@@ -885,7 +888,11 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 
 	case 0x6:
 	case 0x7:
-		gb->cart_mode_select = (val & 1);
+		val &= 1;
+		if(gb->mbc == 3 && val && gb->cart_mode_select == 0)
+			memcpy(&gb->rtc_latched, &gb->rtc_real, sizeof(gb->rtc_latched));
+
+		gb->cart_mode_select = val;
 		return;
 
 	case 0x8:
@@ -897,7 +904,7 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 	case 0xB:
 		if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
 		{
-			gb->cart_rtc[gb->cart_ram_bank - 0x08] = val;
+			gb->rtc_latched.bytes[gb->cart_ram_bank - 0x08] = val;
 		}
 		/* Do not write to RAM if unavailable or disabled. */
 		else if(gb->cart_ram && gb->enable_cart_ram)
@@ -3674,28 +3681,28 @@ void gb_set_bootrom(struct gb_s *gb,
 void gb_tick_rtc(struct gb_s *gb)
 {
 	/* is timer running? */
-	if((gb->cart_rtc[4] & 0x40) == 0)
+	if((gb->rtc_latched.bytes[4] & 0x40) == 0)
 	{
-		if(++gb->rtc_bits.sec == 60)
+		if(++gb->rtc_real.reg.sec == 60)
 		{
-			gb->rtc_bits.sec = 0;
+			gb->rtc_real.reg.sec = 0;
 
-			if(++gb->rtc_bits.min == 60)
+			if(++gb->rtc_real.reg.min == 60)
 			{
-				gb->rtc_bits.min = 0;
+				gb->rtc_real.reg.min = 0;
 
-				if(++gb->rtc_bits.hour == 24)
+				if(++gb->rtc_real.reg.hour == 24)
 				{
-					gb->rtc_bits.hour = 0;
+					gb->rtc_real.reg.hour = 0;
 
-					if(++gb->rtc_bits.yday == 0)
+					if(++gb->rtc_real.reg.yday == 0)
 					{
-						if(gb->rtc_bits.high & 1)  /* Bit 8 of days*/
+						if(gb->rtc_real.reg.high & 1)  /* Bit 8 of days*/
 						{
-							gb->rtc_bits.high |= 0x80; /* Overflow bit */
+							gb->rtc_real.reg.high |= 0x80; /* Overflow bit */
 						}
 
-						gb->rtc_bits.high ^= 1;
+						gb->rtc_real.reg.high ^= 1;
 					}
 				}
 			}
@@ -3705,11 +3712,11 @@ void gb_tick_rtc(struct gb_s *gb)
 
 void gb_set_rtc(struct gb_s *gb, const struct tm * const time)
 {
-	gb->cart_rtc[0] = time->tm_sec;
-	gb->cart_rtc[1] = time->tm_min;
-	gb->cart_rtc[2] = time->tm_hour;
-	gb->cart_rtc[3] = time->tm_yday & 0xFF; /* Low 8 bits of day counter. */
-	gb->cart_rtc[4] = time->tm_yday >> 8; /* High 1 bit of day counter. */
+	gb->rtc_real.bytes[0] = time->tm_sec;
+	gb->rtc_real.bytes[1] = time->tm_min;
+	gb->rtc_real.bytes[2] = time->tm_hour;
+	gb->rtc_real.bytes[3] = time->tm_yday & 0xFF; /* Low 8 bits of day counter. */
+	gb->rtc_real.bytes[4] = time->tm_yday >> 8; /* High 1 bit of day counter. */
 }
 #endif // PEANUT_GB_HEADER_ONLY
 
