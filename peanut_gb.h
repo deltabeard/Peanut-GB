@@ -894,7 +894,7 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 	case 0x7:
 		val &= 1;
 		if(gb->mbc == 3 && val && gb->cart_mode_select == 0)
-			memcpy(&gb->rtc_latched, &gb->rtc_real, sizeof(gb->rtc_latched));
+			memcpy(&gb->rtc_latched.bytes, &gb->rtc_real.bytes, sizeof(gb->rtc_latched.bytes));
 
 		gb->cart_mode_select = val;
 		return;
@@ -908,7 +908,7 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 	case 0xB:
 		if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
 		{
-			gb->rtc_latched.bytes[gb->cart_ram_bank - 0x08] = val;
+			gb->rtc_real.bytes[gb->cart_ram_bank - 0x08] = val;
 		}
 		/* Do not write to RAM if unavailable or disabled. */
 		else if(gb->cart_ram && gb->enable_cart_ram)
