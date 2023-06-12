@@ -1530,9 +1530,9 @@ void __gb_draw_line(struct gb_s *gb)
 	// draw sprites
 	if(gb->hram_io[IO_LCDC] & LCDC_OBJ_ENABLE)
 	{
+		uint8_t sprite_number;
 #if PEANUT_GB_HIGH_LCD_ACCURACY
 		uint8_t number_of_sprites = 0;
-		uint8_t sprite_number;
 
 		struct sprite_data sprites_to_render[NUM_SPRITES];
 
