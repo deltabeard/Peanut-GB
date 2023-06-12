@@ -237,6 +237,17 @@
 # endif
 #endif /* !defined(PGB_UNREACHABLE) */
 
+#if __has_builtin(__builtin_expect_with_probability)
+# define PGB_EXPECT_PROBABILITY(expr, c, probability) \
+	__builtin_expect_with_probability(!!(expr), c, probability)
+# define PGB_LIKELY(expr)   __builtin_expect(!!(expr), 1)
+# define PGB_UNLIKELY(expr) __builtin_expect(!!(expr), 0)
+#else
+# define PGB_EXPECT_PROBABILITY(expr, c, probability) (!!(expr))
+# define PGB_LIKELY(expr)   (!!(expr))
+# define PGB_UNLIKELY(expr) (!!(expr))
+#endif /* __builtin_expect_with_probability */
+
 #if PEANUT_GB_USE_INTRINSICS
 /* If using MSVC, only enable intrinsics for x86 platforms*/
 # if defined(_MSC_VER) && __has_include("intrin.h") && \
@@ -1357,15 +1368,15 @@ void __gb_draw_line(struct gb_s *gb)
 	uint8_t pixels[160] = {0};
 
 	/* If LCD not initialised by front-end, don't render anything. */
-	if(gb->display.lcd_draw_line == NULL)
+	if(PGB_UNLIKELY(gb->display.lcd_draw_line == NULL))
 		return;
 
-	if(gb->direct.frame_skip && !gb->display.frame_skip_count)
+	if(PGB_UNLIKELY(gb->direct.frame_skip && !gb->display.frame_skip_count))
 		return;
 
 	/* If interlaced mode is activated, check if we need to draw the current
 	 * line. */
-	if(gb->direct.interlace)
+	if(PGB_UNLIKELY(gb->direct.interlace))
 	{
 		if((gb->display.interlace_count == 0
 				&& (gb->hram_io[IO_LY] & 1) == 0)
@@ -1383,7 +1394,7 @@ void __gb_draw_line(struct gb_s *gb)
 	}
 
 	/* If background is enabled, draw it. */
-	if(gb->hram_io[IO_LCDC] & LCDC_BG_ENABLE)
+	if(PGB_LIKELY(gb->hram_io[IO_LCDC] & LCDC_BG_ENABLE))
 	{
 		uint8_t bg_y, disp_x, bg_x, idx, py, px, t1, t2;
 		uint16_t bg_map, tile;
@@ -1468,8 +1479,8 @@ void __gb_draw_line(struct gb_s *gb)
 		uint8_t disp_x, win_x, py, px, idx, t1, t2, end;
 
 		/* Calculate Window Map Address. */
-		win_line = (gb->hram_io[IO_LCDC] & LCDC_WINDOW_MAP) ?
-				    VRAM_BMAP_2 : VRAM_BMAP_1;
+		win_line = !(gb->hram_io[IO_LCDC] & LCDC_WINDOW_MAP) ?
+				    VRAM_BMAP_1 : VRAM_BMAP_2;
 		win_line += (gb->display.window_clear >> 3) * 0x20;
 
 		disp_x = LCD_WIDTH - 1;
@@ -1480,7 +1491,7 @@ void __gb_draw_line(struct gb_s *gb)
 		px = 7 - (win_x & 0x07);
 		idx = gb->vram[win_line + (win_x >> 3)];
 
-		if(gb->hram_io[IO_LCDC] & LCDC_TILE_SELECT)
+		if(PGB_UNLIKELY(gb->hram_io[IO_LCDC] & LCDC_TILE_SELECT))
 			tile = VRAM_TILES_1 + idx * 0x10;
 		else
 			tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
@@ -1505,7 +1516,7 @@ void __gb_draw_line(struct gb_s *gb)
 				win_x = disp_x - gb->hram_io[IO_WX] + 7;
 				idx = gb->vram[win_line + (win_x >> 3)];
 
-				if(gb->hram_io[IO_LCDC] & LCDC_TILE_SELECT)
+				if(PGB_UNLIKELY(gb->hram_io[IO_LCDC] & LCDC_TILE_SELECT))
 					tile = VRAM_TILES_1 + idx * 0x10;
 				else
 					tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
@@ -1528,17 +1539,18 @@ void __gb_draw_line(struct gb_s *gb)
 	}
 
 	// draw sprites
-	if(gb->hram_io[IO_LCDC] & LCDC_OBJ_ENABLE)
+	if(PGB_LIKELY(gb->hram_io[IO_LCDC] & LCDC_OBJ_ENABLE))
 	{
 		uint8_t sprite_number;
 #if PEANUT_GB_HIGH_LCD_ACCURACY
-		uint8_t number_of_sprites = 0;
-
-		struct sprite_data sprites_to_render[NUM_SPRITES];
-
 		/* Record number of sprites on the line being rendered, limited
 		 * to the maximum number sprites that the Game Boy is able to
-		 * render on each line (10 sprites). */
+		 * render on each line (10 sprites) and then sort them. This is
+		 * DMG behaviour. */
+
+		uint8_t number_of_sprites = 0;
+		struct sprite_data sprites_to_render[NUM_SPRITES];
+
 		for(sprite_number = 0;
 				sprite_number < PEANUT_GB_ARRAYSIZE(sprites_to_render);
 				sprite_number++)
@@ -1560,16 +1572,15 @@ void __gb_draw_line(struct gb_s *gb)
 			number_of_sprites++;
 		}
 
-		/* If maximum number of sprites reached, prioritise X
-		 * coordinate and object location in OAM. */
+		/* Prioritise sprites based on their X coordinate. */
 		qsort(&sprites_to_render[0], number_of_sprites,
 				sizeof(sprites_to_render[0]), compare_sprites);
+
+		/* If maximum number of sprites reached, prioritise X
+		 * coordinate and also the object location in OAM. */
 		if(number_of_sprites > MAX_SPRITES_LINE)
 			number_of_sprites = MAX_SPRITES_LINE;
-#endif
 
-		/* Render each sprite, from low priority to high priority. */
-#if PEANUT_GB_HIGH_LCD_ACCURACY
 		/* Render the top ten prioritised sprites on this scanline. */
 		for(sprite_number = number_of_sprites - 1;
 				sprite_number != 0xFF;
@@ -1577,6 +1588,9 @@ void __gb_draw_line(struct gb_s *gb)
 		{
 			uint8_t s = sprites_to_render[sprite_number].sprite_number;
 #else
+		/* Render sprites based on there entry in the OAM. This is CGB
+		 * behaviour. This does not perform any sorting, as is therefore
+		 * much faster than the DMG behaviour. */
 		for (sprite_number = NUM_SPRITES - 1;
 			sprite_number != 0xFF;
 			sprite_number--)
@@ -1609,7 +1623,7 @@ void __gb_draw_line(struct gb_s *gb)
 			// y flip
 			py = gb->hram_io[IO_LY] - OY + 16;
 
-			if(OF & OBJ_FLIP_Y)
+			if(PGB_UNLIKELY(OF & OBJ_FLIP_Y))
 				py = (gb->hram_io[IO_LCDC] & LCDC_OBJ_SIZE ? 15 : 7) - py;
 
 			// fetch the tile
