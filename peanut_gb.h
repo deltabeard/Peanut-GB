@@ -150,6 +150,9 @@
 #define SCREEN_REFRESH_CYCLES 70224.0
 #define VERTICAL_SYNC       (DMG_CLOCK_FREQ/SCREEN_REFRESH_CYCLES)
 
+/* Real Time Clock is locked to 1Hz. */
+#define RTC_CYCLES	((unsigned long)DMG_CLOCK_FREQ)
+
 /* SERIAL SC register masks. */
 #define SERIAL_SC_TX_START  0x80
 #define SERIAL_SC_CLOCK_SRC 0x01
@@ -429,6 +432,7 @@ struct count_s
 	uint_fast16_t div_count;	/* Divider Register Counter */
 	uint_fast16_t tima_count;	/* Timer Counter */
 	uint_fast16_t serial_count;	/* Serial Counter */
+	uint_fast32_t rtc_count;	/* RTC Counter */
 };
 
 #if ENABLE_LCD
@@ -3225,6 +3229,41 @@ void __gb_step_cpu(struct gb_s *gb)
 			gb->counter.div_count -= DIV_CYCLES;
 		}
 
+		/* Check for RTC tick. */
+		if(gb->mbc == 3 && (gb->rtc_reg.cart_rtc[4] & 0x40) == 0)
+		{
+			gb->counter.rtc_count += inst_cycles;
+			if(gb->counter.rtc_count >= RTC_CYCLES)
+			{
+				gb->counter.rtc_count -= RTC_CYCLES;
+
+				if(++gb->rtc_real.reg.sec == 60)
+				{
+					gb->rtc_real.reg.sec = 0;
+
+					if(++gb->rtc_real.reg.min == 60)
+					{
+						gb->rtc_real.reg.min = 0;
+
+						if(++gb->rtc_real.reg.hour == 24)
+						{
+							gb->rtc_real.reg.hour = 0;
+
+							if(++gb->rtc_real.reg.yday == 0)
+							{
+								if(gb->rtc_real.reg.high & 1)  /* Bit 8 of days*/
+								{
+									gb->rtc_real.reg.high |= 0x80; /* Overflow bit */
+								}
+
+								gb->rtc_real.reg.high ^= 1;
+							}
+						}
+					}
+				}
+			}
+		}
+
 		/* Check serial transmission. */
 		if(gb->hram_io[IO_SC] & SERIAL_SC_TX_START)
 		{
@@ -3680,34 +3719,8 @@ void gb_set_bootrom(struct gb_s *gb,
  */
 void gb_tick_rtc(struct gb_s *gb)
 {
-	/* is timer running? */
-	if((gb->rtc_latched.bytes[4] & 0x40) == 0)
-	{
-		if(++gb->rtc_real.reg.sec == 60)
-		{
-			gb->rtc_real.reg.sec = 0;
-
-			if(++gb->rtc_real.reg.min == 60)
-			{
-				gb->rtc_real.reg.min = 0;
-
-				if(++gb->rtc_real.reg.hour == 24)
-				{
-					gb->rtc_real.reg.hour = 0;
-
-					if(++gb->rtc_real.reg.yday == 0)
-					{
-						if(gb->rtc_real.reg.high & 1)  /* Bit 8 of days*/
-						{
-							gb->rtc_real.reg.high |= 0x80; /* Overflow bit */
-						}
-
-						gb->rtc_real.reg.high ^= 1;
-					}
-				}
-			}
-		}
-	}
+	(void) gb;
+	return;
 }
 
 void gb_set_rtc(struct gb_s *gb, const struct tm * const time)
