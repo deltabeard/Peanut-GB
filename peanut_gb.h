@@ -3230,7 +3230,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		}
 
 		/* Check for RTC tick. */
-		if(gb->mbc == 3 && (gb->rtc_reg.cart_rtc[4] & 0x40) == 0)
+		if(gb->mbc == 3 && (gb->rtc_real.bytes[4] & 0x40) == 0)
 		{
 			gb->counter.rtc_count += inst_cycles;
 			if(gb->counter.rtc_count >= RTC_CYCLES)
