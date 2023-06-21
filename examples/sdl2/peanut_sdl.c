@@ -37,7 +37,8 @@ struct priv_t
 
 	/* Colour palette for each BG, OBJ0, and OBJ1. */
 	uint16_t selected_palette[3][4];
-	uint16_t fb[LCD_HEIGHT][LCD_WIDTH];
+	//uint16_t fb[LCD_HEIGHT][LCD_WIDTH];
+	SDL_Surface *fb;
 };
 
 /**
@@ -539,16 +540,21 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 /**
  * Draws scanline into framebuffer.
  */
-void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
+void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
 		   const uint_least8_t line)
 {
 	struct priv_t *priv = gb->direct.priv;
+	uint8_t (*lcd)[LCD_HEIGHT][LCD_WIDTH] = priv->fb->pixels;
 
 	for(unsigned int x = 0; x < LCD_WIDTH; x++)
 	{
+#if 0
 		priv->fb[line][x] = priv->selected_palette
 				    [(pixels[x] & LCD_PALETTE_ALL) >> 4]
 				    [pixels[x] & 3];
+#else
+		(*lcd)[line][x] = pixels[x] & 3;
+#endif
 	}
 }
 #endif
@@ -597,13 +603,15 @@ int main(int argc, char **argv)
 	struct priv_t priv =
 	{
 		.rom = NULL,
-		.cart_ram = NULL
+		.cart_ram = NULL,
+		.fb = NULL
 	};
 	const double target_speed_ms = 1000.0 / VERTICAL_SYNC;
 	double speed_compensation = 0.0;
-	SDL_Window *window;
-	SDL_Renderer *renderer;
-	SDL_Texture *texture;
+	SDL_Window *window = NULL;
+	SDL_Renderer *renderer = NULL;
+	SDL_Texture *texture = NULL;
+	SDL_Palette *palette = NULL;
 	SDL_Event event;
 	SDL_GameController *controller = NULL;
 	uint_fast32_t new_ticks, old_ticks;
@@ -673,7 +681,7 @@ int main(int argc, char **argv)
 					break;
 			}
 		} while(rom_file_name == NULL);
-			
+
 		break;
 
 	case 2:
@@ -970,10 +978,20 @@ int main(int argc, char **argv)
 	SDL_RenderSetLogicalSize(renderer, LCD_WIDTH, LCD_HEIGHT);
 	SDL_RenderSetIntegerScale(renderer, 1);
 
-	texture = SDL_CreateTexture(renderer,
-				    SDL_PIXELFORMAT_RGB555,
-				    SDL_TEXTUREACCESS_STREAMING,
-				    LCD_WIDTH, LCD_HEIGHT);
+	{
+		Uint32 pixel_format = SDL_GetWindowPixelFormat(window);
+		if(pixel_format == SDL_PIXELFORMAT_UNKNOWN)
+		{
+			SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_ERROR,
+				"Unable to obtain window pixel format: %s",
+				SDL_GetError());
+			pixel_format = SDL_PIXELFORMAT_RGB24;
+		}
+
+		texture = SDL_CreateTexture(renderer, pixel_format,
+			SDL_TEXTUREACCESS_STREAMING, LCD_WIDTH, LCD_HEIGHT);
+	}
 
 	if(texture == NULL)
 	{
@@ -985,7 +1003,31 @@ int main(int argc, char **argv)
 		goto out;
 	}
 
-	auto_assign_palette(&priv, gb_colour_hash(&gb));
+	priv.fb = SDL_CreateRGBSurfaceWithFormat(0, LCD_WIDTH, LCD_HEIGHT, 8,
+		SDL_PIXELFORMAT_INDEX8);
+	if(priv.fb == NULL)
+	{
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_CRITICAL,
+				"Surface could not be created: %s",
+				SDL_GetError());
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	{
+		const SDL_Color colour[4] = {
+			{ 0xFF, 0xFF, 0xFF, SDL_ALPHA_OPAQUE },
+			{ 0xFF, 0x00, 0x00, SDL_ALPHA_OPAQUE },
+			{ 0xFF, 0xFF, 0x00, SDL_ALPHA_OPAQUE },
+			{ 0x00, 0x00, 0x00, SDL_ALPHA_OPAQUE }
+		};
+		palette = SDL_AllocPalette(SDL_arraysize(colour));
+		SDL_SetPaletteColors(palette, colour, 0, SDL_arraysize(colour));
+		SDL_SetSurfacePalette(priv.fb, palette);
+	}
+
+	//auto_assign_palette(&priv, gb_colour_hash(&gb));
 
 	while(SDL_QuitRequested() == SDL_FALSE)
 	{
@@ -1252,24 +1294,27 @@ int main(int argc, char **argv)
 
 #if ENABLE_LCD
 		/* Copy frame buffer to SDL screen. */
-		SDL_UpdateTexture(texture, NULL, &priv.fb, LCD_WIDTH * sizeof(uint16_t));
+		//SDL_UpdateTexture(texture, NULL, &priv.fb, LCD_WIDTH * sizeof(uint16_t));
 		SDL_RenderClear(renderer);
-		SDL_RenderCopy(renderer, texture, NULL, NULL);
+		{
+			SDL_Texture *t;
+			t = SDL_CreateTextureFromSurface(renderer, priv.fb);
+			SDL_RenderCopy(renderer, t, NULL, NULL);
+			SDL_DestroyTexture(t);
+		}
 		SDL_RenderPresent(renderer);
 
 		if(dump_bmp)
 		{
-			if(save_lcd_bmp(&gb, priv.fb) != 0)
-			{
-				SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
-					       SDL_LOG_PRIORITY_ERROR,
-					       "Failure dumping frame: %s",
-					       SDL_GetError());
-				dump_bmp = 0;
-				SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
-					       SDL_LOG_PRIORITY_INFO,
-					       "Stopped dumping frames");
-			}
+			static uint_fast32_t file_num = 0;
+			char file_name[32];
+			char title_str[16];
+
+			SDL_snprintf(file_name, sizeof(file_name),
+				"%.16s_%010ld.bmp",
+				gb_get_rom_name(&gb, title_str), file_num);
+			SDL_SaveBMP(priv.fb, file_name);
+			file_num++;
 		}
 
 #endif
@@ -1342,9 +1387,21 @@ int main(int argc, char **argv)
 	}
 
 quit:
-	SDL_DestroyRenderer(renderer);
-	SDL_DestroyWindow(window);
-	SDL_DestroyTexture(texture);
+	if(renderer != NULL)
+		SDL_DestroyRenderer(renderer);
+
+	if(window != NULL)
+		SDL_DestroyWindow(window);
+
+	if(texture != NULL)
+		SDL_DestroyTexture(texture);
+
+	if(priv.fb != NULL)
+		SDL_FreeSurface(priv.fb);
+
+	if(palette != NULL)
+		SDL_FreePalette(palette);
+
 	SDL_GameControllerClose(controller);
 	SDL_Quit();
 #ifdef ENABLE_SOUND_BLARGG
