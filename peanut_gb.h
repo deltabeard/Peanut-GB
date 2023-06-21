@@ -88,6 +88,12 @@
 # define ENABLE_LCD 1
 #endif
 
+/* Enable 16 bit colour palette. If disabled, only four colour shades are set in
+ * pixel data. */
+#ifndef PEANUT_GB_16BIT_COLOUR
+# define PEANUT_GB_16BIT_COLOUR 1
+#endif
+
 /* Adds more code to improve LCD rendering accuracy. */
 #ifndef PEANUT_GB_HIGH_LCD_ACCURACY
 # define PEANUT_GB_HIGH_LCD_ACCURACY 1
@@ -434,6 +440,8 @@ struct count_s
 #if ENABLE_LCD
 	/* Bit mask for the shade of pixel to display */
 	#define LCD_COLOUR	0x03
+
+# if PEANUT_GB_16BIT_COLOUR
 	/**
 	* Bit mask for whether a pixel is OBJ0, OBJ1, or BG. Each may have a different
 	* palette when playing a DMG game on CGB.
@@ -448,6 +456,7 @@ struct count_s
 	* LCD_PALETTE_ALL == 0b11 --> NOT POSSIBLE
 	*/
 	#define LCD_PALETTE_ALL 0x30
+# endif
 #endif
 
 /**
@@ -1452,7 +1461,9 @@ void __gb_draw_line(struct gb_s *gb)
 			/* copy background */
 			c = (t1 & 0x1) | ((t2 & 0x1) << 1);
 			pixels[disp_x] = gb->display.bg_palette[c];
+#if PEANUT_GB_16BIT_COLOUR
 			pixels[disp_x] |= LCD_PALETTE_BG;
+#endif
 			t1 = t1 >> 1;
 			t2 = t2 >> 1;
 			px++;
@@ -1518,7 +1529,9 @@ void __gb_draw_line(struct gb_s *gb)
 			// copy window
 			c = (t1 & 0x1) | ((t2 & 0x1) << 1);
 			pixels[disp_x] = gb->display.bg_palette[c];
+#if PEANUT_GB_16BIT_COLOUR
 			pixels[disp_x] |= LCD_PALETTE_BG;
+#endif
 			t1 = t1 >> 1;
 			t2 = t2 >> 1;
 			px++;
@@ -1650,8 +1663,10 @@ void __gb_draw_line(struct gb_s *gb)
 					pixels[disp_x] = (OF & OBJ_PALETTE)
 						? gb->display.sp_palette[c + 4]
 						: gb->display.sp_palette[c];
+#if PEANUT_GB_16BIT_COLOUR
 					/* Set pixel palette (OBJ0 or OBJ1). */
 					pixels[disp_x] |= (OF & OBJ_PALETTE);
+#endif
 				}
 
 				t1 = t1 >> 1;
