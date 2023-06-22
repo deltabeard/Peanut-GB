@@ -1,12 +1,12 @@
 .POSIX:
 CC		:= cc
 OPT		:= -g2 -O2
-CFLAGS		= $(OPT) -std=c99 -Wall -Wextra
+CFLAGS		= $(OPT) -std=c99 -Wall -Wextra -DPEANUT_GB_12_COLOUR=1
 CP		:= cp
 
-override peanut-benchmark-sep.o: CFLAGS += -DPEANUT_GB_HEADER_ONLY
+peanut-benchmark-sep.o: override CFLAGS += -DPEANUT_GB_HEADER_ONLY
 
-override CFLAGS += -DENABLE_SOUND=0 -DENABLE_LCD=1 -DPEANUT_GB_16BIT_COLOUR=1
+override CFLAGS += -DENABLE_SOUND=0 -DENABLE_LCD=1
 
 all: peanut-benchmark peanut-benchmark-sep
 peanut-benchmark: peanut-benchmark.c ../../peanut_gb.h
