@@ -575,8 +575,7 @@ int main(int argc, char **argv)
 	const double target_speed_ms = 1000.0 / VERTICAL_SYNC;
 	double speed_compensation = 0.0;
 	SDL_Window *window = NULL;
-	SDL_Renderer *renderer = NULL;
-	SDL_Texture *texture = NULL;
+	SDL_Surface *win_surf = NULL, *intermediate_surf = NULL;
 	SDL_Event event;
 	SDL_GameController *controller = NULL;
 	uint_fast32_t new_ticks, old_ticks;
@@ -905,68 +904,11 @@ int main(int argc, char **argv)
 	}
 
 	SDL_SetWindowMinimumSize(window, LCD_WIDTH, LCD_HEIGHT);
-
-	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
-	if(renderer == NULL)
-	{
-		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
-				SDL_LOG_PRIORITY_CRITICAL,
-				"Could not create renderer: %s",
-				SDL_GetError());
-		ret = EXIT_FAILURE;
-		goto out;
-	}
-
-	if(SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255) < 0)
-	{
-		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
-				SDL_LOG_PRIORITY_CRITICAL,
-				"Renderer could not draw color: %s",
-				SDL_GetError());
-		ret = EXIT_FAILURE;
-		goto out;
-	}
-
-	if(SDL_RenderClear(renderer) < 0)
-	{
-		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
-				SDL_LOG_PRIORITY_CRITICAL,
-				"Renderer could not clear: %s",
-				SDL_GetError());
-		ret = EXIT_FAILURE;
-		goto out;
-	}
-
-	SDL_RenderPresent(renderer);
-
-	/* Use integer scale. */
-	SDL_RenderSetLogicalSize(renderer, LCD_WIDTH, LCD_HEIGHT);
-	SDL_RenderSetIntegerScale(renderer, 1);
-
-	{
-		Uint32 pixel_format = SDL_GetWindowPixelFormat(window);
-		if(pixel_format == SDL_PIXELFORMAT_UNKNOWN)
-		{
-			SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
-				SDL_LOG_PRIORITY_ERROR,
-				"Unable to obtain window pixel format: %s",
-				SDL_GetError());
-			pixel_format = SDL_PIXELFORMAT_RGB24;
-		}
-
-		texture = SDL_CreateTexture(renderer, pixel_format,
-			SDL_TEXTUREACCESS_STREAMING, LCD_WIDTH, LCD_HEIGHT);
-	}
-
-	if(texture == NULL)
-	{
-		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
-				SDL_LOG_PRIORITY_CRITICAL,
-				"Texture could not be created: %s",
-				SDL_GetError());
-		ret = EXIT_FAILURE;
-		goto out;
-	}
+	/* Obtain window surface. */
+	win_surf = SDL_GetWindowSurface(window);
+	SDL_SetSurfaceBlendMode(win_surf, SDL_BLENDMODE_NONE);
+	/* Clear surface. */
+	SDL_FillRect(win_surf, NULL, 0);
 
 	priv.fb = SDL_CreateRGBSurfaceWithFormat(0, LCD_WIDTH, LCD_HEIGHT, 8,
 		SDL_PIXELFORMAT_INDEX8);
@@ -978,6 +920,17 @@ int main(int argc, char **argv)
 				SDL_GetError());
 		ret = EXIT_FAILURE;
 		goto out;
+	}
+	SDL_SetSurfaceBlendMode(priv.fb, SDL_BLENDMODE_NONE);
+
+	{
+		Uint32 win_pixel_format;
+		win_pixel_format = SDL_GetWindowPixelFormat(window);
+		if(win_pixel_format == SDL_PIXELFORMAT_UNKNOWN)
+			win_pixel_format = SDL_PIXELFORMAT_RGBA32;
+
+		intermediate_surf = SDL_ConvertSurfaceFormat(priv.fb,
+			win_pixel_format, 0);
 	}
 
 	{
@@ -1031,6 +984,16 @@ int main(int argc, char **argv)
 			{
 			case SDL_QUIT:
 				goto quit;
+
+			case SDL_WINDOWEVENT:
+			switch (event.window.event) {
+				case SDL_WINDOWEVENT_RESIZED:
+					win_surf = SDL_GetWindowSurface(window);
+					SDL_SetSurfaceBlendMode(win_surf, SDL_BLENDMODE_NONE);
+					SDL_FillRect(win_surf, NULL, 0);
+					break;
+			}
+			break;
 
 			case SDL_CONTROLLERBUTTONDOWN:
 			case SDL_CONTROLLERBUTTONUP:
@@ -1279,23 +1242,18 @@ int main(int argc, char **argv)
 
 #if ENABLE_LCD
 		/* Copy frame buffer to SDL screen. */
-		//SDL_UpdateTexture(texture, NULL, &priv.fb, LCD_WIDTH * sizeof(uint16_t));
-		SDL_RenderClear(renderer);
-		{
-			SDL_Texture *t;
-			t = SDL_CreateTextureFromSurface(renderer, priv.fb);
-			SDL_RenderCopy(renderer, t, NULL, NULL);
-			SDL_DestroyTexture(t);
-		}
+		SDL_BlitSurface(priv.fb, NULL, intermediate_surf, NULL);
+		SDL_BlitScaled(intermediate_surf, NULL, win_surf, NULL);
 
 		if(benchmark.enable)
 		{
 			benchmark.frames++;
-			if(benchmark.frames >= 2048)
+			if(benchmark.frames >= 4096)
 			{
 				double dur, fps;
 				benchmark.end_ticks = SDL_GetTicks();
-				dur = (double)(benchmark.end_ticks - benchmark.start_ticks) / 1000.0;
+				dur = (double)(benchmark.end_ticks -
+					benchmark.start_ticks) / 1000.0;
 				fps = benchmark.frames / dur;
 				SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
 					SDL_LOG_PRIORITY_INFO,
@@ -1305,7 +1263,7 @@ int main(int argc, char **argv)
 			continue;
 		}
 
-		SDL_RenderPresent(renderer);
+		SDL_UpdateWindowSurface(window);
 
 		if(dump_bmp)
 		{
@@ -1319,7 +1277,6 @@ int main(int argc, char **argv)
 			SDL_SaveBMP(priv.fb, file_name);
 			file_num++;
 		}
-
 #endif
 
 		/* Use a delay that will draw the screen at a rate of 59.7275 Hz. */
@@ -1390,14 +1347,8 @@ int main(int argc, char **argv)
 	}
 
 quit:
-	if(renderer != NULL)
-		SDL_DestroyRenderer(renderer);
-
 	if(window != NULL)
 		SDL_DestroyWindow(window);
-
-	if(texture != NULL)
-		SDL_DestroyTexture(texture);
 
 	if(priv.fb != NULL)
 		SDL_FreeSurface(priv.fb);
