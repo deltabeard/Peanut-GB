@@ -36,9 +36,10 @@ struct priv_t
 	uint8_t *bootrom;
 
 	/* Colour palette for each BG, OBJ0, and OBJ1. */
-	uint16_t selected_palette[3][4];
+	//uint16_t selected_palette[3][4];
 	//uint16_t fb[LCD_HEIGHT][LCD_WIDTH];
 	SDL_Surface *fb;
+	SDL_Palette *palette;
 };
 
 /**
@@ -184,6 +185,7 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t addr
 	exit(EXIT_FAILURE);
 }
 
+#if 0
 /**
  * Automatically assigns a colour palette to the game using a given game
  * checksum.
@@ -535,6 +537,7 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 
 	return;
 }
+#endif
 
 #if ENABLE_LCD
 /**
@@ -553,49 +556,11 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
 				    [(pixels[x] & LCD_PALETTE_ALL) >> 4]
 				    [pixels[x] & 3];
 #else
-		(*lcd)[line][x] = pixels[x] & 3;
+		(*lcd)[line][x] =  (pixels[x] >> 2) | (pixels[x] & 3);
 #endif
 	}
 }
 #endif
-
-/**
- * Saves the LCD screen as a 15-bit BMP file.
- */
-int save_lcd_bmp(struct gb_s* gb, uint16_t fb[LCD_HEIGHT][LCD_WIDTH])
-{
-	/* Should be enough to record up to 828 days worth of frames. */
-	static uint_fast32_t file_num = 0;
-	char file_name[32];
-	char title_str[16];
-	SDL_RWops *f;
-	int ret = -1;
-
-	SDL_snprintf(file_name, 32, "%.16s_%010ld.bmp",
-		 gb_get_rom_name(gb, title_str), file_num);
-
-	f = SDL_RWFromFile(file_name, "wb");
-	if(f == NULL)
-		goto ret;
-
-	const uint8_t bmp_hdr_rgb555[] = {
-		0x42, 0x4d, 0x36, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x36, 0x00, 0x00, 0x00, 0x28, 0x00, 0x00, 0x00, 0xa0, 0x00,
-		0x00, 0x00, 0x70, 0xff, 0xff, 0xff, 0x01, 0x00, 0x10, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0xb4, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00
-	};
-
-	SDL_RWwrite(f, bmp_hdr_rgb555, sizeof(uint8_t), sizeof(bmp_hdr_rgb555));
-	SDL_RWwrite(f, fb, sizeof(uint16_t), LCD_HEIGHT * LCD_WIDTH);
-	ret = SDL_RWclose(f);
-
-	file_num++;
-
-ret:
-	return ret;
-}
 
 int main(int argc, char **argv)
 {
@@ -604,14 +569,14 @@ int main(int argc, char **argv)
 	{
 		.rom = NULL,
 		.cart_ram = NULL,
-		.fb = NULL
+		.fb = NULL,
+		.palette = NULL
 	};
 	const double target_speed_ms = 1000.0 / VERTICAL_SYNC;
 	double speed_compensation = 0.0;
 	SDL_Window *window = NULL;
 	SDL_Renderer *renderer = NULL;
 	SDL_Texture *texture = NULL;
-	SDL_Palette *palette = NULL;
 	SDL_Event event;
 	SDL_GameController *controller = NULL;
 	uint_fast32_t new_ticks, old_ticks;
@@ -1016,15 +981,25 @@ int main(int argc, char **argv)
 	}
 
 	{
-		const SDL_Color colour[4] = {
+		const SDL_Color colour[12] = {
 			{ 0xFF, 0xFF, 0xFF, SDL_ALPHA_OPAQUE },
-			{ 0xFF, 0x00, 0x00, SDL_ALPHA_OPAQUE },
-			{ 0xFF, 0xFF, 0x00, SDL_ALPHA_OPAQUE },
+			{ 0xFF, 0x84, 0x84, SDL_ALPHA_OPAQUE },
+			{ 0x94, 0x3A, 0x3A, SDL_ALPHA_OPAQUE },
+			{ 0x00, 0x00, 0x00, SDL_ALPHA_OPAQUE },
+
+			{ 0xFF, 0xFF, 0xFF, SDL_ALPHA_OPAQUE },
+			{ 0x7B, 0xFF, 0x31, SDL_ALPHA_OPAQUE },
+			{ 0x00, 0x84, 0x00, SDL_ALPHA_OPAQUE },
+			{ 0x00, 0x00, 0x00, SDL_ALPHA_OPAQUE },
+
+			{ 0xFF, 0xFF, 0xFF, SDL_ALPHA_OPAQUE },
+			{ 0x63, 0xA5, 0xFF, SDL_ALPHA_OPAQUE },
+			{ 0x00, 0x00, 0xFF, SDL_ALPHA_OPAQUE },
 			{ 0x00, 0x00, 0x00, SDL_ALPHA_OPAQUE }
 		};
-		palette = SDL_AllocPalette(SDL_arraysize(colour));
-		SDL_SetPaletteColors(palette, colour, 0, SDL_arraysize(colour));
-		SDL_SetSurfacePalette(priv.fb, palette);
+		priv.palette = SDL_AllocPalette(SDL_arraysize(colour));
+		SDL_SetPaletteColors(priv.palette, colour, 0, SDL_arraysize(colour));
+		SDL_SetSurfacePalette(priv.fb, priv.palette);
 	}
 
 	//auto_assign_palette(&priv, gb_colour_hash(&gb));
@@ -1035,6 +1010,13 @@ int main(int argc, char **argv)
 		static double rtc_timer = 0;
 		static unsigned int selected_palette = 3;
 		static unsigned int dump_bmp = 0;
+		static struct {
+			Uint32 start_ticks, end_ticks;
+			Uint32 frames;
+			SDL_bool enable;
+		} benchmark = {
+			0, 0, 0
+		};
 
 		/* Calculate the time taken to draw frame, then later add a
 		 * delay to cap at 60 fps. */
@@ -1124,15 +1106,12 @@ int main(int argc, char **argv)
 					gb.direct.joypad_bits.left = 0;
 					break;
 
-				case SDLK_SPACE:
-					fast_mode = 2;
-					break;
-
 				case SDLK_1:
 					fast_mode = 1;
 					break;
 
 				case SDLK_2:
+				case SDLK_SPACE:
 					fast_mode = 2;
 					break;
 
@@ -1142,6 +1121,12 @@ int main(int argc, char **argv)
 
 				case SDLK_4:
 					fast_mode = 4;
+					break;
+
+				case SDLK_9:
+					benchmark.start_ticks = SDL_GetTicks();
+					benchmark.frames = 0;
+					benchmark.enable = SDL_TRUE;
 					break;
 
 				case SDLK_r:
@@ -1175,14 +1160,14 @@ int main(int argc, char **argv)
 				case SDLK_p:
 					if(event.key.keysym.mod == KMOD_LSHIFT)
 					{
-						auto_assign_palette(&priv, gb_colour_hash(&gb));
+						//auto_assign_palette(&priv, gb_colour_hash(&gb));
 						break;
 					}
 
-					if(++selected_palette == NUMBER_OF_PALETTES)
-						selected_palette = 0;
+					//if(++selected_palette == NUMBER_OF_PALETTES)
+					//	selected_palette = 0;
 
-					manual_assign_palette(&priv, selected_palette);
+					//manual_assign_palette(&priv, selected_palette);
 					break;
 				}
 
@@ -1236,7 +1221,7 @@ int main(int argc, char **argv)
 					}
 					else
 					{
-						SDL_SetWindowFullscreen(window,		SDL_WINDOW_FULLSCREEN_DESKTOP);
+						SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
 						fullscreen = SDL_WINDOW_FULLSCREEN_DESKTOP;
 						SDL_ShowCursor(SDL_DISABLE);
 					}
@@ -1302,6 +1287,24 @@ int main(int argc, char **argv)
 			SDL_RenderCopy(renderer, t, NULL, NULL);
 			SDL_DestroyTexture(t);
 		}
+
+		if(benchmark.enable)
+		{
+			benchmark.frames++;
+			if(benchmark.frames >= 2048)
+			{
+				double dur, fps;
+				benchmark.end_ticks = SDL_GetTicks();
+				dur = (double)(benchmark.end_ticks - benchmark.start_ticks) / 1000.0;
+				fps = benchmark.frames / dur;
+				SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+					SDL_LOG_PRIORITY_INFO,
+					"%f FPS, dur: %f\n", fps, dur);
+				benchmark.enable = SDL_FALSE;
+			}
+			continue;
+		}
+
 		SDL_RenderPresent(renderer);
 
 		if(dump_bmp)
@@ -1399,8 +1402,8 @@ quit:
 	if(priv.fb != NULL)
 		SDL_FreeSurface(priv.fb);
 
-	if(palette != NULL)
-		SDL_FreePalette(palette);
+	if(priv.palette != NULL)
+		SDL_FreePalette(priv.palette);
 
 	SDL_GameControllerClose(controller);
 	SDL_Quit();
