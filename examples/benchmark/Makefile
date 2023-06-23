@@ -1,15 +1,30 @@
 .POSIX:
-CC		= cc
-OPT		= -s -Ofast
-CFLAGS		= $(OPT) -std=c99 -Wall -Wextra
+CC		:= cc
+OPT		:= -g2 -O2
+CFLAGS		= $(OPT) -std=c99 -Wall -Wextra -DPEANUT_GB_12_COLOUR=1
+CP		:= cp
 
-all: peanut-benchmark peanut-benchmark-prof peanut-benchmark-rom
-peanut-benchmark: ../../peanut_gb.h peanut_benchmark.c
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) 
-peanut-benchmark-rom: ../../peanut_gb.h peanut_benchmark_rom.c
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) 
-peanut-benchmark-prof: ../../peanut_gb.h peanut_benchmark_prof.c prof.h
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) 
+peanut-benchmark-sep.o: override CFLAGS += -DPEANUT_GB_HEADER_ONLY
+
+override CFLAGS += -DENABLE_SOUND=0 -DENABLE_LCD=1
+
+all: peanut-benchmark peanut-benchmark-sep
+peanut-benchmark: peanut-benchmark.c ../../peanut_gb.h
+	$(CC) $(CFLAGS) $(LDFLAGS) -o$@ $< $(LDLIBS)
+
+# Separate objects linked to a single executable.
+peanut-benchmark-sep: peanut-benchmark-sep.o peanut_gb.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o$@ $^ $(LDLIBS)
+
+peanut-benchmark-sep.o: peanut-benchmark.c
+	$(CC) -c $(CFLAGS) -o$@ $<
+
+peanut_gb.o: ../../peanut_gb.h
+	$(CP) ../../peanut_gb.h peanut_gb.c
+	$(CC) -c $(CFLAGS) -o$@ peanut_gb.c
+
+peanut-benchmark.S: peanut-benchmark.c ../../peanut_gb.h
+	$(CC) -S $(CFLAGS) $(LDFLAGS) -o$@ $< $(LDLIBS)
 
 clean:
-	rm -f peanut-benchmark peanut-benchmark-prof peanut-benchmark-rom
+	$(RM) peanut-benchmark$(EXT)

@@ -1,8 +1,21 @@
+# Build items
 *.o
-*.gch
-*.gcda
 *.a
 *.exe
 peanut-sdl
 peanut-debug
 tags
+build*/
+bin*/
+# Profile items
+*.html
+*.css
+*.gch
+*.gcda
+*.gcno
+# Run items
+*.sav
+*.bmp
+*.gb
+*.gbc
+*.bin

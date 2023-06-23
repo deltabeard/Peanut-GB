@@ -1,35 +1,39 @@
 /**
  * MIT License
- * Copyright (c) 2018 Mahyar Koshkouei
+ * Copyright (c) 2018-2023 Mahyar Koshkouei
  *
  * An example of using the peanut_gb.h library. This example application uses
  * SDL2 to draw the screen and get input.
  */
 
-#include <errno.h>
-
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
-#include <SDL2/SDL.h>
+#include "SDL.h"
 
-#ifdef ENABLE_SOUND_BLARGG
+#if defined(ENABLE_SOUND_BLARGG)
 #	include "blargg_apu/audio.h"
-#elif defined ENABLE_SOUND_PEANUT
-#	include "peanut_apu/peanut_apu.h"
+#elif defined(ENABLE_SOUND_MINIGB)
+#	include "minigb_apu/minigb_apu.h"
 #endif
 
 #include "../../peanut_gb.h"
-#include "nativefiledialog/src/include/nfd.h"
+
+enum {
+	LOG_CATERGORY_PEANUTSDL = SDL_LOG_CATEGORY_CUSTOM
+};
 
 struct priv_t
 {
+	/* Window context used to generate message boxes. */
+	SDL_Window *win;
+
 	/* Pointer to allocated memory holding GB file. */
 	uint8_t *rom;
 	/* Pointer to allocated memory holding save file. */
 	uint8_t *cart_ram;
+	/* Pointer to boot ROM binary. */
+	uint8_t *bootrom;
 
 	/* Colour palette for each BG, OBJ0, and OBJ1. */
 	uint16_t selected_palette[3][4];
@@ -64,38 +68,16 @@ void gb_cart_ram_write(struct gb_s *gb, const uint_fast32_t addr,
 	p->cart_ram[addr] = val;
 }
 
-/**
- * Returns a pointer to the allocated space containing the ROM. Must be freed.
- */
-uint8_t *read_rom_to_ram(const char *file_name)
+uint8_t gb_bootrom_read(struct gb_s *gb, const uint_fast16_t addr)
 {
-	FILE *rom_file = fopen(file_name, "rb");
-	size_t rom_size;
-	uint8_t *rom = NULL;
-
-	if(rom_file == NULL)
-		return NULL;
-
-	fseek(rom_file, 0, SEEK_END);
-	rom_size = ftell(rom_file);
-	rewind(rom_file);
-	rom = malloc(rom_size);
-
-	if(fread(rom, sizeof(uint8_t), rom_size, rom_file) != rom_size)
-	{
-		free(rom);
-		fclose(rom_file);
-		return NULL;
-	}
-
-	fclose(rom_file);
-	return rom;
+	const struct priv_t * const p = gb->direct.priv;
+	return p->bootrom[addr];
 }
 
 void read_cart_ram_file(const char *save_file_name, uint8_t **dest,
 			const size_t len)
 {
-	FILE *f;
+	SDL_RWops *f;
 
 	/* If save file not required. */
 	if(len == 0)
@@ -105,90 +87,100 @@ void read_cart_ram_file(const char *save_file_name, uint8_t **dest,
 	}
 
 	/* Allocate enough memory to hold save file. */
-	if((*dest = malloc(len)) == NULL)
+	if((*dest = SDL_malloc(len)) == NULL)
 	{
-		printf("%d: %s\n", __LINE__, strerror(errno));
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_CRITICAL,
+				"%d: %s", __LINE__, SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
 
-	f = fopen(save_file_name, "rb");
+	f = SDL_RWFromFile(save_file_name, "rb");
 
 	/* It doesn't matter if the save file doesn't exist. We initialise the
 	 * save memory allocated above. The save file will be created on exit. */
 	if(f == NULL)
 	{
-		memset(*dest, 0xFF, len);
+		SDL_memset(*dest, 0, len);
 		return;
 	}
 
 	/* Read save file to allocated memory. */
-	fread(*dest, sizeof(uint8_t), len, f);
-	fclose(f);
+	SDL_RWread(f, *dest, sizeof(uint8_t), len);
+	SDL_RWclose(f);
 }
 
 void write_cart_ram_file(const char *save_file_name, uint8_t **dest,
 			 const size_t len)
 {
-	FILE *f;
+	SDL_RWops *f;
 
 	if(len == 0 || *dest == NULL)
 		return;
 
-	if((f = fopen(save_file_name, "wb")) == NULL)
+	if((f = SDL_RWFromFile(save_file_name, "wb")) == NULL)
 	{
-		puts("Unable to open save file.");
-		printf("%d: %s\n", __LINE__, strerror(errno));
-		exit(EXIT_FAILURE);
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_CRITICAL,
+				"Unable to open save file: %s",
+				SDL_GetError());
+		return;
 	}
 
 	/* Record save file. */
-	fwrite(*dest, sizeof(uint8_t), len, f);
-	fclose(f);
+	SDL_RWwrite(f, *dest, sizeof(uint8_t), len);
+	SDL_RWclose(f);
+
+	return;
 }
 
 /**
  * Handles an error reported by the emulator. The emulator context may be used
  * to better understand why the error given in gb_err was reported.
  */
-void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
+void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t addr)
 {
+	const char* gb_err_str[GB_INVALID_MAX] = {
+		"UNKNOWN",
+		"INVALID OPCODE",
+		"INVALID READ",
+		"INVALID WRITE",
+		"HALT FOREVER"
+	};
 	struct priv_t *priv = gb->direct.priv;
+	char error_msg[256];
+	char location[64] = "";
+	uint8_t instr_byte;
 
-	switch(gb_err)
+	/* Record save file. */
+	write_cart_ram_file("recovery.sav", &priv->cart_ram, gb_get_save_size(gb));
+
+	if(addr >= 0x4000 && addr < 0x8000)
 	{
-	case GB_INVALID_OPCODE:
-		/* We compensate for the post-increment in the __gb_step_cpu
-		 * function. */
-		fprintf(stdout, "Invalid opcode %#04x at PC: %#06x, SP: %#06x\n",
-			val,
-			gb->cpu_reg.pc - 1,
-			gb->cpu_reg.sp);
-		break;
-
-	/* Ignoring non fatal errors. */
-	case GB_INVALID_WRITE:
-	case GB_INVALID_READ:
-		return;
-
-	default:
-		printf("Unknown error");
-		break;
+		uint32_t rom_addr;
+		rom_addr = (uint32_t)addr * (uint32_t)gb->selected_rom_bank;
+		SDL_snprintf(location, sizeof(location),
+			" (bank %d mode %d, file offset %u)",
+			gb->selected_rom_bank, gb->cart_mode_select, rom_addr);
 	}
 
-	fprintf(stderr, "Error. Press q to exit, or any other key to continue.");
+	instr_byte = __gb_read(gb, addr);
 
-	if(getchar() == 'q')
-	{
-		/* Record save file. */
-		write_cart_ram_file("recovery.sav", &priv->cart_ram,
-				    gb_get_save_size(gb));
+	SDL_snprintf(error_msg, sizeof(error_msg),
+		"Error: %s at 0x%04X%s with instruction %02X.\n"
+		"Cart RAM saved to recovery.sav\n"
+		"Exiting.\n",
+		gb_err_str[gb_err], addr, location, instr_byte);
+	SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+			SDL_LOG_PRIORITY_CRITICAL,
+			"%s", error_msg);
 
-		free(priv->rom);
-		free(priv->cart_ram);
-		exit(EXIT_FAILURE);
-	}
+	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error", error_msg, priv->win);
 
-	return;
+	/* Free memory and then exit. */
+	SDL_free(priv->cart_ram);
+	SDL_free(priv->rom);
+	exit(EXIT_FAILURE);
 }
 
 /**
@@ -360,7 +352,9 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 			{ 0x7FFF, 0x5294, 0x294A, 0x0000 },
 			{ 0x7FFF, 0x5294, 0x294A, 0x0000 }
 		};
-		printf("No palette found for 0x%02X.\n", game_checksum);
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_INFO,
+				"No palette found for 0x%02X.", game_checksum);
 		memcpy(priv->selected_palette, palette, palette_bytes);
 	}
 	}
@@ -562,18 +556,21 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
 /**
  * Saves the LCD screen as a 15-bit BMP file.
  */
-void save_lcd_bmp(struct gb_s* gb, uint16_t fb[LCD_HEIGHT][LCD_WIDTH])
+int save_lcd_bmp(struct gb_s* gb, uint16_t fb[LCD_HEIGHT][LCD_WIDTH])
 {
 	/* Should be enough to record up to 828 days worth of frames. */
 	static uint_fast32_t file_num = 0;
 	char file_name[32];
 	char title_str[16];
-	FILE* f;
+	SDL_RWops *f;
+	int ret = -1;
 
-	snprintf(file_name, 32, "%.16s_%010ld.bmp",
+	SDL_snprintf(file_name, 32, "%.16s_%010ld.bmp",
 		 gb_get_rom_name(gb, title_str), file_num);
 
-	f = fopen(file_name, "wb");
+	f = SDL_RWFromFile(file_name, "wb");
+	if(f == NULL)
+		goto ret;
 
 	const uint8_t bmp_hdr_rgb555[] = {
 		0x42, 0x4d, 0x36, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -581,18 +578,17 @@ void save_lcd_bmp(struct gb_s* gb, uint16_t fb[LCD_HEIGHT][LCD_WIDTH])
 		0x00, 0x00, 0x70, 0xff, 0xff, 0xff, 0x01, 0x00, 0x10, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0xb4, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00 
+		0x00, 0x00, 0x00, 0x00
 	};
 
-	fwrite(bmp_hdr_rgb555, sizeof(uint8_t), sizeof(bmp_hdr_rgb555), f);
-	fwrite(fb, sizeof(uint16_t), LCD_HEIGHT * LCD_WIDTH, f);
-	fclose(f);
+	SDL_RWwrite(f, bmp_hdr_rgb555, sizeof(uint8_t), sizeof(bmp_hdr_rgb555));
+	SDL_RWwrite(f, fb, sizeof(uint16_t), LCD_HEIGHT * LCD_WIDTH);
+	ret = SDL_RWclose(f);
 
 	file_num++;
 
-	/* Each dot shows a new frame being saved. */
-	putc('.', stdout);
-	fflush(stdout);
+ret:
+	return ret;
 }
 
 int main(int argc, char **argv)
@@ -605,7 +601,6 @@ int main(int argc, char **argv)
 	};
 	const double target_speed_ms = 1000.0 / VERTICAL_SYNC;
 	double speed_compensation = 0.0;
-	unsigned int running = 1;
 	SDL_Window *window;
 	SDL_Renderer *renderer;
 	SDL_Texture *texture;
@@ -622,29 +617,64 @@ int main(int argc, char **argv)
 	char *save_file_name = NULL;
 	int ret = EXIT_SUCCESS;
 
+	SDL_LogSetPriority(LOG_CATERGORY_PEANUTSDL, SDL_LOG_PRIORITY_INFO);
+
+	/* Enable Hi-DPI to stop blurry game image. */
+	SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
+
+	/* Initialise frontend implementation, in this case, SDL2. */
+	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO) < 0)
+	{
+		char buf[128];
+		SDL_snprintf(buf, sizeof(buf),
+				"Unable to initialise SDL2: %s", SDL_GetError());
+		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error", buf, NULL);
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	window = SDL_CreateWindow("Peanut-SDL: Opening File",
+			SDL_WINDOWPOS_CENTERED,
+			SDL_WINDOWPOS_CENTERED,
+			LCD_WIDTH * 2, LCD_HEIGHT * 2,
+			SDL_WINDOW_RESIZABLE | SDL_WINDOW_INPUT_FOCUS);
+
+	if(window == NULL)
+	{
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_CRITICAL,
+				"Could not create window: %s",
+				SDL_GetError());
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+	priv.win = window;
+
 	switch(argc)
 	{
-#if ENABLE_FILE_GUI
-
 	case 1:
-	{
-		/* Invoke file picker */
-		nfdresult_t result =
-			NFD_OpenDialog("gb,gbc", NULL, &rom_file_name);
+		SDL_SetWindowTitle(window, "Drag and drop ROM");
+		do
+		{
+			SDL_Delay(10);
+			SDL_PollEvent(&event);
 
-		if(result == NFD_CANCEL)
-		{
-			puts("No ROM selected.");
-			exit(EXIT_FAILURE);
-		}
-		else if(result != NFD_OKAY)
-		{
-			printf("Error: %s\n", NFD_GetError());
-			exit(EXIT_FAILURE);
-		}
-	}
-	break;
-#endif
+			switch(event.type)
+			{
+				case SDL_DROPFILE:
+					rom_file_name = event.drop.file;
+					break;
+
+				case SDL_QUIT:
+					ret = EXIT_FAILURE;
+					goto out;
+
+				default:
+					break;
+			}
+		} while(rom_file_name == NULL);
+			
+		break;
 
 	case 2:
 		/* Apply file name to rom_file_name
@@ -661,20 +691,30 @@ int main(int argc, char **argv)
 
 	default:
 #if ENABLE_FILE_GUI
-		printf("Usage: %s [ROM] [SAVE]\n", argv[0]);
-		puts("A file picker is presented if ROM is not given.");
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_CRITICAL,
+				"Usage: %s [ROM] [SAVE]", argv[0]);
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_CRITICAL,
+				"A file picker is presented if ROM is not given.");
 #else
-		printf("Usage: %s ROM [SAVE]\n", argv[0]);
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_CRITICAL,
+				"Usage: %s ROM [SAVE]\n", argv[0]);
 #endif
-		puts("SAVE is set by default if not provided.");
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_CRITICAL,
+				"SAVE is set by default if not provided.");
 		ret = EXIT_FAILURE;
 		goto out;
 	}
 
 	/* Copy input ROM file to allocated memory. */
-	if((priv.rom = read_rom_to_ram(rom_file_name)) == NULL)
+	if((priv.rom = SDL_LoadFile(rom_file_name, NULL)) == NULL)
 	{
-		printf("%d: %s\n", __LINE__, strerror(errno));
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_CRITICAL,
+				"%d: %s", __LINE__, SDL_GetError());
 		ret = EXIT_FAILURE;
 		goto out;
 	}
@@ -688,11 +728,14 @@ int main(int argc, char **argv)
 
 		/* Allocate enough space for the ROM file name, for the "sav"
 		 * extension and for the null terminator. */
-		save_file_name = malloc(strlen(rom_file_name) + strlen(extension) + 1);
+		save_file_name = SDL_malloc(
+				SDL_strlen(rom_file_name) + SDL_strlen(extension) + 1);
 
 		if(save_file_name == NULL)
 		{
-			printf("%d: %s\n", __LINE__, strerror(errno));
+			SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+					SDL_LOG_PRIORITY_CRITICAL,
+					"%d: %s", __LINE__, SDL_GetError());
 			ret = EXIT_FAILURE;
 			goto out;
 		}
@@ -725,19 +768,41 @@ int main(int argc, char **argv)
 		break;
 
 	case GB_INIT_CARTRIDGE_UNSUPPORTED:
-		puts("Unsupported cartridge.");
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_CRITICAL,
+				"Unsupported cartridge.");
 		ret = EXIT_FAILURE;
 		goto out;
 
 	case GB_INIT_INVALID_CHECKSUM:
-		puts("Invalid ROM: Checksum failure.");
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_CRITICAL,
+				"Invalid ROM: Checksum failure.");
 		ret = EXIT_FAILURE;
 		goto out;
 
 	default:
-		printf("Unknown error: %d\n", gb_ret);
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_CRITICAL,
+				"Unknown error: %d", gb_ret);
 		ret = EXIT_FAILURE;
 		goto out;
+	}
+
+	/* Copy dmg_boot.bin boot ROM file to allocated memory. */
+	if((priv.bootrom = SDL_LoadFile("dmg_boot.bin", NULL)) == NULL)
+	{
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_INFO,
+				"No dmg_boot.bin file found; disabling boot ROM");
+	}
+	else
+	{
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_INFO,
+				"boot ROM enabled");
+		gb_set_bootrom(&gb, gb_bootrom_read);
+		gb_reset(&gb);
 	}
 
 	/* Load Save File. */
@@ -746,9 +811,14 @@ int main(int argc, char **argv)
 	/* Set the RTC of the game cartridge. Only used by games that support it. */
 	{
 		time_t rawtime;
-		struct tm *timeinfo;
 		time(&rawtime);
+#ifdef _POSIX_C_SOURCE
+		struct tm timeinfo;
+		localtime_r(&rawtime, &timeinfo);
+#else
+		struct tm *timeinfo;
 		timeinfo = localtime(&rawtime);
+#endif
 
 		/* You could potentially force the game to allow the player to
 		 * reset the time by setting the RTC to invalid values.
@@ -765,39 +835,43 @@ int main(int argc, char **argv)
 
 		/* Set RTC. Only games that specify support for RTC will use
 		 * these values. */
+#ifdef _POSIX_C_SOURCE
+		gb_set_rtc(&gb, &timeinfo);
+#else
 		gb_set_rtc(&gb, timeinfo);
+#endif
 	}
 
-	/* Initialise frontend implementation, in this case, SDL2. */
-	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO) < 0)
-	{
-		printf("Could not initialise SDL: %s\n", SDL_GetError());
-		ret = EXIT_FAILURE;
-		goto out;
-	}
-
-#ifdef ENABLE_SOUND
+#if ENABLE_SOUND
 	SDL_AudioDeviceID dev;
 #endif
 
-#ifdef ENABLE_SOUND_BLARGG
+#if ENABLE_SOUND == 0
+	// Sound is disabled, so do nothing.
+#elif defined(ENABLE_SOUND_BLARGG)
 	audio_init(&dev);
-#elif defined ENABLE_SOUND_PEANUT
+#elif defined(ENABLE_SOUND_MINIGB)
 	{
 		SDL_AudioSpec want, have;
 
 		want.freq = AUDIO_SAMPLE_RATE;
-		want.format   = AUDIO_F32SYS,
+		want.format   = AUDIO_S16,
 		want.channels = 2;
-		want.samples = 1024;
+		want.samples = AUDIO_SAMPLES;
 		want.callback = audio_callback;
 		want.userdata = NULL;
 
-		printf("Audio driver: %s\n", SDL_GetAudioDeviceName(0, 0));
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_INFO,
+				"Audio driver: %s",
+				SDL_GetAudioDeviceName(0, 0));
 
 		if((dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0)) == 0)
 		{
-			printf("SDL could not open audio device: %s\n", SDL_GetError());
+			SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+					SDL_LOG_PRIORITY_CRITICAL,
+					"SDL could not open audio device: %s",
+					SDL_GetError());
 			exit(EXIT_FAILURE);
 		}
 
@@ -815,71 +889,77 @@ int main(int argc, char **argv)
 
 	if(SDL_GameControllerAddMappingsFromFile("gamecontrollerdb.txt") < 0)
 	{
-		printf("Unable to assign joystick mappings: %s\n",
-		       SDL_GetError());
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_INFO,
+				"Unable to assign joystick mappings: %s\n",
+				SDL_GetError());
 	}
 
 	/* Open the first available controller. */
-	for(uint_fast8_t i = 0; i < SDL_NumJoysticks(); i++)
+	for(int i = 0; i < SDL_NumJoysticks(); i++)
 	{
-		if(SDL_IsGameController(i))
-		{
-			controller = SDL_GameControllerOpen(i);
+		if(!SDL_IsGameController(i))
+			continue;
 
-			if(controller)
-			{
-				printf("Game Controller %s connected.\n",
-				       SDL_GameControllerName(controller));
-				break;
-			}
-			else
-				printf("Could not open gamecontroller %i: %s\n", i, SDL_GetError());
+		controller = SDL_GameControllerOpen(i);
+
+		if(controller)
+		{
+			SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+					SDL_LOG_PRIORITY_INFO,
+					"Game Controller %s connected.",
+					SDL_GameControllerName(controller));
+			break;
+		}
+		else
+		{
+			SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+					SDL_LOG_PRIORITY_INFO,
+					"Could not open game controller %i: %s\n",
+					i, SDL_GetError());
 		}
 	}
 
 	{
 		/* 12 for "Peanut-SDL: " and a maximum of 16 for the title. */
 		char title_str[28] = "Peanut-SDL: ";
-		printf("ROM: %s\n", gb_get_rom_name(&gb, title_str + 12));
-		printf("MBC: %d\n", gb.mbc);
-
-		window = SDL_CreateWindow(title_str,
-					  SDL_WINDOWPOS_UNDEFINED,
-					  SDL_WINDOWPOS_UNDEFINED,
-					  LCD_WIDTH * 2, LCD_HEIGHT * 2,
-					  SDL_WINDOW_RESIZABLE | SDL_WINDOW_INPUT_FOCUS);
-
-		if(window == NULL)
-		{
-			printf("Could not create window: %s\n", SDL_GetError());
-			ret = EXIT_FAILURE;
-			goto out;
-		}
+		gb_get_rom_name(&gb, title_str + 12);
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_INFO,
+				"%s",
+				title_str);
+		SDL_SetWindowTitle(window, title_str);
 	}
-
 
 	SDL_SetWindowMinimumSize(window, LCD_WIDTH, LCD_HEIGHT);
 
-	renderer = SDL_CreateRenderer(window, -1,
-				      SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
-
+	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
 	if(renderer == NULL)
 	{
-		printf("Could not create renderer: %s\n", SDL_GetError());
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_CRITICAL,
+				"Could not create renderer: %s",
+				SDL_GetError());
 		ret = EXIT_FAILURE;
 		goto out;
 	}
 
 	if(SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255) < 0)
 	{
-		printf("Renderer could not draw color: %s\n", SDL_GetError());
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_CRITICAL,
+				"Renderer could not draw color: %s",
+				SDL_GetError());
 		ret = EXIT_FAILURE;
 		goto out;
 	}
 
 	if(SDL_RenderClear(renderer) < 0)
 	{
-		printf("Renderer could not clear: %s\n", SDL_GetError());
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_CRITICAL,
+				"Renderer could not clear: %s",
+				SDL_GetError());
 		ret = EXIT_FAILURE;
 		goto out;
 	}
@@ -897,17 +977,20 @@ int main(int argc, char **argv)
 
 	if(texture == NULL)
 	{
-		printf("Texture could not be created: %s\n", SDL_GetError());
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_CRITICAL,
+				"Texture could not be created: %s",
+				SDL_GetError());
 		ret = EXIT_FAILURE;
 		goto out;
 	}
 
 	auto_assign_palette(&priv, gb_colour_hash(&gb));
 
-	while(running)
+	while(SDL_QuitRequested() == SDL_FALSE)
 	{
 		int delay;
-		static unsigned int rtc_timer = 0;
+		static double rtc_timer = 0;
 		static unsigned int selected_palette = 3;
 		static unsigned int dump_bmp = 0;
 
@@ -923,8 +1006,7 @@ int main(int argc, char **argv)
 			switch(event.type)
 			{
 			case SDL_QUIT:
-				running = 0;
-				break;
+				goto quit;
 
 			case SDL_CONTROLLERBUTTONDOWN:
 			case SDL_CONTROLLERBUTTONUP:
@@ -1037,9 +1119,13 @@ int main(int argc, char **argv)
 					dump_bmp = ~dump_bmp;
 
 					if(dump_bmp)
-						puts("Dumping frames");
+						SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+								SDL_LOG_PRIORITY_INFO,
+								"Dumping frames");
 					else
-						printf("\nStopped dumping frames\n");
+						SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+								SDL_LOG_PRIORITY_INFO,
+								"Stopped dumping frames");
 
 					break;
 #endif
@@ -1108,7 +1194,7 @@ int main(int argc, char **argv)
 					}
 					else
 					{
-						SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+						SDL_SetWindowFullscreen(window,		SDL_WINDOW_FULLSCREEN_DESKTOP);
 						fullscreen = SDL_WINDOW_FULLSCREEN_DESKTOP;
 						SDL_ShowCursor(SDL_DISABLE);
 					}
@@ -1140,11 +1226,11 @@ int main(int argc, char **argv)
 		gb_run_frame(&gb);
 
 		/* Tick the internal RTC when 1 second has passed. */
-		rtc_timer += target_speed_ms / fast_mode;
+		rtc_timer += target_speed_ms / (double) fast_mode;
 
-		if(rtc_timer >= 1000)
+		if(rtc_timer >= 1000.0)
 		{
-			rtc_timer -= 1000;
+			rtc_timer -= 1000.0;
 			gb_tick_rtc(&gb);
 		}
 
@@ -1172,7 +1258,19 @@ int main(int argc, char **argv)
 		SDL_RenderPresent(renderer);
 
 		if(dump_bmp)
-			save_lcd_bmp(&gb, priv.fb);
+		{
+			if(save_lcd_bmp(&gb, priv.fb) != 0)
+			{
+				SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+					       SDL_LOG_PRIORITY_ERROR,
+					       "Failure dumping frame: %s",
+					       SDL_GetError());
+				dump_bmp = 0;
+				SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+					       SDL_LOG_PRIORITY_INFO,
+					       "Stopped dumping frames");
+			}
+		}
 
 #endif
 
@@ -1208,12 +1306,10 @@ int main(int argc, char **argv)
 				gb_tick_rtc(&gb);
 
 				/* If 60 seconds has passed, record save file.
-				 * We do this because the external audio library
+				 * We do this because the blarrg audio library
 				 * used contains asserts that will abort the
 				 * program without save.
-				 * TODO: Remove use of assert in audio library
-				 * in release build. */
-				/* TODO: Remove all workarounds due to faulty
+				 * TODO: Remove all workarounds due to faulty
 				 * external libraries. */
 				--save_timer;
 
@@ -1225,8 +1321,8 @@ int main(int argc, char **argv)
 					SDL_LockAudioDevice(dev);
 #endif
 					write_cart_ram_file(save_file_name,
-							    &priv.cart_ram,
-							    gb_get_save_size(&gb));
+						&priv.cart_ram,
+						gb_get_save_size(&gb));
 #if ENABLE_SOUND_BLARGG
 					SDL_UnlockAudioDevice(dev);
 #endif
@@ -1245,6 +1341,7 @@ int main(int argc, char **argv)
 		}
 	}
 
+quit:
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 	SDL_DestroyTexture(texture);
@@ -1252,24 +1349,22 @@ int main(int argc, char **argv)
 	SDL_Quit();
 #ifdef ENABLE_SOUND_BLARGG
 	audio_cleanup();
-#elif defined ENABLE_SOUND_PEANUT
-	audio_deinit();
 #endif
 
 	/* Record save file. */
 	write_cart_ram_file(save_file_name, &priv.cart_ram, gb_get_save_size(&gb));
 
 out:
-	free(priv.rom);
-	free(priv.cart_ram);
+	SDL_free(priv.rom);
+	SDL_free(priv.cart_ram);
 
 	/* If the save file name was automatically generated (which required memory
 	 * allocated on the help), then free it here. */
 	if(argc == 2)
-		free(save_file_name);
+		SDL_free(save_file_name);
 
 	if(argc == 1)
-		free(rom_file_name);
+		SDL_free(rom_file_name);
 
 	return ret;
 }
