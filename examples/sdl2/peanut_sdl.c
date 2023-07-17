@@ -17,6 +17,8 @@
 #	include "minigb_apu/minigb_apu.h"
 #endif
 
+#define PEANUT_FULL_GBC_SUPPORT 0
+
 #include "../../peanut_gb.h"
 
 enum {
@@ -544,12 +546,27 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
 {
 	struct priv_t *priv = gb->direct.priv;
 
-	for(unsigned int x = 0; x < LCD_WIDTH; x++)
+#if PEANUT_FULL_GBC_SUPPORT
+    if (gb->cgb.cgbMode)
 	{
-		priv->fb[line][x] = priv->selected_palette
+        for (unsigned int x = 0; x < LCD_WIDTH; x++)
+		{
+            priv->fb[line][x] = gb->cgb.fixPalette[pixels[x]];
+        }
+    }
+	else
+	{
+#endif
+		for(unsigned int x = 0; x < LCD_WIDTH; x++)
+		{
+			priv->fb[line][x] = priv->selected_palette
 				    [(pixels[x] & LCD_PALETTE_ALL) >> 4]
 				    [pixels[x] & 3];
-	}
+		}
+#if PEANUT_FULL_GBC_SUPPORT
+    }
+#endif
+
 }
 #endif
 
