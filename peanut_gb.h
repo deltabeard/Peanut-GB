@@ -1927,11 +1927,17 @@ void __gb_draw_line(struct gb_s *gb)
 			sprites_to_render[number_of_sprites].x = OX;
 			number_of_sprites++;
 		}
-
+#if PEANUT_FULL_GBC_SUPPORT
+		if(!gb->cgb.cgbMode)
+		{
+#endif
 		/* If maximum number of sprites reached, prioritise X
 		 * coordinate and object location in OAM. */
 		qsort(&sprites_to_render[0], number_of_sprites,
 				sizeof(sprites_to_render[0]), compare_sprites);
+#if PEANUT_FULL_GBC_SUPPORT
+		}
+#endif
 		if(number_of_sprites > MAX_SPRITES_LINE)
 			number_of_sprites = MAX_SPRITES_LINE;
 #endif
@@ -2022,14 +2028,17 @@ void __gb_draw_line(struct gb_s *gb)
 				uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
 				// check transparency / sprite overlap / background overlap
 #if PEANUT_FULL_GBC_SUPPORT
-				if (gb->cgb.cgbMode
-					&& (c && !(pixelsPrio[disp_x]
-					&& (pixels[disp_x] & 0x3))
-					&& !((OF & OBJ_PRIORITY)
-					&& (pixels[disp_x] & 0x3))))
+				if(gb->cgb.cgbMode)
 				{
-					/* Set pixel colour. */
-					pixels[disp_x] = ((OF & OBJ_CGB_PALETTE) << 2) + c + 0x20;  // add 0x20 to differentiate from BG
+					uint8_t isBackgroundDisabled = c && !(gb->hram_io[IO_LCDC] & LCDC_BG_ENABLE);
+					uint8_t isPixelPriorityNonConflicting = c && !(pixelsPrio[disp_x] && (pixels[disp_x] & 0x3))
+															  && !((OF & OBJ_PRIORITY) && (pixels[disp_x] & 0x3));
+
+					if(isBackgroundDisabled || isPixelPriorityNonConflicting)
+					{
+						/* Set pixel colour. */
+						pixels[disp_x] = ((OF & OBJ_CGB_PALETTE) << 2) + c + 0x20;  // add 0x20 to differentiate from BG
+					}
 				}
 				else
 #endif
