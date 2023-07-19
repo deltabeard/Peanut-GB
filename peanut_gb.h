@@ -663,8 +663,13 @@ struct gb_s
 		void *priv;
 	} direct;
 
-
+	/* Tracks button state to initiate a joypad interrupt when the button
+	 * state changes. */
 	uint8_t joypad_intr_track;
+	/* The number of cycles until the joypad interrupt should trigger. */
+	uint16_t joypad_intr_cycles;
+	/* Random value seed. */
+	uint16_t rand_seed;
 };
 
 #ifndef PEANUT_GB_HEADER_ONLY
@@ -3307,12 +3312,38 @@ void __gb_step_cpu(struct gb_s *gb)
 			}
 		}
 
+		if(gb->joypad_intr_track != 0)
+		{
+			if(gb->joypad_intr_track < inst_cycles)
+			{
+				gb->joypad_intr_track = 0;
+				gb->hram_io[IO_IF] |= CONTROL_INTR;
+				gb->joypad_intr_track = gb->direct.joypad;
+			}
+			else
+			{
+				gb->joypad_intr_track -= inst_cycles;
+			}
+		}
 		/* If joypad interrupts are enabled, check if we should trigger it. */
-		if(gb->hram_io[IO_IE] & CONTROL_INTR &&
+		else if(gb->hram_io[IO_IE] & CONTROL_INTR &&
 				gb->direct.joypad != gb->joypad_intr_track)
 		{
-			gb->hram_io[IO_IF] |= CONTROL_INTR;
-			gb->joypad_intr_track = gb->direct.joypad;
+			if(gb->joypad_intr_cycles == 0)
+			{
+				uint16_t x = gb->rand_seed;
+				/* Perform 16-bit xorshift. */
+				x ^= x << 7;
+				x ^= x >> 9;
+				x ^= x << 8;
+				gb->rand_seed = x;
+				gb->joypad_intr_cycles = x;
+			}
+			else
+			{
+				gb->hram_io[IO_IF] |= CONTROL_INTR;
+				gb->joypad_intr_track = gb->direct.joypad;
+			}
 		}
 
 		/* If LCD is off, don't update LCD state or increase the LCD
@@ -3533,6 +3564,10 @@ void gb_reset(struct gb_s *gb)
 	gb->counter.serial_count = 0;
 
 	gb->direct.joypad = 0xFF;
+	gb->joypad_intr_track = gb->direct.joypad;
+	gb->joypad_intr_cycles = 0;
+	gb->rand_seed = 0xD803;
+
 	gb->hram_io[IO_JOYP] = 0xCF;
 	gb->hram_io[IO_SB  ] = 0x00;
 	gb->hram_io[IO_SC  ] = 0x7E;
