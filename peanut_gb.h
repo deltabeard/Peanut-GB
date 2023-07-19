@@ -645,7 +645,7 @@ struct gb_s
 
 		union
 		{
-			struct
+			struct joypad_state
 			{
 				uint8_t a	: 1;
 				uint8_t b	: 1;
@@ -662,6 +662,12 @@ struct gb_s
 		/* Implementation defined data. Set to NULL if not required. */
 		void *priv;
 	} direct;
+
+	/* Joypad state to set on the given LCD line. */
+	struct joypad_state new_joypad_state;
+	/* LCD line to set joypad state. */
+	uint8_t joypad_lcd_line_set;
+	uint8_t joypad_set_enable;
 
 	/* Tracks button state to initiate a joypad interrupt when the button
 	 * state changes. */
@@ -3916,6 +3922,18 @@ void gb_set_rtc(struct gb_s *gb, const struct tm * const time);
  */
 void gb_set_bootrom(struct gb_s *gb,
 	uint8_t (*gb_bootrom_read)(struct gb_s*, const uint_fast16_t));
+
+
+/**
+ * Set joypad button states on a specific LCD line. This sets all the buttons on
+ * the given LCD line. The maximum LCD line is 153 (0 is the first line).
+ * This function assumes that the buttons changes state (so this will trigger a
+ * joypad interrupt if enabled by the ROM).
+ * If this function is used, then gb->direct.joypad should not be written to
+ * directly.
+ */
+void gb_set_joypad(struct gb_s *gb, struct joypad_state *j,
+		uint8_t lcd_line);
 
 /* Undefine CPU Flag helper functions. */
 #undef PEANUT_GB_CPUFLAG_MASK_CARRY
