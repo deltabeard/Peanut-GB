@@ -585,9 +585,6 @@ struct gb_s
 	uint8_t enable_cart_ram;
 	/* Cartridge ROM/RAM mode select. */
 	uint8_t cart_mode_select;
-#if PEANUT_FULL_GBC_SUPPORT
-	uint16_t cart_ram_bank_offset;  //offset to subtract from the address to point to the right SRAM bank
-#endif
 	union
 	{
 		struct
@@ -1030,11 +1027,6 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 						      addr - CART_RAM_ADDR + (gb->cart_ram_bank * CRAM_BANK_SIZE), val);
 			}
 			else if(gb->num_ram_banks)
-#if PEANUT_FULL_GBC_SUPPORT
-				if(gb->cgb.cgbMode)
-					gb->gb_cart_ram_write(gb, addr - gb->cart_ram_bank_offset, val);
-				else
-#endif
 				gb->gb_cart_ram_write(gb, addr - CART_RAM_ADDR, val);
 		}
 
