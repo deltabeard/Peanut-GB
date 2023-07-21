@@ -159,6 +159,10 @@
 /* Serial clock locked to 8192Hz on DMG.
  * 4194304 / (8192 / 8) = 4096 clock cycles for sending 1 byte. */
 #define SERIAL_CYCLES       4096
+#define SERIAL_CYCLES_1KB   (SERIAL_CYCLES/1ul)
+#define SERIAL_CYCLES_2KB   (SERIAL_CYCLES/2ul)
+#define SERIAL_CYCLES_32KB  (SERIAL_CYCLES/32ul)
+#define SERIAL_CYCLES_64KB  (SERIAL_CYCLES/64ul)
 
 /* Calculating VSYNC. */
 #define DMG_CLOCK_FREQ      4194304.0
@@ -3626,15 +3630,22 @@ void __gb_step_cpu(struct gb_s *gb)
 		/* Check serial transmission. */
 		if(gb->hram_io[IO_SC] & SERIAL_SC_TX_START)
 		{
+			unsigned int serial_cycles = SERIAL_CYCLES_1KB;
+
 			/* If new transfer, call TX function. */
 			if(gb->counter.serial_count == 0 &&
 				gb->gb_serial_tx != NULL)
 				(gb->gb_serial_tx)(gb, gb->hram_io[IO_SB]);
 
+#if PEANUT_FULL_GBC_SUPPORT
+			if(gb->hram_io[IO_SC] & 0x3)
+				serial_cycles = SERIAL_CYCLES_32KB;
+#endif
+
 			gb->counter.serial_count += inst_cycles;
 
 			/* If it's time to receive byte, call RX function. */
-			if(gb->counter.serial_count >= SERIAL_CYCLES)
+			if(gb->counter.serial_count >= serial_cycles)
 			{
 				/* If RX can be done, do it. */
 				/* If RX failed, do not change SB if using external
