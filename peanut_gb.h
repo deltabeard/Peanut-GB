@@ -193,7 +193,7 @@
 #define LCD_LINE_CYCLES     456
 /* Mode 0 starts on cycle 372. */
 #if PEANUT_FULL_GBC_SUPPORT
-#define LCD_MODE_0_CYCLES   0
+#define LCD_MODE_0_CYCLES   380
 #else
 #define LCD_MODE_0_CYCLES   372
 #endif
@@ -786,11 +786,8 @@ uint8_t __gb_read(struct gb_s *gb, uint16_t addr)
 #endif
 	case 0xA:
 	case 0xB:
-#if PEANUT_FULL_GBC_SUPPORT
-		if(gb->cart_ram && gb->enable_cart_ram)
+		if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
 		{
-#endif
-		if (gb->mbc == 3 && gb->cart_ram_bank >= 0x08) {
 			return gb->cart_rtc[gb->cart_ram_bank - 0x08];
 		}
 		else if(gb->cart_ram && gb->enable_cart_ram)
@@ -808,28 +805,19 @@ uint8_t __gb_read(struct gb_s *gb, uint16_t addr)
 							    (gb->cart_ram_bank * CRAM_BANK_SIZE));
 			}
 			else
-#if PEANUT_FULL_GBC_SUPPORT
-				return gb->gb_cart_ram_read(gb, addr - gb->cart_ram_bank_offset);
-#else
 				return gb->gb_cart_ram_read(gb, addr - CART_RAM_ADDR);
-#endif
 		}
-#if PEANUT_FULL_GBC_SUPPORT
-		}
-#endif
+
 		return 0xFF;
 
 	case 0xC:
-#if PEANUT_FULL_GBC_SUPPORT
-		return gb->wram[addr - WRAM_0_ADDR];
-#endif
 	case 0xD:
 #if PEANUT_FULL_GBC_SUPPORT
+	if(gb->cgb.cgbMode && addr >= WRAM_1_ADDR)
 		return gb->wram[addr - gb->cgb.wramBankOffset];
-		return gb->wram[addr - ECHO_ADDR];
-#else
-		return gb->wram[addr - WRAM_0_ADDR];
 #endif
+		return gb->wram[addr - WRAM_0_ADDR];
+
 	case 0xE:
 		return gb->wram[addr - ECHO_ADDR];
 
@@ -994,26 +982,14 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 		if(gb->mbc == 1)
 		{
 			gb->cart_ram_bank = (val & 3);
-#if PEANUT_FULL_GBC_SUPPORT
-			gb->cart_ram_bank_offset = 0xA000 - (gb->cart_ram_bank << 13);
-#endif
 			gb->selected_rom_bank = ((val & 3) << 5) | (gb->selected_rom_bank & 0x1F);
 			gb->selected_rom_bank = gb->selected_rom_bank & gb->num_rom_banks_mask;
 		}
 		else if(gb->mbc == 3)
-		{
 			gb->cart_ram_bank = val;
-#if PEANUT_FULL_GBC_SUPPORT
-			gb->cart_ram_bank_offset = 0xA000 - ((gb->cart_ram_bank & 3) << 13);
-#endif
-		}
 		else if(gb->mbc == 5)
-		{
 			gb->cart_ram_bank = (val & 0x0F);
-#if PEANUT_FULL_GBC_SUPPORT
-			gb->cart_ram_bank_offset = 0xA000 - (gb->cart_ram_bank << 13);
-#endif
-		}
+
 		return;
 
 	case 0x6:
@@ -1055,10 +1031,11 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 			}
 			else if(gb->num_ram_banks)
 #if PEANUT_FULL_GBC_SUPPORT
-				gb->gb_cart_ram_write(gb, addr - gb->cart_ram_bank_offset, val);
-#else
-				gb->gb_cart_ram_write(gb, addr - CART_RAM_ADDR, val);
+				if(gb->cgb.cgbMode)
+					gb->gb_cart_ram_write(gb, addr - gb->cart_ram_bank_offset, val);
+				else
 #endif
+				gb->gb_cart_ram_write(gb, addr - CART_RAM_ADDR, val);
 		}
 
 		return;
@@ -1282,7 +1259,7 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 		/* CGB VRAM Bank*/
 		case 0x4F:
 			gb->cgb.vramBank = val & 0x01;
-			if (gb->cgb.cgbMode) gb->cgb.vramBankOffset = VRAM_ADDR - (gb->cgb.vramBank << 13);
+			if(gb->cgb.cgbMode) gb->cgb.vramBankOffset = VRAM_ADDR - (gb->cgb.vramBank << 13);
 			return;
 #endif
 		/* Turn off boot ROM */
@@ -1309,9 +1286,9 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 			gb->cgb.dmaSize = (val & 0x7F) + 1;
 			gb->cgb.dmaMode = val >> 7;
 			//DMA GBC
-			if (gb->cgb.dmaActive)
+			if(gb->cgb.dmaActive)
 			{  // Only transfer if dma is not active (=1) otherwise treat it as a termination
-				if (gb->cgb.cgbMode && (!gb->cgb.dmaMode))
+				if(gb->cgb.cgbMode && (!gb->cgb.dmaMode))
 				{
 					for (int i = 0; i < (gb->cgb.dmaSize << 4); i++)
 					{
@@ -1341,7 +1318,7 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 			gb->cgb.BGPalette[(gb->cgb.BGPaletteID & 0x3F)] = val;
 			fixPaletteTemp = (gb->cgb.BGPalette[(gb->cgb.BGPaletteID & 0x3E) + 1] << 8) + (gb->cgb.BGPalette[(gb->cgb.BGPaletteID & 0x3E)]);
 			gb->cgb.fixPalette[((gb->cgb.BGPaletteID & 0x3E) >> 1)] = ((fixPaletteTemp & 0x7C00) >> 10) | (fixPaletteTemp & 0x03E0) | ((fixPaletteTemp & 0x001F) << 10);  // swap Red and Blue
-			if (gb->cgb.BGPaletteInc) gb->cgb.BGPaletteID = (++gb->cgb.BGPaletteID) & 0x3F;
+			if(gb->cgb.BGPaletteInc) gb->cgb.BGPaletteID = (++gb->cgb.BGPaletteID) & 0x3F;
 			return;
 
 		/* CGB OAM Palette Index*/
@@ -1355,14 +1332,14 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 			gb->cgb.OAMPalette[(gb->cgb.OAMPaletteID & 0x3F)] = val;
 			fixPaletteTemp = (gb->cgb.OAMPalette[(gb->cgb.OAMPaletteID & 0x3E) + 1] << 8) + (gb->cgb.OAMPalette[(gb->cgb.OAMPaletteID & 0x3E)]);
 			gb->cgb.fixPalette[0x20 + ((gb->cgb.OAMPaletteID & 0x3E) >> 1)] = ((fixPaletteTemp & 0x7C00) >> 10) | (fixPaletteTemp & 0x03E0) | ((fixPaletteTemp & 0x001F) << 10);  // swap Red and Blue
-			if (gb->cgb.OAMPaletteInc) gb->cgb.OAMPaletteID = (++gb->cgb.OAMPaletteID) & 0x3F;
+			if(gb->cgb.OAMPaletteInc) gb->cgb.OAMPaletteID = (++gb->cgb.OAMPaletteID) & 0x3F;
 			return;
 
 		/* CGB WRAM Bank*/
 		case 0x70:
 			gb->cgb.wramBank = val;
 			gb->cgb.wramBankOffset = WRAM_1_ADDR - (1 << 12);
-			if (gb->cgb.cgbMode && (gb->cgb.wramBank & 7) > 0) gb->cgb.wramBankOffset = WRAM_1_ADDR - ((gb->cgb.wramBank & 7) << 12);
+			if(gb->cgb.cgbMode && (gb->cgb.wramBank & 7) > 0) gb->cgb.wramBankOffset = WRAM_1_ADDR - ((gb->cgb.wramBank & 7) << 12);
 			return;
 #endif
 
@@ -1675,12 +1652,18 @@ void __gb_draw_line(struct gb_s *gb)
 			tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
 
 #if PEANUT_FULL_GBC_SUPPORT
-		if (gb->cgb.cgbMode && (idxAtt & 0x08)) tile += 0x2000;  //VRAM bank 2
-		if (gb->cgb.cgbMode && (idxAtt & 0x40)) tile += 2 * (7 - py);
-		if (!gb->cgb.cgbMode || !(idxAtt & 0x40)) tile += 2 * py;
+		if(gb->cgb.cgbMode)
+		{
+			if(idxAtt & 0x08) tile += 0x2000; //VRAM bank 2
+			if(idxAtt & 0x40) tile += 2 * (7 - py);
+		}
+		if(!(idxAtt & 0x40))
+		{
+			tile += 2 * py;
+		}
 
 		/* fetch first tile */
-		if (gb->cgb.cgbMode && (idxAtt & 0x20))
+		if(gb->cgb.cgbMode && (idxAtt & 0x20))
 		{  //Horizantal Flip
 			t1 = gb->vram[tile] << px;
 			t2 = gb->vram[tile + 1] << px;
@@ -1716,9 +1699,15 @@ void __gb_draw_line(struct gb_s *gb)
 					tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
 
 #if PEANUT_FULL_GBC_SUPPORT
-				if (gb->cgb.cgbMode && (idxAtt & 0x08)) tile += 0x2000;  //VRAM bank 2
-				if (gb->cgb.cgbMode && (idxAtt & 0x40)) tile += 2 * (7 - py);
-				if (!gb->cgb.cgbMode || !(idxAtt & 0x40)) tile += 2 * py;
+				if(gb->cgb.cgbMode)
+				{
+					if(idxAtt & 0x08) tile += 0x2000; //VRAM bank 2
+					if(idxAtt & 0x40) tile += 2 * (7 - py);
+				}
+				if(!(idxAtt & 0x40))
+				{
+					tile += 2 * py;
+				}
 #else
 				tile += 2 * py;
 #endif
@@ -1797,12 +1786,18 @@ void __gb_draw_line(struct gb_s *gb)
 			tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
 
 #if PEANUT_FULL_GBC_SUPPORT
-		if (gb->cgb.cgbMode && (idxAtt & 0x08)) tile += 0x2000;  //VRAM bank 2
-		if (gb->cgb.cgbMode && (idxAtt & 0x40)) tile += 2 * (7 - py);
-		if (!gb->cgb.cgbMode || !(idxAtt & 0x40)) tile += 2 * py;
+		if(gb->cgb.cgbMode)
+		{
+			if(idxAtt & 0x08) tile += 0x2000; //VRAM bank 2
+			if(idxAtt & 0x40) tile += 2 * (7 - py);
+		}
+		if(!(idxAtt & 0x40))
+		{
+			tile += 2 * py;
+		}
 
 		// fetch first tile
-		if (gb->cgb.cgbMode && (idxAtt & 0x20))
+		if(gb->cgb.cgbMode && (idxAtt & 0x20))
 		{  //Horizantal Flip
 			t1 = gb->vram[tile] << px;
 			t2 = gb->vram[tile + 1] << px;
@@ -1842,9 +1837,15 @@ void __gb_draw_line(struct gb_s *gb)
 					tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
 
 #if PEANUT_FULL_GBC_SUPPORT
-				if (gb->cgb.cgbMode && (idxAtt & 0x08)) tile += 0x2000;  //VRAM bank 2
-				if (gb->cgb.cgbMode && (idxAtt & 0x40)) tile += 2 * (7 - py);
-				if (!gb->cgb.cgbMode || !(idxAtt & 0x40)) tile += 2 * py;
+				if(gb->cgb.cgbMode)
+				{
+					if(idxAtt & 0x08) tile += 0x2000; //VRAM bank 2
+					if(idxAtt & 0x40) tile += 2 * (7 - py);
+				}
+				if(!(idxAtt & 0x40))
+				{
+					tile += 2 * py;
+				}
 #else
 				tile += 2 * py;
 #endif
@@ -1854,7 +1855,7 @@ void __gb_draw_line(struct gb_s *gb)
 
 			// copy window
 #if PEANUT_FULL_GBC_SUPPORT
-			if (idxAtt & 0x20)
+			if(idxAtt & 0x20)
 			{  //Horizantal Flip
 				c = (((t1 & 0x80) >> 1) | (t2 & 0x80)) >> 6;
 				pixels[disp_x] = ((idxAtt & 0x07) << 2) + c;
@@ -1865,7 +1866,7 @@ void __gb_draw_line(struct gb_s *gb)
 			else
 			{
 				c = (t1 & 0x1) | ((t2 & 0x1) << 1);
-				if (gb->cgb.cgbMode)
+				if(gb->cgb.cgbMode)
 				{
 					pixels[disp_x] = ((idxAtt & 0x07) << 2) + c;
 					pixelsPrio[disp_x] = (idxAtt >> 7);
@@ -1917,7 +1918,7 @@ void __gb_draw_line(struct gb_s *gb)
 			uint8_t OX = gb->oam[4 * sprite_number + 1];
 
 			/* If sprite isn't on this line, continue. */
-			if (gb->hram_io[IO_LY] +
+			if(gb->hram_io[IO_LY] +
 				(gb->hram_io[IO_LCDC] & LCDC_OBJ_SIZE ? 0 : 8) >= OY
 					|| gb->hram_io[IO_LY] + 16 < OY)
 				continue;
@@ -2031,8 +2032,9 @@ void __gb_draw_line(struct gb_s *gb)
 				if(gb->cgb.cgbMode)
 				{
 					uint8_t isBackgroundDisabled = c && !(gb->hram_io[IO_LCDC] & LCDC_BG_ENABLE);
-					uint8_t isPixelPriorityNonConflicting = c && !(pixelsPrio[disp_x] && (pixels[disp_x] & 0x3))
-															  && !((OF & OBJ_PRIORITY) && (pixels[disp_x] & 0x3));
+					uint8_t isPixelPriorityNonConflicting = c &&
+															!(pixelsPrio[disp_x] && (pixels[disp_x] & 0x3)) &&
+															!((OF & OBJ_PRIORITY) && (pixels[disp_x] & 0x3));
 
 					if(isBackgroundDisabled || isPixelPriorityNonConflicting)
 					{
@@ -2251,7 +2253,7 @@ void __gb_step_cpu(struct gb_s *gb)
 	case 0x10: /* STOP */
 		//gb->gb_halt = 1;
 #if PEANUT_FULL_GBC_SUPPORT
-		if (gb->cgb.cgbMode & gb->cgb.doubleSpeedPrep)
+		if(gb->cgb.cgbMode & gb->cgb.doubleSpeedPrep)
 		{
 			gb->cgb.doubleSpeedPrep = 0;
 			gb->cgb.doubleSpeed ^= 1;
@@ -3779,7 +3781,7 @@ void __gb_step_cpu(struct gb_s *gb)
 
 #if PEANUT_FULL_GBC_SUPPORT
 				//DMA GBC
-				if (gb->cgb.cgbMode && (!gb->cgb.dmaActive) && gb->cgb.dmaMode)
+				if(gb->cgb.cgbMode && !gb->cgb.dmaActive && gb->cgb.dmaMode)
 				{
 					for (uint8_t i = 0; i < 0x10; i++)
 					{
@@ -3788,7 +3790,7 @@ void __gb_step_cpu(struct gb_s *gb)
 					}
 					gb->cgb.dmaSource += 0x10;
 					gb->cgb.dmaDest += 0x10;
-					if (!(--gb->cgb.dmaSize)) gb->cgb.dmaActive = 1;
+					if(!(--gb->cgb.dmaSize)) gb->cgb.dmaActive = 1;
 				}
 #endif
 				if(gb->hram_io[IO_STAT] & STAT_MODE_0_INTR)
@@ -3917,18 +3919,18 @@ void gb_reset(struct gb_s *gb)
 		gb->hram_io[IO_STAT] = 0x85;
 		gb->hram_io[IO_BANK] = 0x01;
 #if PEANUT_FULL_GBC_SUPPORT
-		if (gb->cgb.cgbMode)
+		if(gb->cgb.cgbMode)
 		{
 			gb->cpu_reg.a = 0x11;
 			gb->cpu_reg.f_bits.z = 1;
 			gb->cpu_reg.f_bits.n = 0;
 			gb->cpu_reg.f_bits.h = hdr_chk;
 			gb->cpu_reg.f_bits.c = hdr_chk;
+			gb->cpu_reg.bc.reg = 0x0000;
+			gb->cpu_reg.de.reg = 0x0008;
+			gb->cpu_reg.hl.reg = 0x007C;
+			gb->hram_io[IO_DIV] = 0xFF;
 		}
-		if (gb->cgb.cgbMode) gb->cpu_reg.bc.reg = 0x0000;
-		if (gb->cgb.cgbMode) gb->cpu_reg.de.reg = 0x0008;
-		if (gb->cgb.cgbMode) gb->cpu_reg.hl.reg = 0x007C;
-		if (gb->cgb.cgbMode) gb->hram_io[IO_DIV] = 0xFF;
 #endif
 
 		memset(gb->vram, 0x00, VRAM_SIZE);
@@ -3954,7 +3956,7 @@ void gb_reset(struct gb_s *gb)
 	gb->hram_io[IO_SB  ] = 0x00;
 	gb->hram_io[IO_SC  ] = 0x7E;
 #if PEANUT_FULL_GBC_SUPPORT
-	if (gb->cgb.cgbMode) gb->hram_io[IO_SC] = 0x7F;
+	if(gb->cgb.cgbMode) gb->hram_io[IO_SC] = 0x7F;
 #endif
 	/* DIV */
 	gb->hram_io[IO_TIMA] = 0x00;
