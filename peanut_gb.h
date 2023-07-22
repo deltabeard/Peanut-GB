@@ -196,7 +196,11 @@
 /* PPU cycles through modes every 456 cycles. */
 #define LCD_LINE_CYCLES     456
 /* Mode 0 starts on cycle 372. */
+#if PEANUT_FULL_GBC_SUPPORT
+#define LCD_MODE_0_CYCLES   380
+#else
 #define LCD_MODE_0_CYCLES   372
+#endif
 /* Mode 2 starts on cycle 204. */
 #define LCD_MODE_2_CYCLES   204
 /* Mode 3 starts on cycle 284. */
