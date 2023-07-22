@@ -50,7 +50,7 @@ ENDIF()
 SET(LIBRARY_DISCOVER_METHOD DEFAULT_LIBRARY_DISCOVER_METHOD CACHE STRING
     "Tool to use for discovering dependencies; options are: PKG_CONFIG, CPM")
 SET(ENABLE_SOUND ON CACHE BOOL "Enable sound output")
-SET(ENABLE_GBC_SUPPORT ON CACHE BOOL "Enable support for GBC-only games")
+SET(ENABLE_GBC_SUPPORT OFF CACHE BOOL "Enable support for GBC-only games (Experimental)")
 
 IF(${LIBRARY_DISCOVER_METHOD} STREQUAL "PKG_CONFIG")
     INCLUDE(FindPkgConfig)
