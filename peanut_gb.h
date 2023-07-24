@@ -195,8 +195,8 @@
 /** LCD characteristics **/
 /* PPU cycles through modes every 456 cycles. */
 #define LCD_LINE_CYCLES     456
-/* Mode 0 starts on cycle 380. */
-#define LCD_MODE_0_CYCLES   380
+/* Mode 0 starts on cycle 372. */
+#define LCD_MODE_0_CYCLES   372
 /* Mode 2 starts on cycle 204. */
 #define LCD_MODE_2_CYCLES   204
 /* Mode 3 starts on cycle 284. */
@@ -3708,10 +3708,11 @@ void __gb_step_cpu(struct gb_s *gb)
 
 		/* LCD Timing */
 #if PEANUT_FULL_GBC_SUPPORT
-		gb->counter.lcd_count += (inst_cycles >> gb->cgb.doubleSpeed);
-#else
-		gb->counter.lcd_count += inst_cycles;
+        if (inst_cycles > 1)
+            gb->counter.lcd_count += (inst_cycles >> gb->cgb.doubleSpeed);
+        else
 #endif
+		gb->counter.lcd_count += inst_cycles;
 
 		/* New Scanline */
 		if(gb->counter.lcd_count >= LCD_LINE_CYCLES)
