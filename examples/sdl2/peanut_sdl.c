@@ -620,7 +620,9 @@ int main(int argc, char **argv)
 	SDL_LogSetPriority(LOG_CATERGORY_PEANUTSDL, SDL_LOG_PRIORITY_INFO);
 
 	/* Enable Hi-DPI to stop blurry game image. */
+	#ifdef SDL_HINT_WINDOWS_DPI_AWARENESS
 	SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
+	#endif
 
 	/* Initialise frontend implementation, in this case, SDL2. */
 	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO) < 0)
