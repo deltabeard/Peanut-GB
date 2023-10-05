@@ -1711,8 +1711,8 @@ void __gb_step_cpu(struct gb_s *gb)
 	static const uint_fast16_t TAC_CYCLES[4] = {1024, 16, 64, 256};
 
 	/* Handle interrupts */
-	/* If gb_halt is positive, then an interrupt must have occured by the
-	 * time we reach here, becuase on HALT, we jump to the next interrupt
+	/* If gb_halt is positive, then an interrupt must have occurred by the
+	 * time we reach here, because on HALT, we jump to the next interrupt
 	 * immediately. */
 	while(gb->gb_halt || (gb->gb_ime &&
 			gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & ANY_INTR))
@@ -3218,7 +3218,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	default:
-		/* Return address where invlid opcode that was read. */
+		/* Return address where invalid opcode that was read. */
 		(gb->gb_error)(gb, GB_INVALID_OPCODE, gb->cpu_reg.pc.reg - 1);
 		PGB_UNREACHABLE();
 	}
