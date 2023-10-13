@@ -41,6 +41,7 @@
 # define __has_include(x) 0
 #endif
 
+#include <stdio.h>
 #include <stdlib.h>	/* Required for qsort and abort */
 #include <stdint.h>	/* Required for int types */
 #include <string.h>	/* Required for memset */
@@ -102,6 +103,10 @@
 /* Use intrinsic functions. This may produce smaller and faster code. */
 #ifndef PEANUT_GB_USE_INTRINSICS
 # define PEANUT_GB_USE_INTRINSICS 1
+#endif
+
+#ifndef PEANUT_GB_USE_LOOP_OPTIMISATION
+# define PEANUT_GB_USE_LOOP_OPTIMISATION 1
 #endif
 
 /* Only include function prototypes. At least one file must *not* have this
@@ -1959,7 +1964,143 @@ void __gb_step_cpu(struct gb_s *gb)
 		{
 			int8_t temp = (int8_t) __gb_read(gb, gb->cpu_reg.pc.reg++);
 			gb->cpu_reg.pc.reg += temp;
+
+#if PEANUT_GB_USE_LOOP_OPTIMISATION
+			/**
+			 * Check for possible busy loop.
+			 * We check if the jump is -3, where the "JR NZ, imm"
+			 * instruction requires 2 bytes, and the third byte
+			 * being the operation performed on each loop.
+			 * Example busy loop:
+			 * .loop
+			 * 	dec r8
+			 * 	jr nz, .loop
+			 */
+			if(temp == -3)
+			{
+				uint8_t instr;
+				instr = __gb_read(gb, gb->cpu_reg.pc.reg);
+# if 0
+				/* This implementation checks for DEC r8
+				 * instead of just DEC a (below), but there is
+				 * a significant performance penalty in
+				 * decoding the instruction. */
+
+				/* Check to see if the single byte opcode is a
+				 * DEC instruction. */
+				if((instr & 0b111) == 0b101 &&
+						(instr & 0xF0) <= 0x30)
+				{
+					uint8_t *lut[8] = {
+						&gb->cpu_reg.bc.bytes.b,
+						&gb->cpu_reg.bc.bytes.c,
+						&gb->cpu_reg.de.bytes.d,
+						&gb->cpu_reg.de.bytes.e,
+						&gb->cpu_reg.hl.bytes.h,
+						&gb->cpu_reg.hl.bytes.l,
+						NULL, /* (HL) */
+						&gb->cpu_reg.a
+
+					};
+					uint8_t r = instr >> 3;
+
+					/* (HL) is a special case because it
+					 * requires reading and writing to a
+					 * memory location. */
+					if(r != 6)
+					{
+						/* If register is 0, then we
+						 * loop 256 times. */
+						if(*lut[r] == 0)
+							(*lut[r])--;
+						/* Multiply by number of clock
+						 * cycles, and compensate for
+						 * final JR instruction which
+						 * does not jump, and executes
+						 * in 4 less clock cycles. */
+						inst_cycles += ((unsigned)(*lut[r]) * (8U + 4U)) - 4;
+						(*lut[r]) = 0;
+					}
+					else
+					{
+						uint8_t hl = __gb_read(gb, gb->cpu_reg.hl.reg);
+						if(hl == 0)
+							hl--;
+
+						inst_cycles += ((unsigned)(hl) * (8U + 12U)) - 4;
+						__gb_write(gb, gb->cpu_reg.hl.reg, 0x00);
+					}
+
+					gb->cpu_reg.pc.reg += 3;
+					gb->cpu_reg.f_bits.z = 1;
+					gb->cpu_reg.f_bits.n = 1;
+					gb->cpu_reg.f_bits.h = 0;
+					break;
+				}
+# else
+				/* Alternative implementation of busy loop that
+				 * only check for DEC a. */
+				if(instr == 0x3D)
+				{
+					inst_cycles += ((unsigned)gb->cpu_reg.a * 12U) - 4;
+					gb->cpu_reg.a = 0;
+					gb->cpu_reg.pc.reg += 3;
+					gb->cpu_reg.f_bits.z = 1;
+					gb->cpu_reg.f_bits.n = 1;
+					gb->cpu_reg.f_bits.h = 0;
+					break;
+				}
+# endif
+			}
+			/**
+			 * Check for memset()
+			 * .x
+			 * 	ld [hli], a
+			 * 	dec r8
+			 * 	jr nz, .x
+			 */
+			else if(temp == -4)
+			{
+				uint8_t instr;
+				instr = __gb_read(gb, gb->cpu_reg.pc.reg);
+				/* Check for 'ld [hli], a' instruction. */
+				if(instr == 0x22)
+				{
+					uint8_t dec = __gb_read(gb, gb->cpu_reg.pc.reg + 1);
+					if((dec & 0b111) == 0b101 &&
+							(dec & 0xF0) <= 0x10)
+					{
+						uint8_t *lut[4] = {
+							&gb->cpu_reg.bc.bytes.b,
+							&gb->cpu_reg.bc.bytes.c,
+							&gb->cpu_reg.de.bytes.d,
+							&gb->cpu_reg.de.bytes.e
+						};
+						uint8_t r = dec >> 3;
+
+						/* Multiply by number of clock
+						 * cycles, and compensate for
+						 * final JR instruction which
+						 * does not jump, and executes
+						 * in 4 less clock cycles. */
+						inst_cycles += ((unsigned)(*lut[r]) * (8U + 4U + 8U)) - 4;
+						do
+						{
+							__gb_write(gb, gb->cpu_reg.hl.reg++, gb->cpu_reg.a);
+						} while(--(*lut[r]));
+
+						gb->cpu_reg.pc.reg += 4;
+						gb->cpu_reg.f_bits.z = 1;
+						gb->cpu_reg.f_bits.n = 1;
+						gb->cpu_reg.f_bits.h = 0;
+						break;
+					}
+				}
+			}
+#endif /* PEANUT_GB_USE_LOOP_OPTIMISATION */
+
 			inst_cycles += 4;
+
 		}
 		else
 			gb->cpu_reg.pc.reg++;
