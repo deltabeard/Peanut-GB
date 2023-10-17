@@ -3172,6 +3172,40 @@ void __gb_step_cpu(struct gb_s *gb)
 
 		break;
 
+	case 0xDB: /* Peanut-GB Hijacking Instruction for popular routines. */
+	{
+		/**
+		 * Second byte must be in the format:
+		 * 0bMBBBDDSS
+		 * If M is 1, then BBB is the register with the number of bytes,
+		 * DD is the destination 16-bit address pointer, and SS is the
+		 * source 16-bit address pointer.
+		 *
+		 * 0b000BBBSS : Memset
+		 *
+		 * 0b00100RRR : Busy
+		 *
+		 *
+		 * Memcpy:
+		 * 	Src/Dest = bc++, de++, hl++
+		 * 	Bytes = bc--, de--, b--, c--, d--, e--
+		 *
+		 * Memset:
+		 * 	Src = a
+		 * 	Dest = hl++
+		 * 	Bytes = b--, c--
+		 *
+		 * Busy:
+		 * 	Duration: {a, b, c, d, e}--
+		 */
+		uint8_t routine = __gb_read(gb, gb->cpu_reg.pc.reg++);
+		if(routine == 0x00)
+		{
+			(gb->gb_error)(gb, GB_INVALID_OPCODE, gb->cpu_reg.pc.reg - 1);
+			PGB_UNREACHABLE();
+		}
+	}
+
 	case 0xDC: /* CALL C, imm */
 		if(gb->cpu_reg.f_bits.c)
 		{
