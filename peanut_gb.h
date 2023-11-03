@@ -917,7 +917,13 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 	case 0xB:
 		if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
 		{
-			gb->rtc_real.bytes[gb->cart_ram_bank - 0x08] = val;
+			const uint8_t rtc_reg_mask[5] = {
+				0x3F, 0x3F, 0x1F, 0xFF, 0xC1
+			};
+			uint8_t reg = gb->cart_ram_bank - 0x08;
+			//if(reg == 0) gb->counter.rtc_count = 0;
+
+			gb->rtc_real.bytes[reg] = val & rtc_reg_mask[reg];
 		}
 		/* Do not write to RAM if unavailable or disabled. */
 		else if(gb->cart_ram && gb->enable_cart_ram)
@@ -3245,37 +3251,57 @@ void __gb_step_cpu(struct gb_s *gb)
 		}
 
 		/* Check for RTC tick. */
-		if(gb->mbc == 3 && (gb->rtc_real.bytes[4] & 0x40) == 0)
+		if(gb->mbc == 3 && (gb->rtc_real.reg.high & 0x40) == 0)
 		{
 			gb->counter.rtc_count += inst_cycles;
-			if(gb->counter.rtc_count >= RTC_CYCLES)
+			while(gb->counter.rtc_count >= RTC_CYCLES)
 			{
+				printf("Count: %lu, ", gb->counter.rtc_count);
 				gb->counter.rtc_count -= RTC_CYCLES;
 
-				if(++gb->rtc_real.reg.sec == 60)
+				printf("(%d)%d %02d:%02d:%02d\n",
+					(gb->rtc_real.reg.high & 0x80),
+					(gb->rtc_real.reg.high & 1) << 8 | gb->rtc_real.reg.yday,
+					gb->rtc_real.reg.hour,
+					gb->rtc_real.reg.min,
+					gb->rtc_real.reg.sec);
+
+				/* Detect invalid rollover. */
+				if(gb->rtc_real.reg.sec == 63)
 				{
 					gb->rtc_real.reg.sec = 0;
-
-					if(++gb->rtc_real.reg.min == 60)
-					{
-						gb->rtc_real.reg.min = 0;
-
-						if(++gb->rtc_real.reg.hour == 24)
-						{
-							gb->rtc_real.reg.hour = 0;
-
-							if(++gb->rtc_real.reg.yday == 0)
-							{
-								if(gb->rtc_real.reg.high & 1)  /* Bit 8 of days*/
-								{
-									gb->rtc_real.reg.high |= 0x80; /* Overflow bit */
-								}
-
-								gb->rtc_real.reg.high ^= 1;
-							}
-						}
-					}
+					continue;
 				}
+				
+				if(++gb->rtc_real.reg.sec != 60)
+					continue;
+
+				gb->rtc_real.reg.sec = 0;
+				if(gb->rtc_real.reg.min == 63)
+				{
+					gb->rtc_real.reg.min = 0;
+					continue;
+				}
+				if(++gb->rtc_real.reg.min != 60)
+					continue;
+
+				gb->rtc_real.reg.min = 0;
+				if(gb->rtc_real.reg.hour == 31)
+				{
+					gb->rtc_real.reg.hour = 0;
+					continue;
+				}
+				if(++gb->rtc_real.reg.hour != 24)
+					continue;
+
+				gb->rtc_real.reg.hour = 0;
+				if(++gb->rtc_real.reg.yday != 0)
+					continue;
+
+				if(gb->rtc_real.reg.high & 1)  /* Bit 8 of days*/
+					gb->rtc_real.reg.high |= 0x80; /* Overflow bit */
+
+				gb->rtc_real.reg.high ^= 1;
 			}
 		}
 
