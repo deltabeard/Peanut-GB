@@ -25,7 +25,7 @@ endif
 
 all: peanut-sdl
 peanut-sdl: $(OBJECTS)
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(LDLIBS) -o $@ $^
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $^ $(LDLIBS)
 
 peanut_sdl.o: peanut_sdl.c ../../peanut_gb.h
 

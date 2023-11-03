@@ -88,6 +88,12 @@
 # define ENABLE_LCD 1
 #endif
 
+/* Enable 16 bit colour palette. If disabled, only four colour shades are set in
+ * pixel data. */
+#ifndef PEANUT_GB_12_COLOUR
+# define PEANUT_GB_12_COLOUR 1
+#endif
+
 /* Adds more code to improve LCD rendering accuracy. */
 #ifndef PEANUT_GB_HIGH_LCD_ACCURACY
 # define PEANUT_GB_HIGH_LCD_ACCURACY 1
@@ -438,6 +444,8 @@ struct count_s
 #if ENABLE_LCD
 	/* Bit mask for the shade of pixel to display */
 	#define LCD_COLOUR	0x03
+
+# if PEANUT_GB_12_COLOUR
 	/**
 	* Bit mask for whether a pixel is OBJ0, OBJ1, or BG. Each may have a different
 	* palette when playing a DMG game on CGB.
@@ -452,6 +460,7 @@ struct count_s
 	* LCD_PALETTE_ALL == 0b11 --> NOT POSSIBLE
 	*/
 	#define LCD_PALETTE_ALL 0x30
+# endif
 #endif
 
 /**
@@ -1463,7 +1472,9 @@ void __gb_draw_line(struct gb_s *gb)
 			/* copy background */
 			c = (t1 & 0x1) | ((t2 & 0x1) << 1);
 			pixels[disp_x] = gb->display.bg_palette[c];
+#if PEANUT_GB_12_COLOUR
 			pixels[disp_x] |= LCD_PALETTE_BG;
+#endif
 			t1 = t1 >> 1;
 			t2 = t2 >> 1;
 			px++;
@@ -1529,7 +1540,9 @@ void __gb_draw_line(struct gb_s *gb)
 			// copy window
 			c = (t1 & 0x1) | ((t2 & 0x1) << 1);
 			pixels[disp_x] = gb->display.bg_palette[c];
+#if PEANUT_GB_12_COLOUR
 			pixels[disp_x] |= LCD_PALETTE_BG;
+#endif
 			t1 = t1 >> 1;
 			t2 = t2 >> 1;
 			px++;
@@ -1661,8 +1674,10 @@ void __gb_draw_line(struct gb_s *gb)
 					pixels[disp_x] = (OF & OBJ_PALETTE)
 						? gb->display.sp_palette[c + 4]
 						: gb->display.sp_palette[c];
+#if PEANUT_GB_12_COLOUR
 					/* Set pixel palette (OBJ0 or OBJ1). */
 					pixels[disp_x] |= (OF & OBJ_PALETTE);
+#endif
 				}
 
 				t1 = t1 >> 1;
@@ -1707,8 +1722,8 @@ void __gb_step_cpu(struct gb_s *gb)
 	static const uint_fast16_t TAC_CYCLES[4] = {1024, 16, 64, 256};
 
 	/* Handle interrupts */
-	/* If gb_halt is positive, then an interrupt must have occured by the
-	 * time we reach here, becuase on HALT, we jump to the next interrupt
+	/* If gb_halt is positive, then an interrupt must have occurred by the
+	 * time we reach here, because on HALT, we jump to the next interrupt
 	 * immediately. */
 	while(gb->gb_halt || (gb->gb_ime &&
 			gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & ANY_INTR))
@@ -2023,7 +2038,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 	}
 
-	case 0x28: /* JP Z, imm */
+	case 0x28: /* JR Z, imm */
 		if(gb->cpu_reg.f_bits.z)
 		{
 			int8_t temp = (int8_t) __gb_read(gb, gb->cpu_reg.pc.reg++);
@@ -2073,7 +2088,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		gb->cpu_reg.f_bits.h = 1;
 		break;
 
-	case 0x30: /* JP NC, imm */
+	case 0x30: /* JR NC, imm */
 		if(!gb->cpu_reg.f_bits.c)
 		{
 			int8_t temp = (int8_t) __gb_read(gb, gb->cpu_reg.pc.reg++);
@@ -2129,7 +2144,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		gb->cpu_reg.f_bits.c = 1;
 		break;
 
-	case 0x38: /* JP C, imm */
+	case 0x38: /* JR C, imm */
 		if(gb->cpu_reg.f_bits.c)
 		{
 			int8_t temp = (int8_t) __gb_read(gb, gb->cpu_reg.pc.reg++);
@@ -3214,7 +3229,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	default:
-		/* Return address where invlid opcode that was read. */
+		/* Return address where invalid opcode that was read. */
 		(gb->gb_error)(gb, GB_INVALID_OPCODE, gb->cpu_reg.pc.reg - 1);
 		PGB_UNREACHABLE();
 	}
