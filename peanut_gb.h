@@ -3256,15 +3256,7 @@ void __gb_step_cpu(struct gb_s *gb)
 			gb->counter.rtc_count += inst_cycles;
 			while(gb->counter.rtc_count >= RTC_CYCLES)
 			{
-				printf("Count: %lu, ", gb->counter.rtc_count);
 				gb->counter.rtc_count -= RTC_CYCLES;
-
-				printf("(%d)%d %02d:%02d:%02d\n",
-					(gb->rtc_real.reg.high & 0x80),
-					(gb->rtc_real.reg.high & 1) << 8 | gb->rtc_real.reg.yday,
-					gb->rtc_real.reg.hour,
-					gb->rtc_real.reg.min,
-					gb->rtc_real.reg.sec);
 
 				/* Detect invalid rollover. */
 				if(gb->rtc_real.reg.sec == 63)
@@ -3272,7 +3264,7 @@ void __gb_step_cpu(struct gb_s *gb)
 					gb->rtc_real.reg.sec = 0;
 					continue;
 				}
-				
+
 				if(++gb->rtc_real.reg.sec != 60)
 					continue;
 
@@ -3756,7 +3748,7 @@ void gb_set_bootrom(struct gb_s *gb,
 }
 
 /**
- * This was taken from SameBoy, which is released under MIT Licence.
+ * Deprecated. Will be removed in the next major version.
  */
 void gb_tick_rtc(struct gb_s *gb)
 {
@@ -3893,10 +3885,8 @@ uint8_t gb_colour_hash(struct gb_s *gb);
 const char* gb_get_rom_name(struct gb_s* gb, char *title_str);
 
 /**
- * Tick the internal RTC by one second. This does not affect games with no RTC
- * support.
- *
- * \param gb	An initialised emulator context. Must not be NULL.
+ * Deprecated. Will be removed in the next major version.
+ * RTC is ticked internally and this function has no effect.
  */
 void gb_tick_rtc(struct gb_s *gb);
 
