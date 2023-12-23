@@ -21,7 +21,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  *
- * Please note that at least three parts of source code within this project was
+ * Please note that at least two parts of source code within this project was
  * taken from the SameBoy project at https://github.com/LIJI32/SameBoy/ which at
  * the time of this writing is released under the MIT License. Occurrences of
  * this code is marked as being taken from SameBoy with a comment.
