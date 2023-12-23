@@ -3269,12 +3269,12 @@ void __gb_step_cpu(struct gb_s *gb)
 		if(gb->mbc == 3 && (gb->rtc_real.reg.high & 0x40) == 0)
 		{
 			gb->counter.rtc_count += inst_cycles;
-			while(gb->counter.rtc_count >= RTC_CYCLES)
+			while(PGB_UNLIKELY(gb->counter.rtc_count >= RTC_CYCLES))
 			{
 				gb->counter.rtc_count -= RTC_CYCLES;
 
 				/* Detect invalid rollover. */
-				if(gb->rtc_real.reg.sec == 63)
+				if(PGB_UNLIKELY(gb->rtc_real.reg.sec == 63))
 				{
 					gb->rtc_real.reg.sec = 0;
 					continue;
