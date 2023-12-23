@@ -3584,6 +3584,7 @@ void gb_reset(struct gb_s *gb)
 	gb->counter.div_count = 0;
 	gb->counter.tima_count = 0;
 	gb->counter.serial_count = 0;
+	gb->counter.rtc_count = 0;
 
 	gb->direct.joypad = 0xFF;
 	gb->hram_io[IO_JOYP] = 0xCF;
