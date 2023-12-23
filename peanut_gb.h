@@ -21,7 +21,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  *
- * Please note that at least three parts of source code within this project was
+ * Please note that at least two parts of source code within this project was
  * taken from the SameBoy project at https://github.com/LIJI32/SameBoy/ which at
  * the time of this writing is released under the MIT License. Occurrences of
  * this code is marked as being taken from SameBoy with a comment.
@@ -155,6 +155,9 @@
 #define DMG_CLOCK_FREQ      4194304.0
 #define SCREEN_REFRESH_CYCLES 70224.0
 #define VERTICAL_SYNC       (DMG_CLOCK_FREQ/SCREEN_REFRESH_CYCLES)
+
+/* Real Time Clock is locked to 1Hz. */
+#define RTC_CYCLES	((unsigned long)DMG_CLOCK_FREQ)
 
 /* SERIAL SC register masks. */
 #define SERIAL_SC_TX_START  0x80
@@ -435,6 +438,7 @@ struct count_s
 	uint_fast16_t div_count;	/* Divider Register Counter */
 	uint_fast16_t tima_count;	/* Timer Counter */
 	uint_fast16_t serial_count;	/* Serial Counter */
+	uint_fast32_t rtc_count;	/* RTC Counter */
 };
 
 #if ENABLE_LCD
@@ -490,6 +494,19 @@ enum gb_serial_rx_ret_e
 {
 	GB_SERIAL_RX_SUCCESS = 0,
 	GB_SERIAL_RX_NO_CONNECTION = 1
+};
+
+union cart_rtc
+{
+	struct
+	{
+		uint8_t sec;
+		uint8_t min;
+		uint8_t hour;
+		uint8_t yday;
+		uint8_t high;
+	} reg;
+	uint8_t bytes[5];
 };
 
 /**
@@ -568,18 +585,8 @@ struct gb_s
 	uint8_t enable_cart_ram;
 	/* Cartridge ROM/RAM mode select. */
 	uint8_t cart_mode_select;
-	union
-	{
-		struct
-		{
-			uint8_t sec;
-			uint8_t min;
-			uint8_t hour;
-			uint8_t yday;
-			uint8_t high;
-		} rtc_bits;
-		uint8_t cart_rtc[5];
-	};
+
+	union cart_rtc rtc_latched, rtc_real;
 
 	struct cpu_registers_s cpu_reg;
 	//struct gb_registers_s gb_reg;
@@ -740,7 +747,7 @@ uint8_t __gb_read(struct gb_s *gb, uint16_t addr)
 	case 0xB:
 		if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
 		{
-			return gb->cart_rtc[gb->cart_ram_bank - 0x08];
+			return gb->rtc_latched.bytes[gb->cart_ram_bank - 0x08];
 		}
 		else if(gb->cart_ram && gb->enable_cart_ram)
 		{
@@ -894,7 +901,11 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 
 	case 0x6:
 	case 0x7:
-		gb->cart_mode_select = (val & 1);
+		val &= 1;
+		if(gb->mbc == 3 && val && gb->cart_mode_select == 0)
+			memcpy(&gb->rtc_latched.bytes, &gb->rtc_real.bytes, sizeof(gb->rtc_latched.bytes));
+
+		gb->cart_mode_select = val;
 		return;
 
 	case 0x8:
@@ -906,7 +917,13 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 	case 0xB:
 		if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
 		{
-			gb->cart_rtc[gb->cart_ram_bank - 0x08] = val;
+			const uint8_t rtc_reg_mask[5] = {
+				0x3F, 0x3F, 0x1F, 0xFF, 0xC1
+			};
+			uint8_t reg = gb->cart_ram_bank - 0x08;
+			//if(reg == 0) gb->counter.rtc_count = 0;
+
+			gb->rtc_real.bytes[reg] = val & rtc_reg_mask[reg];
 		}
 		/* Do not write to RAM if unavailable or disabled. */
 		else if(gb->cart_ram && gb->enable_cart_ram)
@@ -3233,6 +3250,53 @@ void __gb_step_cpu(struct gb_s *gb)
 			gb->counter.div_count -= DIV_CYCLES;
 		}
 
+		/* Check for RTC tick. */
+		if(gb->mbc == 3 && (gb->rtc_real.reg.high & 0x40) == 0)
+		{
+			gb->counter.rtc_count += inst_cycles;
+			while(gb->counter.rtc_count >= RTC_CYCLES)
+			{
+				gb->counter.rtc_count -= RTC_CYCLES;
+
+				/* Detect invalid rollover. */
+				if(gb->rtc_real.reg.sec == 63)
+				{
+					gb->rtc_real.reg.sec = 0;
+					continue;
+				}
+
+				if(++gb->rtc_real.reg.sec != 60)
+					continue;
+
+				gb->rtc_real.reg.sec = 0;
+				if(gb->rtc_real.reg.min == 63)
+				{
+					gb->rtc_real.reg.min = 0;
+					continue;
+				}
+				if(++gb->rtc_real.reg.min != 60)
+					continue;
+
+				gb->rtc_real.reg.min = 0;
+				if(gb->rtc_real.reg.hour == 31)
+				{
+					gb->rtc_real.reg.hour = 0;
+					continue;
+				}
+				if(++gb->rtc_real.reg.hour != 24)
+					continue;
+
+				gb->rtc_real.reg.hour = 0;
+				if(++gb->rtc_real.reg.yday != 0)
+					continue;
+
+				if(gb->rtc_real.reg.high & 1)  /* Bit 8 of days*/
+					gb->rtc_real.reg.high |= 0x80; /* Overflow bit */
+
+				gb->rtc_real.reg.high ^= 1;
+			}
+		}
+
 		/* Check serial transmission. */
 		if(gb->hram_io[IO_SC] & SERIAL_SC_TX_START)
 		{
@@ -3520,6 +3584,7 @@ void gb_reset(struct gb_s *gb)
 	gb->counter.div_count = 0;
 	gb->counter.tima_count = 0;
 	gb->counter.serial_count = 0;
+	gb->counter.rtc_count = 0;
 
 	gb->direct.joypad = 0xFF;
 	gb->hram_io[IO_JOYP] = 0xCF;
@@ -3684,47 +3749,21 @@ void gb_set_bootrom(struct gb_s *gb,
 }
 
 /**
- * This was taken from SameBoy, which is released under MIT Licence.
+ * Deprecated. Will be removed in the next major version.
  */
 void gb_tick_rtc(struct gb_s *gb)
 {
-	/* is timer running? */
-	if((gb->cart_rtc[4] & 0x40) == 0)
-	{
-		if(++gb->rtc_bits.sec == 60)
-		{
-			gb->rtc_bits.sec = 0;
-
-			if(++gb->rtc_bits.min == 60)
-			{
-				gb->rtc_bits.min = 0;
-
-				if(++gb->rtc_bits.hour == 24)
-				{
-					gb->rtc_bits.hour = 0;
-
-					if(++gb->rtc_bits.yday == 0)
-					{
-						if(gb->rtc_bits.high & 1)  /* Bit 8 of days*/
-						{
-							gb->rtc_bits.high |= 0x80; /* Overflow bit */
-						}
-
-						gb->rtc_bits.high ^= 1;
-					}
-				}
-			}
-		}
-	}
+	(void) gb;
+	return;
 }
 
 void gb_set_rtc(struct gb_s *gb, const struct tm * const time)
 {
-	gb->cart_rtc[0] = time->tm_sec;
-	gb->cart_rtc[1] = time->tm_min;
-	gb->cart_rtc[2] = time->tm_hour;
-	gb->cart_rtc[3] = time->tm_yday & 0xFF; /* Low 8 bits of day counter. */
-	gb->cart_rtc[4] = time->tm_yday >> 8; /* High 1 bit of day counter. */
+	gb->rtc_real.bytes[0] = time->tm_sec;
+	gb->rtc_real.bytes[1] = time->tm_min;
+	gb->rtc_real.bytes[2] = time->tm_hour;
+	gb->rtc_real.bytes[3] = time->tm_yday & 0xFF; /* Low 8 bits of day counter. */
+	gb->rtc_real.bytes[4] = time->tm_yday >> 8; /* High 1 bit of day counter. */
 }
 #endif // PEANUT_GB_HEADER_ONLY
 
@@ -3847,10 +3886,8 @@ uint8_t gb_colour_hash(struct gb_s *gb);
 const char* gb_get_rom_name(struct gb_s* gb, char *title_str);
 
 /**
- * Tick the internal RTC by one second. This does not affect games with no RTC
- * support.
- *
- * \param gb	An initialised emulator context. Must not be NULL.
+ * Deprecated. Will be removed in the next major version.
+ * RTC is ticked internally and this function has no effect.
  */
 void gb_tick_rtc(struct gb_s *gb);
 
