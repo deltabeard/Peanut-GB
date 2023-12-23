@@ -246,6 +246,21 @@
 # endif
 #endif /* !defined(PGB_UNREACHABLE) */
 
+#if !defined(PGB_UNLIKELY)
+# if __has_builtin(__builtin_expect)
+#  define PGB_UNLIKELY(expr) __builtin_expect(!!(expr), 0)
+# else
+#  define PGB_UNLIKELY(expr) (expr)
+# endif
+#endif /* !defined(PGB_UNLIKELY) */
+#if !defined(PGB_LIKELY)
+# if __has_builtin(__builtin_expect)
+#  define PGB_LIKELY(expr) __builtin_expect(!!(expr), 1)
+# else
+#  define PGB_LIKELY(expr) (expr)
+# endif
+#endif /* !defined(PGB_LIKELY) */
+
 #if PEANUT_GB_USE_INTRINSICS
 /* If using MSVC, only enable intrinsics for x86 platforms*/
 # if defined(_MSC_VER) && __has_include("intrin.h") && \
