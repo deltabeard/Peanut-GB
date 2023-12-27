@@ -359,7 +359,7 @@
 
 #define PGB_INSTR_OR_R8(r)							\
 	gb->cpu_reg.a |= r;							\
-        gb->cpu_reg.f.reg = 0;							\
+	gb->cpu_reg.f.reg = 0;							\
 	gb->cpu_reg.f.f_bits.z = (gb->cpu_reg.a == 0x00)
 
 #define PGB_INSTR_AND_R8(r)							\
@@ -459,25 +459,34 @@ struct count_s
 	uint_fast32_t rtc_count;	/* RTC Counter */
 };
 
+#ifndef PEANUT_GB_USE_NIBBLE_FOR_PALETTE
+# define PEANUT_GB_USE_NIBBLE_FOR_PALETTE 0
+#endif
 #if ENABLE_LCD
-	/* Bit mask for the shade of pixel to display */
-	#define LCD_COLOUR	0x03
+/* Bit mask for the shade of pixel to display */
+# define LCD_COLOUR	0x03
 
 # if PEANUT_GB_12_COLOUR
-	/**
-	* Bit mask for whether a pixel is OBJ0, OBJ1, or BG. Each may have a different
-	* palette when playing a DMG game on CGB.
-	*/
-	#define LCD_PALETTE_OBJ	0x10
-	#define LCD_PALETTE_BG	0x20
-	/**
-	* Bit mask for the two bits listed above.
-	* LCD_PALETTE_ALL == 0b00 --> OBJ0
-	* LCD_PALETTE_ALL == 0b01 --> OBJ1
-	* LCD_PALETTE_ALL == 0b10 --> BG
-	* LCD_PALETTE_ALL == 0b11 --> NOT POSSIBLE
-	*/
-	#define LCD_PALETTE_ALL 0x30
+#  if PEANUT_GB_USE_NIBBLE_FOR_PALETTE
+/**
+ * Bit mask for whether a pixel is OBJ0, OBJ1, or BG. Each may have a different
+ * palette when playing a DMG game on CGB.
+ */
+#   define LCD_PALETTE_OBJ	0x04
+#   define LCD_PALETTE_BG	0x08
+/**
+ * Bit mask for the two bits listed above.
+ * LCD_PALETTE_ALL == 0b00 --> OBJ0
+ * LCD_PALETTE_ALL == 0b01 --> OBJ1
+ * LCD_PALETTE_ALL == 0b10 --> BG
+ * LCD_PALETTE_ALL == 0b11 --> NOT POSSIBLE
+ */
+#   define LCD_PALETTE_ALL	0x0C
+#  else
+#   define LCD_PALETTE_OBJ	0x10
+#   define LCD_PALETTE_BG	0x20
+#   define LCD_PALETTE_ALL	0x30
+#  endif
 # endif
 #endif
 
@@ -1195,12 +1204,12 @@ uint8_t __gb_execute_cb(struct gb_s *gb)
 	{
 	case 0x06:
 	case 0x86:
-    	case 0xC6:
+	case 0xC6:
 		inst_cycles += 8;
-    	break;
-    	case 0x46:
+	break;
+	case 0x46:
 		inst_cycles += 4;
-    	break;
+	break;
 	}
 
 	switch(r)
@@ -1690,9 +1699,15 @@ void __gb_draw_line(struct gb_s *gb)
 					pixels[disp_x] = (OF & OBJ_PALETTE)
 						? gb->display.sp_palette[c + 4]
 						: gb->display.sp_palette[c];
+
+					/* Set pixel palette (OBJ0 or OBJ1)
+					 * using LCD_PALETTE_OBJ. */
 #if PEANUT_GB_12_COLOUR
-					/* Set pixel palette (OBJ0 or OBJ1). */
+# if PEANUT_GB_USE_NIBBLE_FOR_PALETTE
+					pixels[disp_x] |= (OF & OBJ_PALETTE) >> 2;
+# else
 					pixels[disp_x] |= (OF & OBJ_PALETTE);
+# endif
 #endif
 				}
 
@@ -2024,7 +2039,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		if((a & 0x100) == 0x100)
 			gb->cpu_reg.f.f_bits.c = 1;
 
-		gb->cpu_reg.a = a;
+		gb->cpu_reg.a = (uint8_t)a;
 		gb->cpu_reg.f.f_bits.z = (gb->cpu_reg.a == 0);
 		gb->cpu_reg.f.f_bits.h = 0;
 

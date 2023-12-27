@@ -17,6 +17,7 @@
 #	include "minigb_apu/minigb_apu.h"
 #endif
 
+#define PEANUT_GB_USE_NIBBLE_FOR_PALETTE 1
 #include "../../peanut_gb.h"
 
 enum {
@@ -36,8 +37,29 @@ struct priv_t
 	uint8_t *bootrom;
 
 	/* Colour palette for each BG, OBJ0, and OBJ1. */
-	uint16_t selected_palette[3][4];
-	uint16_t fb[LCD_HEIGHT][LCD_WIDTH];
+	//SDL_Palette selected_palette[3];
+	uint8_t fb[LCD_HEIGHT][LCD_WIDTH];
+};
+
+static const SDL_Colour default_palette[12] =
+{
+	/* OBJ0 */
+	{ .r = 0xFF, .g = 0xFF, .b = 0xFF, .a = SDL_ALPHA_OPAQUE },
+	{ .r = 0xFF, .g = 0xAD, .b = 0x63, .a = SDL_ALPHA_OPAQUE },
+	{ .r = 0x94, .g = 0x3A, .b = 0x3A, .a = SDL_ALPHA_OPAQUE },
+	{ .r = 0x00, .g = 0x00, .b = 0x00, .a = SDL_ALPHA_OPAQUE },
+
+	/* OBJ1 */
+	{ .r = 0xFF, .g = 0xFF, .b = 0xFF, .a = SDL_ALPHA_OPAQUE },
+	{ .r = 0x7B, .g = 0xFF, .b = 0x31, .a = SDL_ALPHA_OPAQUE },
+	{ .r = 0x00, .g = 0x84, .b = 0x00, .a = SDL_ALPHA_OPAQUE },
+	{ .r = 0x00, .g = 0x00, .b = 0x00, .a = SDL_ALPHA_OPAQUE },
+
+	/* BG */
+	{ .r = 0xFF, .g = 0xFF, .b = 0xFF, .a = SDL_ALPHA_OPAQUE },
+	{ .r = 0x63, .g = 0xA5, .b = 0xFF, .a = SDL_ALPHA_OPAQUE },
+	{ .r = 0x00, .g = 0x00, .b = 0xFF, .a = SDL_ALPHA_OPAQUE },
+	{ .r = 0x00, .g = 0x00, .b = 0x00, .a = SDL_ALPHA_OPAQUE }
 };
 
 /**
@@ -183,6 +205,7 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t addr
 	exit(EXIT_FAILURE);
 }
 
+#if 0
 /**
  * Automatically assigns a colour palette to the game using a given game
  * checksum.
@@ -534,6 +557,7 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 
 	return;
 }
+#endif
 
 #if ENABLE_LCD
 /**
@@ -543,20 +567,14 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
 		   const uint_least8_t line)
 {
 	struct priv_t *priv = gb->direct.priv;
-
-	for(unsigned int x = 0; x < LCD_WIDTH; x++)
-	{
-		priv->fb[line][x] = priv->selected_palette
-				    [(pixels[x] & LCD_PALETTE_ALL) >> 4]
-				    [pixels[x] & 3];
-	}
+	SDL_memcpy(&priv->fb[line][0], pixels, 160);
 }
 #endif
 
 /**
  * Saves the LCD screen as a 15-bit BMP file.
  */
-int save_lcd_bmp(struct gb_s* gb, uint16_t fb[LCD_HEIGHT][LCD_WIDTH])
+int save_lcd_bmp(struct gb_s* gb, uint8_t fb[LCD_HEIGHT][LCD_WIDTH])
 {
 	/* Should be enough to record up to 828 days worth of frames. */
 	static uint_fast32_t file_num = 0;
@@ -568,6 +586,7 @@ int save_lcd_bmp(struct gb_s* gb, uint16_t fb[LCD_HEIGHT][LCD_WIDTH])
 	SDL_snprintf(file_name, 32, "%.16s_%010ld.bmp",
 		 gb_get_rom_name(gb, title_str), file_num);
 
+#if 0
 	f = SDL_RWFromFile(file_name, "wb");
 	if(f == NULL)
 		goto ret;
@@ -582,8 +601,9 @@ int save_lcd_bmp(struct gb_s* gb, uint16_t fb[LCD_HEIGHT][LCD_WIDTH])
 	};
 
 	SDL_RWwrite(f, bmp_hdr_rgb555, sizeof(uint8_t), sizeof(bmp_hdr_rgb555));
-	SDL_RWwrite(f, fb, sizeof(uint16_t), LCD_HEIGHT * LCD_WIDTH);
+	SDL_RWwrite(f, fb, sizeof(uint8_t), LCD_HEIGHT * LCD_WIDTH);
 	ret = SDL_RWclose(f);
+#endif
 
 	file_num++;
 
@@ -603,7 +623,8 @@ int main(int argc, char **argv)
 	double speed_compensation = 0.0;
 	SDL_Window *window;
 	SDL_Renderer *renderer;
-	SDL_Texture *texture;
+	SDL_Surface *surface;
+	SDL_Palette *palette;
 	SDL_Event event;
 	SDL_GameController *controller = NULL;
 	uint_fast32_t new_ticks, old_ticks;
@@ -620,9 +641,9 @@ int main(int argc, char **argv)
 	SDL_LogSetPriority(LOG_CATERGORY_PEANUTSDL, SDL_LOG_PRIORITY_INFO);
 
 	/* Enable Hi-DPI to stop blurry game image. */
-	#ifdef SDL_HINT_WINDOWS_DPI_AWARENESS
+#ifdef SDL_HINT_WINDOWS_DPI_AWARENESS
 	SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
-	#endif
+#endif
 
 	/* Initialise frontend implementation, in this case, SDL2. */
 	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO) < 0)
@@ -972,11 +993,11 @@ int main(int argc, char **argv)
 	SDL_RenderSetLogicalSize(renderer, LCD_WIDTH, LCD_HEIGHT);
 	SDL_RenderSetIntegerScale(renderer, 1);
 
+#if 0
 	texture = SDL_CreateTexture(renderer,
-				    SDL_PIXELFORMAT_RGB555,
-				    SDL_TEXTUREACCESS_STREAMING,
-				    LCD_WIDTH, LCD_HEIGHT);
-
+				SDL_PIXELFORMAT_INDEX8,
+				SDL_TEXTUREACCESS_STREAMING,
+				LCD_WIDTH, LCD_HEIGHT);
 	if(texture == NULL)
 	{
 		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
@@ -986,8 +1007,17 @@ int main(int argc, char **argv)
 		ret = EXIT_FAILURE;
 		goto out;
 	}
+#endif
 
-	auto_assign_palette(&priv, gb_colour_hash(&gb));
+	surface = SDL_CreateRGBSurfaceWithFormatFrom(priv.fb,
+			LCD_WIDTH, LCD_HEIGHT,
+			8, LCD_WIDTH, SDL_PIXELFORMAT_INDEX8);
+	palette = SDL_AllocPalette(12);
+	SDL_SetPaletteColors(palette, default_palette,
+		0, SDL_arraysize(default_palette));
+	SDL_SetSurfacePalette(surface, palette);
+
+	//auto_assign_palette(&priv, gb_colour_hash(&gb));
 
 	while(SDL_QuitRequested() == SDL_FALSE)
 	{
@@ -995,6 +1025,7 @@ int main(int argc, char **argv)
 		static double rtc_timer = 0;
 		static unsigned int selected_palette = 3;
 		static unsigned int dump_bmp = 0;
+		SDL_Texture *texture;
 
 		/* Calculate the time taken to draw frame, then later add a
 		 * delay to cap at 60 fps. */
@@ -1135,14 +1166,14 @@ int main(int argc, char **argv)
 				case SDLK_p:
 					if(event.key.keysym.mod == KMOD_LSHIFT)
 					{
-						auto_assign_palette(&priv, gb_colour_hash(&gb));
+						//auto_assign_palette(&priv, gb_colour_hash(&gb));
 						break;
 					}
 
-					if(++selected_palette == NUMBER_OF_PALETTES)
-						selected_palette = 0;
+					//if(++selected_palette == NUMBER_OF_PALETTES)
+					//	selected_palette = 0;
 
-					manual_assign_palette(&priv, selected_palette);
+					//manual_assign_palette(&priv, selected_palette);
 					break;
 				}
 
@@ -1224,8 +1255,10 @@ int main(int argc, char **argv)
 			}
 		}
 
+		SDL_LockSurface(surface);
 		/* Execute CPU cycles until the screen has to be redrawn. */
 		gb_run_frame(&gb);
+		SDL_UnlockSurface(surface);
 
 		/* Tick the internal RTC when 1 second has passed. */
 		rtc_timer += target_speed_ms / (double) fast_mode;
@@ -1254,10 +1287,12 @@ int main(int argc, char **argv)
 
 #if ENABLE_LCD
 		/* Copy frame buffer to SDL screen. */
-		SDL_UpdateTexture(texture, NULL, &priv.fb, LCD_WIDTH * sizeof(uint16_t));
+		//SDL_UpdateTexture(texture, NULL, &priv.fb, LCD_WIDTH);
+		texture = SDL_CreateTextureFromSurface(renderer, surface);
 		SDL_RenderClear(renderer);
 		SDL_RenderCopy(renderer, texture, NULL, NULL);
 		SDL_RenderPresent(renderer);
+		SDL_DestroyTexture(texture);
 
 		if(dump_bmp)
 		{
@@ -1346,7 +1381,6 @@ int main(int argc, char **argv)
 quit:
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
-	SDL_DestroyTexture(texture);
 	SDL_GameControllerClose(controller);
 	SDL_Quit();
 #ifdef ENABLE_SOUND_BLARGG
