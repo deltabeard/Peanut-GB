@@ -695,7 +695,7 @@ int main(int argc, char **argv)
 					break;
 			}
 		} while(rom_file_name == NULL);
-			
+
 		break;
 
 	case 2:
@@ -712,18 +712,9 @@ int main(int argc, char **argv)
 		break;
 
 	default:
-#if ENABLE_FILE_GUI
 		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
 				SDL_LOG_PRIORITY_CRITICAL,
-				"Usage: %s [ROM] [SAVE]", argv[0]);
-		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
-				SDL_LOG_PRIORITY_CRITICAL,
-				"A file picker is presented if ROM is not given.");
-#else
-		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
-				SDL_LOG_PRIORITY_CRITICAL,
-				"Usage: %s ROM [SAVE]\n", argv[0]);
-#endif
+				"Usage: %s ROM [SAVE]", argv[0]);
 		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
 				SDL_LOG_PRIORITY_CRITICAL,
 				"SAVE is set by default if not provided.");
@@ -924,7 +915,6 @@ int main(int argc, char **argv)
 			continue;
 
 		controller = SDL_GameControllerOpen(i);
-
 		if(controller)
 		{
 			SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
@@ -933,23 +923,19 @@ int main(int argc, char **argv)
 					SDL_GameControllerName(controller));
 			break;
 		}
-		else
-		{
-			SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
-					SDL_LOG_PRIORITY_INFO,
-					"Could not open game controller %i: %s\n",
-					i, SDL_GetError());
-		}
+
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_INFO,
+				"Could not open game controller %i: %s\n",
+				i, SDL_GetError());
 	}
 
 	{
 		/* 12 for "Peanut-SDL: " and a maximum of 16 for the title. */
 		char title_str[28] = "Peanut-SDL: ";
 		gb_get_rom_name(&gb, title_str + 12);
-		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
-				SDL_LOG_PRIORITY_INFO,
-				"%s",
-				title_str);
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL, SDL_LOG_PRIORITY_INFO,
+				"%s", title_str);
 		SDL_SetWindowTitle(window, title_str);
 	}
 
@@ -966,10 +952,9 @@ int main(int argc, char **argv)
 	//auto_assign_palette(&priv, gb_colour_hash(&gb));
 	win_surf = SDL_GetWindowSurface(window);
 	surf_imdt = SDL_ConvertSurfaceFormat(gb_surface, win_surf->format->format, 0);
-	if (surf_imdt == NULL)
+	if(surf_imdt == NULL)
 	{
-		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
-			SDL_LOG_PRIORITY_ERROR,
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL, SDL_LOG_PRIORITY_ERROR,
 			"%s", SDL_GetError());
 		goto quit;
 	}
@@ -1225,7 +1210,7 @@ int main(int argc, char **argv)
 		if(rtc_timer >= 1000.0)
 		{
 			rtc_timer -= 1000.0;
-			gb_tick_rtc(&gb);
+			//gb_tick_rtc(&gb);
 		}
 
 		/* Skip frames during fast mode. */
@@ -1249,10 +1234,9 @@ int main(int argc, char **argv)
 			win_surf = SDL_GetWindowSurface(window);
 
 		SDL_assert_always(win_surf != NULL);
-		//surf_imdt = SDL_ConvertSurfaceFormat(gb_surface, win_surf->format->format, 0);
-		SDL_UpperBlit(gb_surface, NULL, surf_imdt, NULL);
+		SDL_BlitSurface(gb_surface, NULL, surf_imdt, NULL);
 		int bret;
-		
+
 		{
 			SDL_Rect targ_rect;
 			float want_aspect, real_aspect, scale;
@@ -1279,7 +1263,6 @@ int main(int argc, char **argv)
 		}
 		bret = SDL_UpdateWindowSurface(window);
 		SDL_assert_always(bret == 0);
-		SDL_FreeSurface(surf_imdt);
 
 		if(dump_bmp)
 		{
@@ -1327,7 +1310,7 @@ int main(int argc, char **argv)
 			if(rtc_timer >= 1000)
 			{
 				rtc_timer -= 1000;
-				gb_tick_rtc(&gb);
+				//gb_tick_rtc(&gb);
 
 				/* If 60 seconds has passed, record save file.
 				 * We do this because the blarrg audio library
@@ -1367,6 +1350,8 @@ int main(int argc, char **argv)
 
 quit:
 	//SDL_DestroyRenderer(renderer);
+	SDL_FreeSurface(surf_imdt);
+	SDL_FreeSurface(gb_surface);
 	SDL_DestroyWindow(window);
 	SDL_GameControllerClose(controller);
 	SDL_Quit();

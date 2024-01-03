@@ -459,6 +459,12 @@ struct count_s
 	uint_fast32_t rtc_count;	/* RTC Counter */
 };
 
+/**
+ * If PEANUT_GB_USE_NIBBLE_FOR_PALETTE is enabled, the pixel colour data will be
+ * packed into the four least significant bits of a byte (or nibble). This
+ * allows for a smaller look-up table (LUT) to be used directly, in comparison
+ * to performing bit shifts or using a larger LUT.
+ */
 #ifndef PEANUT_GB_USE_NIBBLE_FOR_PALETTE
 # define PEANUT_GB_USE_NIBBLE_FOR_PALETTE 0
 #endif
