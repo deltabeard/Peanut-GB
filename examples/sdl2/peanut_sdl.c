@@ -622,8 +622,7 @@ int main(int argc, char **argv)
 	const double target_speed_ms = 1000.0 / VERTICAL_SYNC;
 	double speed_compensation = 0.0;
 	SDL_Window *window;
-	SDL_Renderer *renderer;
-	SDL_Surface *surface;
+	SDL_Surface *gb_surface, *win_surf, *surf_imdt;
 	SDL_Palette *palette;
 	SDL_Event event;
 	SDL_GameController *controller = NULL;
@@ -956,76 +955,31 @@ int main(int argc, char **argv)
 
 	SDL_SetWindowMinimumSize(window, LCD_WIDTH, LCD_HEIGHT);
 
-	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
-	if(renderer == NULL)
-	{
-		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
-				SDL_LOG_PRIORITY_CRITICAL,
-				"Could not create renderer: %s",
-				SDL_GetError());
-		ret = EXIT_FAILURE;
-		goto out;
-	}
-
-	if(SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255) < 0)
-	{
-		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
-				SDL_LOG_PRIORITY_CRITICAL,
-				"Renderer could not draw color: %s",
-				SDL_GetError());
-		ret = EXIT_FAILURE;
-		goto out;
-	}
-
-	if(SDL_RenderClear(renderer) < 0)
-	{
-		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
-				SDL_LOG_PRIORITY_CRITICAL,
-				"Renderer could not clear: %s",
-				SDL_GetError());
-		ret = EXIT_FAILURE;
-		goto out;
-	}
-
-	SDL_RenderPresent(renderer);
-
-	/* Use integer scale. */
-	SDL_RenderSetLogicalSize(renderer, LCD_WIDTH, LCD_HEIGHT);
-	SDL_RenderSetIntegerScale(renderer, 1);
-
-#if 0
-	texture = SDL_CreateTexture(renderer,
-				SDL_PIXELFORMAT_INDEX8,
-				SDL_TEXTUREACCESS_STREAMING,
-				LCD_WIDTH, LCD_HEIGHT);
-	if(texture == NULL)
-	{
-		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
-				SDL_LOG_PRIORITY_CRITICAL,
-				"Texture could not be created: %s",
-				SDL_GetError());
-		ret = EXIT_FAILURE;
-		goto out;
-	}
-#endif
-
-	surface = SDL_CreateRGBSurfaceWithFormatFrom(priv.fb,
+	gb_surface = SDL_CreateRGBSurfaceWithFormatFrom(priv.fb,
 			LCD_WIDTH, LCD_HEIGHT,
 			8, LCD_WIDTH, SDL_PIXELFORMAT_INDEX8);
 	palette = SDL_AllocPalette(12);
 	SDL_SetPaletteColors(palette, default_palette,
 		0, SDL_arraysize(default_palette));
-	SDL_SetSurfacePalette(surface, palette);
+	SDL_SetSurfacePalette(gb_surface, palette);
 
 	//auto_assign_palette(&priv, gb_colour_hash(&gb));
-
+	win_surf = SDL_GetWindowSurface(window);
+	surf_imdt = SDL_ConvertSurfaceFormat(gb_surface, win_surf->format->format, 0);
+	if (surf_imdt == NULL)
+	{
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+			SDL_LOG_PRIORITY_ERROR,
+			"%s", SDL_GetError());
+		goto quit;
+	}
 	while(SDL_QuitRequested() == SDL_FALSE)
 	{
 		int delay;
 		static double rtc_timer = 0;
 		static unsigned int selected_palette = 3;
 		static unsigned int dump_bmp = 0;
-		SDL_Texture *texture;
+		SDL_bool recreate_window_surface = SDL_FALSE;
 
 		/* Calculate the time taken to draw frame, then later add a
 		 * delay to cap at 60 fps. */
@@ -1252,13 +1206,18 @@ int main(int argc, char **argv)
 				}
 
 				break;
+
+			case SDL_DISPLAYEVENT:
+			case SDL_WINDOWEVENT:
+			case SDL_SYSWMEVENT:
+				recreate_window_surface = SDL_TRUE;
 			}
 		}
 
-		SDL_LockSurface(surface);
+		SDL_LockSurface(gb_surface);
 		/* Execute CPU cycles until the screen has to be redrawn. */
 		gb_run_frame(&gb);
-		SDL_UnlockSurface(surface);
+		SDL_UnlockSurface(gb_surface);
 
 		/* Tick the internal RTC when 1 second has passed. */
 		rtc_timer += target_speed_ms / (double) fast_mode;
@@ -1286,13 +1245,41 @@ int main(int argc, char **argv)
 #endif
 
 #if ENABLE_LCD
-		/* Copy frame buffer to SDL screen. */
-		//SDL_UpdateTexture(texture, NULL, &priv.fb, LCD_WIDTH);
-		texture = SDL_CreateTextureFromSurface(renderer, surface);
-		SDL_RenderClear(renderer);
-		SDL_RenderCopy(renderer, texture, NULL, NULL);
-		SDL_RenderPresent(renderer);
-		SDL_DestroyTexture(texture);
+		if(recreate_window_surface)
+			win_surf = SDL_GetWindowSurface(window);
+
+		SDL_assert_always(win_surf != NULL);
+		//surf_imdt = SDL_ConvertSurfaceFormat(gb_surface, win_surf->format->format, 0);
+		SDL_UpperBlit(gb_surface, NULL, surf_imdt, NULL);
+		int bret;
+		
+		{
+			SDL_Rect targ_rect;
+			float want_aspect, real_aspect, scale;
+
+			want_aspect = (float)LCD_WIDTH / LCD_HEIGHT;
+			real_aspect = (float)win_surf->w / win_surf->h;
+
+			if (want_aspect > real_aspect) {
+				scale = (float)(win_surf->w / LCD_WIDTH);
+			}
+			else {
+				scale = (float)(win_surf->h / LCD_HEIGHT);
+			}
+
+			if (scale < 1.0f) {
+				scale = 1.0f;
+			}
+
+			targ_rect.w = (int)SDL_floor(LCD_WIDTH * scale);
+			targ_rect.x = (win_surf->w - targ_rect.w) / 2;
+			targ_rect.h = (int)SDL_floor(LCD_HEIGHT * scale);
+			targ_rect.y = (win_surf->h - targ_rect.h) / 2;
+			SDL_BlitScaled(surf_imdt, NULL, win_surf, &targ_rect);
+		}
+		bret = SDL_UpdateWindowSurface(window);
+		SDL_assert_always(bret == 0);
+		SDL_FreeSurface(surf_imdt);
 
 		if(dump_bmp)
 		{
@@ -1379,7 +1366,7 @@ int main(int argc, char **argv)
 	}
 
 quit:
-	SDL_DestroyRenderer(renderer);
+	//SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 	SDL_GameControllerClose(controller);
 	SDL_Quit();
