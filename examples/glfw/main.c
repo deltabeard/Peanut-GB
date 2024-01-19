@@ -1,31 +1,34 @@
-#include <glad/gl.h>
-#include <GLFW/glfw3.h>
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <glad/gl.h>
+#include <GLFW/glfw3.h>
+
 // Vertex shader
-const GLchar* vertexShaderSrc = "#version 440\n"
-	"attribute vec4 vertexPosition;\n"
-	"attribute vec2 vertexUV;\n"
-	"varying vec2 TexCoord0;\n"
+static const GLchar *vertexShaderSrc = "#version 440\n"
+	"layout (location = 0) in vec4 vertexPosition;\n"
+	"layout (location = 1) in vec2 vertexUV;\n"
+	"out vec2 TexCoord0;\n"
 	"void main() {\n"
 	"  gl_Position = vertexPosition;\n"
 	"  TexCoord0 = vertexUV;\n"
 	"}\0";
 
 // Fragment shader
-const GLchar* fragmentShaderSrc = "#version 440\n"
-	"varying vec2 TexCoord0;\n"
+static const GLchar *fragmentShaderSrc = "#version 440\n"
+	"in vec2 TexCoord0;\n"
+	"out vec4 FragColor;\n"
 	"uniform sampler2D ColorTable;\n"
 	"uniform sampler2D MyIndexTexture;\n"
 	"void main() {\n"
-	"  vec4 myindex = texture2D(MyIndexTexture, TexCoord0);\n"
-	"  vec4 texel = texture2D(ColorTable, myindex.xy);\n"
-	"  gl_FragColor = texel;\n"
+	"  float index = texture(MyIndexTexture, TexCoord0).r * 255.0;\n"
+	"  vec2 paletteCoord = vec2(index / 255.0, 0.5);\n" // Assuming the palette is a 256x1 texture
+	"  FragColor = texture(ColorTable, paletteCoord);\n"
 	"}\0";
 
-void GLAPIENTRY MessageCallback(GLenum source, GLenum type, GLuint id, GLenum severity,
-                GLsizei length, const GLchar* message,const void* userParam)
+void GLAPIENTRY MessageCallback(GLenum source, GLenum type, GLuint id,
+		GLenum severity, GLsizei length, const GLchar *message,
+		const void *userParam)
 {
 	fprintf(stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
 			(type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""),
@@ -61,7 +64,6 @@ static void framebuffer_size_callback(GLFWwindow *window, int width, int height)
 	glViewport(0, 0, width, height);
 }
 
-
 int main(void)
 {
 	GLFWwindow *window;
@@ -78,7 +80,7 @@ int main(void)
 		return -1;
 	}
 
-	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+	//glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	// Make the window's context current
 	glfwMakeContextCurrent(window);
 
@@ -89,13 +91,9 @@ int main(void)
 		       GLAD_VERSION_MINOR(version));
 		printf("Ver: %s\n"
 			"Shader: %s\n"
-			"%s %s\n"
-			//"Ext: %s\n"
-			,
+			"%s %s\n",
 			glGetString(GL_VERSION), glGetString(GL_SHADING_LANGUAGE_VERSION),
-			glGetString(GL_VENDOR), glGetString(GL_RENDERER)
-			//,glGetString(GL_EXTENSIONS)
-			);
+			glGetString(GL_VENDOR), glGetString(GL_RENDERER));
 	}
 
 	// During init, enable debug output
@@ -105,29 +103,42 @@ int main(void)
 	/* Enable Vsync. */
 	glfwSwapInterval(1);
 
+	glDisable(GL_BLEND);
+	glDisable(GL_DEPTH_TEST);
+
 	// Define palette (256 RGB values)
-	unsigned char palette[256 * 3]; // Replace with your palette data
-	palette[0] = 0x00;
-	palette[1] = 0x00;
-	palette[2] = 0x00;
+	unsigned char palette[256 * 3] = { 0xFF }; // Replace with your palette data
+#if 0
+	for(unsigned i = 0; i < sizeof(palette);) {
+		palette[i] = (i & 0xFF);
+		i++;
+		palette[i] = 255u - (i & 0xFF);
+		i++;
+		palette[i] = 128u - (i & 0xFF);
+		i++;
+	}
+#else
+	palette[0] = palette[1] = palette[2] = 0x00;
 
 	palette[3] = 0xFF;
 	palette[4] = 0x00;
 	palette[5] = 0x00;
 
 	palette[6] = 0x00;
-	palette[7] = 0x00;
-	palette[8] = 0xFF;
+	palette[7] = 0xFF;
+	palette[8] = 0x00;
 
-	palette[9] = 0xFF;
-	palette[10] = 0xFF;
+	palette[9]  = 0x00;
+	palette[10] = 0x00;
 	palette[11] = 0xFF;
+#endif
 
 	// Define pixel data (8-bit values)
 	const int width = 640, height = 480;
 	unsigned char pixels[width * height]; // Replace with your pixel data
 	for(unsigned i = 0; i < sizeof(pixels); i++) {
-		pixels[i] = i & 0b11;
+		pixels[i] = i & 0xFF;
+		//pixels[i] = i & 0b11;
 	}
 
 	// Create texture
@@ -142,6 +153,8 @@ int main(void)
 	glGenTextures(1, &indexTexture);
 	glBindTexture(GL_TEXTURE_2D, indexTexture);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, pixels);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	// Load and compile shaders
 	GLuint vertexShader = compile_shader(GL_VERTEX_SHADER, vertexShaderSrc);
@@ -156,17 +169,20 @@ int main(void)
 
 	// Define vertices for a fullscreen quad
 	const GLfloat vertices[] = {
-	// Positions   // Texture Coords
-	-1.0f,  1.0f,  0.0f, 1.0f, // Top Left
-	-1.0f, -1.0f,  0.0f, 0.0f, // Bottom Left
-	1.0f, -1.0f,  1.0f, 0.0f, // Bottom Right
-	1.0f,  1.0f,  1.0f, 1.0f  // Top Right
+	// positions    // texture Coords
+	-1.0f,  1.0f,    0.0f, 1.0f,
+	-1.0f, -1.0f,    0.0f, 0.0f,
+	 1.0f, -1.0f,    1.0f, 0.0f,
+
+	-1.0f,  1.0f,    0.0f, 1.0f,
+	 1.0f, -1.0f,    1.0f, 0.0f,
+	 1.0f,  1.0f,    1.0f, 1.0f
 	};
 
 	// Define indices for the quad
 	const GLuint indices[] = {
 		0, 1, 2, // First Triangle
-		0, 2, 3  // Second Triangle
+		3, 4, 5  // Second Triangle
 	};
 
 	// Generate VAO and VBO with the respective buffers
@@ -197,17 +213,32 @@ int main(void)
 	// Unbind VAO
 	glBindVertexArray(0);
 
+	GLint ct_loc = glGetUniformLocation(program, "ColorTable");
+	GLint it_loc = glGetUniformLocation(program, "MyIndexTexture");
+	if(ct_loc == -1) {
+		fprintf(stderr, "ColorTable location not found.\n");
+		glfwTerminate();
+		return -1;
+	}
+	if(it_loc == -1) {
+		fprintf(stderr, "MyIndexTexture location not found.\n");
+		glfwTerminate();
+		return -1;
+	}
+
+	glClearColor(0, 0, 0, 1.0);
+
 	// Main loop
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, paletteTexture);
-		glUniform1i(glGetUniformLocation(program, "ColorTable"), 0);
+		glUniform1i(ct_loc, 0);
 
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, indexTexture);
-		glUniform1i(glGetUniformLocation(program, "MyIndexTexture"), 1);
+		glUniform1i(it_loc, 1);
 
 		// In your render loop, bind the VAO and draw the quad
 		glBindVertexArray(VAO);
