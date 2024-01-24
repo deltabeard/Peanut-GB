@@ -19,14 +19,14 @@ static const GLchar *vertexShaderSrc = "#version 440\n"
 
 // Fragment shader
 static const GLchar *fragmentShaderSrc = "#version 440\n"
+	"precision mediump float;\n"
 	"in vec2 TexCoord0;\n"
 	"out vec4 FragColor;\n"
-	"uniform sampler2D ColorTable;\n"
+	"uniform sampler1D ColorTable;\n"
 	"uniform sampler2D MyIndexTexture;\n"
 	"void main() {\n"
-	"  float index = texture(MyIndexTexture, TexCoord0).r;\n"
-	"  vec2 paletteCoord = vec2(index, 0.5);\n" // Assuming the palette is a 256x1 texture
-	"  FragColor = texture(ColorTable, paletteCoord);\n"
+	"  lowp float index = texture(MyIndexTexture, TexCoord0).r;\n"
+	"  FragColor = texture(ColorTable, index);\n"
 	"}\0";
 
 void GLAPIENTRY MessageCallback(GLenum source, GLenum type, GLuint id,
@@ -166,10 +166,10 @@ int main(int argc, char *argv[])
 	// Create texture
 	GLuint paletteTexture;
 	glGenTextures(1, &paletteTexture);
-	glBindTexture(GL_TEXTURE_2D, paletteTexture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, palette);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glBindTexture(GL_TEXTURE_1D, paletteTexture);
+	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB, 256, 0, GL_RGB, GL_UNSIGNED_BYTE, palette);
+	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	GLuint indexTexture;
 	glGenTextures(1, &indexTexture);
@@ -233,14 +233,14 @@ int main(int argc, char *argv[])
 	}
 
 	glClearColor(0, 0, 0, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_1D, paletteTexture);
 
 	// Main loop
 	while (!glfwWindowShouldClose(window)) {
 		gb_run_frame(&gb_ctx.gb);
-		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, paletteTexture);
 
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, indexTexture);
