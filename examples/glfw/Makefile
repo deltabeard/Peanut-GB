@@ -4,4 +4,4 @@ LDLIBS := -lglfw3dll
 override CFLAGS += -Iinc
 
 all: main
-main: main.o gl.o
+main: main.o gl.o gb.o

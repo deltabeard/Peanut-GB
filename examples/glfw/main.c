@@ -4,142 +4,8 @@
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
 
-#define PEANUT_GB_12_COLOUR 0
-#define PEANUT_GB_USE_NIBBLE_FOR_PALETTE 1
-#include "../../peanut_gb.h"
-
-struct priv_t
-{
-	/* Pointer to allocated memory holding GB file. */
-	uint8_t *rom;
-	/* Pointer to allocated memory holding save file. */
-	uint8_t *cart_ram;
-
-	/* Framebuffer. */
-	uint8_t fb[LCD_HEIGHT][LCD_WIDTH];
-};
-
-/**
- * Returns a byte from the ROM file at the given address.
- */
-uint8_t gb_rom_read(struct gb_s *gb, const uint_fast32_t addr)
-{
-	const struct priv_t * const p = gb->direct.priv;
-	return p->rom[addr];
-}
-
-/**
- * Returns a byte from the cartridge RAM at the given address.
- */
-uint8_t gb_cart_ram_read(struct gb_s *gb, const uint_fast32_t addr)
-{
-	const struct priv_t * const p = gb->direct.priv;
-	return p->cart_ram[addr];
-}
-
-/**
- * Writes a given byte to the cartridge RAM at the given address.
- */
-void gb_cart_ram_write(struct gb_s *gb, const uint_fast32_t addr,
-		       const uint8_t val)
-{
-	const struct priv_t * const p = gb->direct.priv;
-	p->cart_ram[addr] = val;
-}
-
-
-/**
- * Returns a pointer to the allocated space containing the ROM. Must be freed.
- */
-static uint8_t *alloc_file(const char *file_name, size_t *file_len)
-{
-	FILE *rom_file = fopen(file_name, "rb");
-	size_t rom_size;
-	uint8_t *rom = NULL;
-
-	if(rom_file == NULL)
-		return NULL;
-
-	fseek(rom_file, 0, SEEK_END);
-	rom_size = ftell(rom_file);
-	rewind(rom_file);
-	rom = malloc(rom_size);
-
-	if(fread(rom, sizeof(uint8_t), rom_size, rom_file) != rom_size)
-	{
-		free(rom);
-		fclose(rom_file);
-		return NULL;
-	}
-
-	if(file_len != NULL)
-		*file_len = rom_file;
-
-	fclose(rom_file);
-	return rom;
-}
-
-static uint8_t *read_cart_ram_file(const char *save_file_name, size_t len)
-{
-	uint8_t *ret;
-	size_t read_size;
-
-	ret = alloc_file(save_file_name, &read_size);
-
-	if(len != read_size)
-	{
-		free(ret);
-		return NULL;
-	}
-	
-	/* It doesn't matter if the save file doesn't exist. We initialise the
-	 * save memory allocated above. The save file will be created on exit. */
-	if(ret == NULL)
-		ret = calloc(len, 1);
-
-	return ret;
-}
-
-void write_cart_ram_file(const char *save_file_name, uint8_t **dest,
-			 const size_t len)
-{
-	FILE *f;
-
-	if(len == 0 || *dest == NULL)
-		return;
-
-	if((f = fopen(save_file_name, "wb")) == NULL)
-	{
-		return;
-	}
-
-	/* Record save file. */
-	fwrite(f, *dest, sizeof(uint8_t), len);
-	fclose(f);
-
-	return;
-}
-
-/**
- * Handles an error reported by the emulator. The emulator context may be used
- * to better understand why the error given in gb_err was reported.
- */
-void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t addr)
-{
-	exit(EXIT_FAILURE);
-}
-
-#if ENABLE_LCD
-/**
- * Draws scanline into framebuffer.
- */
-void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
-		   const uint_least8_t line)
-{
-	struct priv_t *priv = gb->direct.priv;
-	memcpy(&priv->fb[line][0], pixels, 160);
-}
-#endif
+#define PEANUT_GB_HEADER_ONLY
+#include "gb.h"
 
 // Vertex shader
 static const GLchar *vertexShaderSrc = "#version 440\n"
@@ -204,42 +70,22 @@ static void framebuffer_size_callback(GLFWwindow *window, int width, int height)
 int main(int argc, char *argv[])
 {
 	GLFWwindow *window;
-	char *rom_file_name;
-	struct gb_s gb;
-	struct priv_t priv;
+	struct priv gb_ctx;
 
 	if(argc != 2)
 	{
 		fprintf(stderr, "%s ROM\n", argv[0]);
 		return -1;
 	}
-	else
+
 	{
+		char *rom_file_name;
 		rom_file_name = argv[1];
+		if(gb_init_file(&gb_ctx, rom_file_name) != 0) {
+			fprintf(stderr, "Error initalising GB context.\n");
+			return -1;
+		}
 	}
-
-	/* Copy input ROM file to allocated memory. */
-	if((priv.rom = alloc_file(rom_file_name, NULL)) == NULL)
-	{
-		printf("%d: %s\n", __LINE__, strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-
-	/* Initialise context. */
-	int ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read,
-			&gb_cart_ram_write, &gb_error, &priv);
-	if(ret != GB_INIT_NO_ERROR)
-	{
-		fprintf(stderr, "Peanut-GB failed to initialise: %d\n", ret);
-		exit(EXIT_FAILURE);
-	}
-
-	priv.cart_ram = malloc(gb_get_save_size(&gb));
-
-#if ENABLE_LCD
-	gb_init_lcd(&gb, &lcd_draw_line);
-	// gb.direct.interlace = 1;
-#endif
 
 	glfwSetErrorCallback(glfw_error_callback);
 
@@ -280,31 +126,35 @@ int main(int argc, char *argv[])
 	glDisable(GL_DEPTH_TEST);
 
 	// Define palette (256 RGB values)
-	unsigned char palette[256 * 3] = { 0xFF }; // Replace with your palette data
-#if 0
-	for(unsigned i = 0; i < sizeof(palette);) {
-		palette[i] = (i & 0xFF);
-		i++;
-		palette[i] = 255u - (i & 0xFF);
-		i++;
-		palette[i] = 128u - (i & 0xFF);
-		i++;
-	}
-#else
-	palette[0] = palette[1] = palette[2] = 0x00;
-
+	unsigned char palette[256 * 3]; // Replace with your palette data
+	palette[0] = palette[1] = palette[2] = 0xFF;
 	palette[3] = 0xFF;
-	palette[4] = 0x00;
-	palette[5] = 0x00;
+	palette[4] = 0x84;
+	palette[5] = 0x84;
+	palette[6] = 0x94;
+	palette[7] = 0x3A;
+	palette[8] = 0x3A;
+	palette[9] = palette[10] = palette[11] = 0x00;
 
-	palette[6] = 0x00;
-	palette[7] = 0xFF;
-	palette[8] = 0x00;
+	palette[12] = palette[13] = palette[14] = 0xFF;
+	palette[15] = 0x00;
+	palette[16] = 0xFF;
+	palette[17] = 0x00;
+	palette[18] = 0x31;
+	palette[19] = 0x84;
+	palette[20] = 0x00;
+	palette[21] = 0x00;
+	palette[22] = 0x4A;
+	palette[23] = 0x00;
 
-	palette[9]  = 0x00;
-	palette[10] = 0x00;
-	palette[11] = 0xFF;
-#endif
+	palette[24] = palette[25] = palette[26] = 0xFF;
+	palette[27] = 0x63;
+	palette[28] = 0xA5;
+	palette[29] = 0xFF;
+	palette[30] = 0x00;
+	palette[31] = 0x00;
+	palette[32] = 0xFF;
+	palette[33] = palette[34] = palette[35] = 0x00;
 
 	// Define pixel data (8-bit values)
 	unsigned char pixels[LCD_WIDTH * LCD_HEIGHT]; // Replace with your pixel data
@@ -341,13 +191,12 @@ int main(int argc, char *argv[])
 
 	// Define vertices for a fullscreen quad
 	const GLfloat vertices[] = {
-    // positions    // texture Coords (flipped on y-axis)
-    -1.0f, -1.0f,  0.0f, 1.0f, // Bottom-left corner of the screen, top-left of the texture
-     1.0f, -1.0f,  1.0f, 1.0f, // Bottom-right corner of the screen, top-right of the texture
-    -1.0f,  1.0f,  0.0f, 0.0f, // Top-left corner of the screen, bottom-left of the texture
-     1.0f,  1.0f,  1.0f, 0.0f  // Top-right corner of the screen, bottom-right of the texture
-};
-
+		// positions    // texture Coords (flipped on y-axis)
+		-1.0f, -1.0f, 0.0f, 1.0f, // Bottom-left corner of the screen, top-left of the texture
+		1.0f, -1.0f, 1.0f, 1.0f, // Bottom-right corner of the screen, top-right of the texture
+		-1.0f, 1.0f, 0.0f, 0.0f, // Top-left corner of the screen, bottom-left of the texture
+		1.0f, 1.0f, 1.0f, 0.0f // Top-right corner of the screen, bottom-right of the texture
+	};
 
 	// Generate VAO and VBO with the respective buffers
 	GLuint VAO, VBO;
@@ -387,7 +236,7 @@ int main(int argc, char *argv[])
 
 	// Main loop
 	while (!glfwWindowShouldClose(window)) {
-		gb_run_frame(&gb);
+		gb_run_frame(&gb_ctx.gb);
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
 		glActiveTexture(GL_TEXTURE0);
@@ -397,7 +246,7 @@ int main(int argc, char *argv[])
 		glBindTexture(GL_TEXTURE_2D, indexTexture);
 		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
 			LCD_WIDTH, LCD_HEIGHT, GL_RED, GL_UNSIGNED_BYTE,
-			priv.fb);
+			gb_ctx.fb);
 
 		// In your render loop, bind the VAO and draw the quad
 		glBindVertexArray(VAO);
