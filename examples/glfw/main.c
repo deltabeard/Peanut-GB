@@ -24,8 +24,8 @@ static const GLchar *fragmentShaderSrc = "#version 440\n"
 	"uniform sampler2D ColorTable;\n"
 	"uniform sampler2D MyIndexTexture;\n"
 	"void main() {\n"
-	"  float index = texture(MyIndexTexture, TexCoord0).r * 255.0;\n"
-	"  vec2 paletteCoord = vec2(index / 255.0, 0.5);\n" // Assuming the palette is a 256x1 texture
+	"  float index = texture(MyIndexTexture, TexCoord0).r;\n"
+	"  vec2 paletteCoord = vec2(index, 0.5);\n" // Assuming the palette is a 256x1 texture
 	"  FragColor = texture(ColorTable, paletteCoord);\n"
 	"}\0";
 
