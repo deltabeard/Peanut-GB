@@ -1068,6 +1068,14 @@ int main(int argc, char **argv)
 					gb.direct.joypad_bits.b = 0;
 					break;
 
+				case SDLK_a:
+					gb.direct.joypad_bits.a = ~gb.direct.joypad_bits.a;
+					break;
+
+				case SDLK_s:
+					gb.direct.joypad_bits.b = ~gb.direct.joypad_bits.b;
+					break;
+
 				case SDLK_UP:
 					gb.direct.joypad_bits.up = 0;
 					break;
@@ -1164,6 +1172,14 @@ int main(int argc, char **argv)
 					break;
 
 				case SDLK_x:
+					gb.direct.joypad_bits.b = 1;
+					break;
+
+				case SDLK_a:
+					gb.direct.joypad_bits.a = 1;
+					break;
+
+				case SDLK_s:
 					gb.direct.joypad_bits.b = 1;
 					break;
 
