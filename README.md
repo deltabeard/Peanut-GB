@@ -162,7 +162,7 @@ returns 0 if the game does not use any save data.
 
 This function runs the CPU until a full frame is rendered to the LCD.
 
-#### gb_color_hash
+#### gb_colour_hash
 
 This function calculates a hash of the game title. This hash is calculated in
 the same way as the Game Boy Color to add colour to Game Boy games.
