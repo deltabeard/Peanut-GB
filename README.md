@@ -79,6 +79,8 @@ maximum FPS to 50.
 | Start             | Return     | START  |
 | Select            | Backspace  | BACK   |
 | D-Pad             | Arrow Keys | DPAD   |
+| Repeat A          | a          |        |
+| Repeat B          | s          |        |
 | Normal Speed      | 1          |        |
 | Turbo x2 (Hold)   | Space      |        |
 | Turbo X2 (Toggle) | 2          |        |
