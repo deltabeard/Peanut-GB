@@ -19,11 +19,11 @@ INCLUDE(../../version.all)
 
 # Initialise project information.
 PROJECT(peanut-benchmark
-        LANGUAGES C
-	VERSION
-	${PEANUTGB_VERSION_MAJOR}.${PEANUTGB_VERSION_MINOR}.${PEANUTGB_VERSION_PATCH}
-        DESCRIPTION "Peanut-GB benchmark application"
-        HOMEPAGE_URL "https://github.com/deltabeard/peanut-gb")
+    LANGUAGES C
+    VERSION
+    ${PEANUTGB_VERSION_MAJOR}.${PEANUTGB_VERSION_MINOR}.${PEANUTGB_VERSION_PATCH}
+    DESCRIPTION "Peanut-GB benchmark application"
+    HOMEPAGE_URL "https://github.com/deltabeard/peanut-gb")
 
 # Add dependencies to project.
 IF(NOT ${CMAKE_BUILD_TYPE} STREQUAL "Debug" AND APPLE)
@@ -34,11 +34,20 @@ ELSEIF(NOT ${CMAKE_BUILD_TYPE} STREQUAL "Debug" AND MSVC)
     MESSAGE(VERBOSE "Setting EXE type to WIN32")
 ENDIF()
 
-ADD_EXECUTABLE(${PROJECT_NAME} ${EXE_TARGET_TYPE})
-TARGET_SOURCES(${PROJECT_NAME} PRIVATE peanut-benchmark.c
+ADD_EXECUTABLE(peanut-benchmark ${EXE_TARGET_TYPE})
+TARGET_SOURCES(peanut-benchmark PRIVATE peanut-benchmark.c
     ../../peanut_gb.h
 )
-TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PRIVATE ../../)
+TARGET_INCLUDE_DIRECTORIES(peanut-benchmark PRIVATE ../../)
+
+ADD_EXECUTABLE(peanut-benchmark-sep ${EXE_TARGET_TYPE})
+ADD_LIBRARY(peanut-gb OBJECT peanut_gb.c)
+TARGET_COMPILE_DEFINITIONS(peanut-gb PRIVATE ENABLE_SOUND=0 ENABLE_LCD=1
+    PEANUT_GB_12_COLOUR=1 PEANUT_GB_HEADER_ONLY=1)
+TARGET_COMPILE_DEFINITIONS(peanut-benchmark-sep PRIVATE ENABLE_SOUND=0 ENABLE_LCD=1
+    PEANUT_GB_12_COLOUR=1)
+TARGET_SOURCES(peanut-benchmark-sep PRIVATE peanut-benchmark.c)
+TARGET_LINK_LIBRARIES(peanut-benchmark-sep peanut-gb)
 
 MESSAGE(STATUS "  CC:      ${CMAKE_C_COMPILER} '${CMAKE_C_COMPILER_ID}' on '${CMAKE_SYSTEM_NAME}'")
 MESSAGE(STATUS "  CFLAGS:  ${CMAKE_C_FLAGS}")

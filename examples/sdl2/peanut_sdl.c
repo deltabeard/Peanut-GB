@@ -619,6 +619,11 @@ int main(int argc, char **argv)
 
 	SDL_LogSetPriority(LOG_CATERGORY_PEANUTSDL, SDL_LOG_PRIORITY_INFO);
 
+	/* Enable Hi-DPI to stop blurry game image. */
+	#ifdef SDL_HINT_WINDOWS_DPI_AWARENESS
+	SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
+	#endif
+
 	/* Initialise frontend implementation, in this case, SDL2. */
 	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO) < 0)
 	{
@@ -930,7 +935,7 @@ int main(int argc, char **argv)
 
 	SDL_SetWindowMinimumSize(window, LCD_WIDTH, LCD_HEIGHT);
 
-	renderer = SDL_CreateRenderer(window, -1, 0);
+	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
 	if(renderer == NULL)
 	{
 		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
@@ -1303,12 +1308,10 @@ int main(int argc, char **argv)
 				gb_tick_rtc(&gb);
 
 				/* If 60 seconds has passed, record save file.
-				 * We do this because the external audio library
+				 * We do this because the blarrg audio library
 				 * used contains asserts that will abort the
 				 * program without save.
-				 * TODO: Remove use of assert in audio library
-				 * in release build. */
-				/* TODO: Remove all workarounds due to faulty
+				 * TODO: Remove all workarounds due to faulty
 				 * external libraries. */
 				--save_timer;
 

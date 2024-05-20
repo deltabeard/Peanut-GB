@@ -177,7 +177,7 @@ Set the time of the real time clock (RTC). Some games use this RTC data.
 
 #### gb_tick_rtc
 
-Increment the real time clock by one second.
+Deprecated: do not use. The RTC is ticked internally.
 
 #### gb_set_bootrom
 
