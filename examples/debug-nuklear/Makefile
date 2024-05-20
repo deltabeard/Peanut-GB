@@ -1,10 +1,6 @@
 # Simple Makefile for building peanutgb-debugger on Unix-like systems.
 # SDL2 is required.
 
-ifeq ($(OS),Windows_NT)
-$(warning This Makefile is only support with MinGW on Windows; otherwise use cmake instead)
-endif
-
 ifneq ($(W64DEVKIT),)
 # w64devkit uses pkg-config out of the box.
 SDL2_CONFIG := pkg-config sdl2
