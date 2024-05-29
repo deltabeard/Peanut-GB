@@ -115,7 +115,7 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
 	const uint32_t palette[] = { 0xFFFFFF, 0xA5A5A5, 0x525252, 0x000000 };
 
 	for(unsigned int x = 0; x < LCD_WIDTH; x++)
-		priv->fb[line][x] = palette[pixels[x] & 3];
+		priv->fb[line][x] = palette[pixels[x] & LCD_COLOUR];
 }
 #endif
 

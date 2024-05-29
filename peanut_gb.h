@@ -505,8 +505,8 @@ struct count_s
 	* Bit mask for whether a pixel is OBJ0, OBJ1, or BG. Each may have a different
 	* palette when playing a DMG game on CGB.
 	*/
-	#define LCD_PALETTE_OBJ	0x10
-	#define LCD_PALETTE_BG	0x20
+	#define LCD_PALETTE_OBJ	0x04
+	#define LCD_PALETTE_BG	0x08
 	/**
 	* Bit mask for the two bits listed above.
 	* LCD_PALETTE_ALL == 0b00 --> OBJ0
@@ -514,7 +514,11 @@ struct count_s
 	* LCD_PALETTE_ALL == 0b10 --> BG
 	* LCD_PALETTE_ALL == 0b11 --> NOT POSSIBLE
 	*/
-	#define LCD_PALETTE_ALL 0x30
+	#define LCD_PALETTE_ALL 0x0c
+# else
+	#define LCD_PALETTE_OBJ	0
+	#define LCD_PALETTE_BG	0
+	#define LCD_PALETTE_ALL 0
 # endif
 #endif
 
@@ -1203,26 +1207,41 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 		/* DMG Palette Registers */
 		case 0x47:
 			gb->hram_io[IO_BGP] = val;
-			gb->display.bg_palette[0] = (gb->hram_io[IO_BGP] & 0x03);
-			gb->display.bg_palette[1] = (gb->hram_io[IO_BGP] >> 2) & 0x03;
-			gb->display.bg_palette[2] = (gb->hram_io[IO_BGP] >> 4) & 0x03;
-			gb->display.bg_palette[3] = (gb->hram_io[IO_BGP] >> 6) & 0x03;
+			gb->display.bg_palette[0] = ((gb->hram_io[IO_BGP] & 0x03)) | LCD_PALETTE_BG;
+			gb->display.bg_palette[1] = ((gb->hram_io[IO_BGP] >> 2) & 0x03) | LCD_PALETTE_BG;
+			gb->display.bg_palette[2] = ((gb->hram_io[IO_BGP] >> 4) & 0x03) | LCD_PALETTE_BG;
+			gb->display.bg_palette[3] = ((gb->hram_io[IO_BGP] >> 6) & 0x03) | LCD_PALETTE_BG;
+
+			gb->display.bg_palette[0] |= gb->display.bg_palette[0] << 4;
+			gb->display.bg_palette[1] |= gb->display.bg_palette[1] << 4;
+			gb->display.bg_palette[2] |= gb->display.bg_palette[2] << 4;
+			gb->display.bg_palette[3] |= gb->display.bg_palette[3] << 4;
 			return;
 
 		case 0x48:
 			gb->hram_io[IO_OBP0] = val;
-			gb->display.sp_palette[0] = (gb->hram_io[IO_OBP0] & 0x03);
-			gb->display.sp_palette[1] = (gb->hram_io[IO_OBP0] >> 2) & 0x03;
-			gb->display.sp_palette[2] = (gb->hram_io[IO_OBP0] >> 4) & 0x03;
-			gb->display.sp_palette[3] = (gb->hram_io[IO_OBP0] >> 6) & 0x03;
+			gb->display.sp_palette[0] = ((gb->hram_io[IO_OBP0] & 0x03));
+			gb->display.sp_palette[1] = ((gb->hram_io[IO_OBP0] >> 2) & 0x03);
+			gb->display.sp_palette[2] = ((gb->hram_io[IO_OBP0] >> 4) & 0x03);
+			gb->display.sp_palette[3] = ((gb->hram_io[IO_OBP0] >> 6) & 0x03);
+
+			gb->display.sp_palette[0] |= gb->display.sp_palette[0] << 4;
+			gb->display.sp_palette[1] |= gb->display.sp_palette[1] << 4;
+			gb->display.sp_palette[2] |= gb->display.sp_palette[2] << 4;
+			gb->display.sp_palette[3] |= gb->display.sp_palette[3] << 4;
 			return;
 
 		case 0x49:
 			gb->hram_io[IO_OBP1] = val;
-			gb->display.sp_palette[4] = (gb->hram_io[IO_OBP1] & 0x03);
-			gb->display.sp_palette[5] = (gb->hram_io[IO_OBP1] >> 2) & 0x03;
-			gb->display.sp_palette[6] = (gb->hram_io[IO_OBP1] >> 4) & 0x03;
-			gb->display.sp_palette[7] = (gb->hram_io[IO_OBP1] >> 6) & 0x03;
+			gb->display.sp_palette[4] = ((gb->hram_io[IO_OBP1] & 0x03)) | LCD_PALETTE_OBJ;
+			gb->display.sp_palette[5] = ((gb->hram_io[IO_OBP1] >> 2) & 0x03) | LCD_PALETTE_OBJ;
+			gb->display.sp_palette[6] = ((gb->hram_io[IO_OBP1] >> 4) & 0x03) | LCD_PALETTE_OBJ;
+			gb->display.sp_palette[7] = ((gb->hram_io[IO_OBP1] >> 6) & 0x03) | LCD_PALETTE_OBJ;
+
+			gb->display.sp_palette[4] |= gb->display.sp_palette[4] << 4;
+			gb->display.sp_palette[5] |= gb->display.sp_palette[5] << 4;
+			gb->display.sp_palette[6] |= gb->display.sp_palette[6] << 4;
+			gb->display.sp_palette[7] |= gb->display.sp_palette[7] << 4;
 			return;
 
 		/* Window Position Registers */
@@ -1556,9 +1575,6 @@ void __gb_draw_line(struct gb_s *gb)
 			/* copy background */
 			c = (t1 & 0x1) | ((t2 & 0x1) << 1);
 			pixels[disp_x] = gb->display.bg_palette[c];
-#if PEANUT_GB_12_COLOUR
-			pixels[disp_x] |= LCD_PALETTE_BG;
-#endif
 			t1 = t1 >> 1;
 			t2 = t2 >> 1;
 			px++;
@@ -1624,9 +1640,6 @@ void __gb_draw_line(struct gb_s *gb)
 			// copy window
 			c = (t1 & 0x1) | ((t2 & 0x1) << 1);
 			pixels[disp_x] = gb->display.bg_palette[c];
-#if PEANUT_GB_12_COLOUR
-			pixels[disp_x] |= LCD_PALETTE_BG;
-#endif
 			t1 = t1 >> 1;
 			t2 = t2 >> 1;
 			px++;
@@ -1760,16 +1773,12 @@ void __gb_draw_line(struct gb_s *gb)
 				uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
 				// check transparency / sprite overlap / background overlap
 
-				if(c && !(OF & OBJ_PRIORITY && !((pixels[disp_x] & 0x3) == gb->display.bg_palette[0])))
+				if(c && !(OF & OBJ_PRIORITY && !((pixels[disp_x] & LCD_COLOUR) == (gb->display.bg_palette[0] & LCD_COLOUR))))
 				{
 					/* Set pixel colour. */
 					pixels[disp_x] = (OF & OBJ_PALETTE)
 						? gb->display.sp_palette[c + 4]
 						: gb->display.sp_palette[c];
-#if PEANUT_GB_12_COLOUR
-					/* Set pixel palette (OBJ0 or OBJ1). */
-					pixels[disp_x] |= (OF & OBJ_PALETTE);
-#endif
 				}
 
 				t1 = t1 >> 1;
