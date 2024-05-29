@@ -36,7 +36,7 @@ struct priv_t
 	uint8_t *bootrom;
 
 	/* Colour palette for each BG, OBJ0, and OBJ1. */
-	uint16_t selected_palette[3][4];
+	uint16_t selected_palette[4 * 4];
 	uint16_t fb[LCD_HEIGHT][LCD_WIDTH];
 };
 
@@ -198,11 +198,11 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 	case 0x71:
 	case 0xFF:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7FFF, 0x7E60, 0x7C00, 0x0000 }, /* OBJ0 */
-			{ 0x7FFF, 0x7E60, 0x7C00, 0x0000 }, /* OBJ1 */
-			{ 0x7FFF, 0x7E60, 0x7C00, 0x0000 }  /* BG */
+			0x7FFF, 0x7E60, 0x7C00, 0x0000, /* OBJ0 */
+			0x7FFF, 0x7E60, 0x7C00, 0x0000, /* OBJ1 */
+			0x7FFF, 0x7E60, 0x7C00, 0x0000  /* BG */
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -213,11 +213,11 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 	case 0xDB:
 	case 0x95: /* Not officially */
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7FFF, 0x7FE0, 0x7C00, 0x0000 }, /* OBJ0 */
-			{ 0x7FFF, 0x7FE0, 0x7C00, 0x0000 }, /* OBJ1 */
-			{ 0x7FFF, 0x7FE0, 0x7C00, 0x0000 }  /* BG */
+			0x7FFF, 0x7FE0, 0x7C00, 0x0000, /* OBJ0 */
+			0x7FFF, 0x7FE0, 0x7C00, 0x0000, /* OBJ1 */
+			0x7FFF, 0x7FE0, 0x7C00, 0x0000  /* BG */
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -226,11 +226,11 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 	/* Donkey Kong */
 	case 0x19:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }, /* OBJ0 */
-			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }, /* OBJ1 */
-			{ 0x7FFF, 0x7E60, 0x7C00, 0x0000 }  /* BG */
+			0x7FFF, 0x7E10, 0x48E7, 0x0000, /* OBJ0 */
+			0x7FFF, 0x7E10, 0x48E7, 0x0000, /* OBJ1 */
+			0x7FFF, 0x7E60, 0x7C00, 0x0000  /* BG */
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -243,11 +243,11 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 	/* Pokemon Blue Star */
 	case 0xD8:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }, /* OBJ0 */
-			{ 0x7FFF, 0x329F, 0x001F, 0x0000 }, /* OBJ1 */
-			{ 0x7FFF, 0x329F, 0x001F, 0x0000 }  /* BG */
+			0x7FFF, 0x7E10, 0x48E7, 0x0000, /* OBJ0 */
+			0x7FFF, 0x329F, 0x001F, 0x0000, /* OBJ1 */
+			0x7FFF, 0x329F, 0x001F, 0x0000  /* BG */
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -256,11 +256,11 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 	/* Pokemon Red */
 	case 0x14:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7FFF, 0x3FE6, 0x0200, 0x0000 }, /* OBJ0 */
-			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }, /* OBJ1 */
-			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }  /* BG */
+			0x7FFF, 0x3FE6, 0x0200, 0x0000, /* OBJ0 */
+			0x7FFF, 0x7E10, 0x48E7, 0x0000, /* OBJ1 */
+			0x7FFF, 0x7E10, 0x48E7, 0x0000  /* BG */
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -269,11 +269,11 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 	/* Pokemon Red Star */
 	case 0x8B:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }, /* OBJ0 */
-			{ 0x7FFF, 0x329F, 0x001F, 0x0000 }, /* OBJ1 */
-			{ 0x7FFF, 0x3FE6, 0x0200, 0x0000 }  /* BG */
+			0x7FFF, 0x7E10, 0x48E7, 0x0000, /* OBJ0 */
+			0x7FFF, 0x329F, 0x001F, 0x0000, /* OBJ1 */
+			0x7FFF, 0x3FE6, 0x0200, 0x0000  /* BG */
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -285,11 +285,11 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 	case 0x5C:
 	case 0xB3:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7D8A, 0x6800, 0x3000, 0x0000 }, /* OBJ0 */
-			{ 0x001F, 0x7FFF, 0x7FEF, 0x021F }, /* OBJ1 */
-			{ 0x527F, 0x7FE0, 0x0180, 0x0000 }  /* BG */
+			0x7D8A, 0x6800, 0x3000, 0x0000, /* OBJ0 */
+			0x001F, 0x7FFF, 0x7FEF, 0x021F, /* OBJ1 */
+			0x527F, 0x7FE0, 0x0180, 0x0000  /* BG */
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -301,11 +301,11 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 	case 0x4B:
 	case 0x6B:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7F08, 0x7F40, 0x48E0, 0x2400 }, /* OBJ0 */
-			{ 0x7FFF, 0x2EFF, 0x7C00, 0x001F }, /* OBJ1 */
-			{ 0x7FFF, 0x463B, 0x2951, 0x0000 }  /* BG */
+			0x7F08, 0x7F40, 0x48E0, 0x2400, /* OBJ0 */
+			0x7FFF, 0x2EFF, 0x7C00, 0x001F, /* OBJ1 */
+			0x7FFF, 0x463B, 0x2951, 0x0000  /* BG */
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -314,11 +314,11 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 	/* Link's Awakening */
 	case 0x70:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7FFF, 0x03E0, 0x1A00, 0x0120 }, /* OBJ0 */
-			{ 0x7FFF, 0x329F, 0x001F, 0x001F }, /* OBJ1 */
-			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }  /* BG */
+			0x7FFF, 0x03E0, 0x1A00, 0x0120, /* OBJ0 */
+			0x7FFF, 0x329F, 0x001F, 0x001F, /* OBJ1 */
+			0x7FFF, 0x7E10, 0x48E7, 0x0000  /* BG */
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -334,11 +334,11 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 	case 0x6D:
 	case 0xF6:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7FFF, 0x329F, 0x001F, 0x0000 }, /* OBJ0 */
-			{ 0x7FFF, 0x3FE6, 0x0200, 0x0000 }, /* OBJ1 */
-			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 }  /* BG */
+			0x7FFF, 0x329F, 0x001F, 0x0000, /* OBJ0 */
+			0x7FFF, 0x3FE6, 0x0200, 0x0000, /* OBJ1 */
+			0x7FFF, 0x7EAC, 0x40C0, 0x0000  /* BG */
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -346,11 +346,11 @@ void auto_assign_palette(struct priv_t *priv, uint8_t game_checksum)
 
 	default:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7FFF, 0x5294, 0x294A, 0x0000 },
-			{ 0x7FFF, 0x5294, 0x294A, 0x0000 },
-			{ 0x7FFF, 0x5294, 0x294A, 0x0000 }
+			0x7FFF, 0x5294, 0x294A, 0x0000,
+			0x7FFF, 0x5294, 0x294A, 0x0000,
+			0x7FFF, 0x5294, 0x294A, 0x0000
 		};
 		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
 				SDL_LOG_PRIORITY_INFO,
@@ -377,11 +377,11 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 	/* 0x05 (Right) */
 	case 0:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7FFF, 0x2BE0, 0x7D00, 0x0000 },
-			{ 0x7FFF, 0x2BE0, 0x7D00, 0x0000 },
-			{ 0x7FFF, 0x2BE0, 0x7D00, 0x0000 }
+			0x7FFF, 0x2BE0, 0x7D00, 0x0000,
+			0x7FFF, 0x2BE0, 0x7D00, 0x0000,
+			0x7FFF, 0x2BE0, 0x7D00, 0x0000
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -390,11 +390,11 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 	/* 0x07 (A + Down) */
 	case 1:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7FFF, 0x7FE0, 0x7C00, 0x0000 },
-			{ 0x7FFF, 0x7FE0, 0x7C00, 0x0000 },
-			{ 0x7FFF, 0x7FE0, 0x7C00, 0x0000 }
+			0x7FFF, 0x7FE0, 0x7C00, 0x0000,
+			0x7FFF, 0x7FE0, 0x7C00, 0x0000,
+			0x7FFF, 0x7FE0, 0x7C00, 0x0000
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -403,11 +403,11 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 	/* 0x12 (Up) */
 	case 2:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 },
-			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 },
-			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 }
+			0x7FFF, 0x7EAC, 0x40C0, 0x0000,
+			0x7FFF, 0x7EAC, 0x40C0, 0x0000,
+			0x7FFF, 0x7EAC, 0x40C0, 0x0000
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -416,11 +416,11 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 	/* 0x13 (B + Right) */
 	case 3:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x0000, 0x0210, 0x7F60, 0x7FFF },
-			{ 0x0000, 0x0210, 0x7F60, 0x7FFF },
-			{ 0x0000, 0x0210, 0x7F60, 0x7FFF }
+			0x0000, 0x0210, 0x7F60, 0x7FFF,
+			0x0000, 0x0210, 0x7F60, 0x7FFF,
+			0x0000, 0x0210, 0x7F60, 0x7FFF
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -430,11 +430,11 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 	default:
 	case 4:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7FFF, 0x5294, 0x294A, 0x0000 },
-			{ 0x7FFF, 0x5294, 0x294A, 0x0000 },
-			{ 0x7FFF, 0x5294, 0x294A, 0x0000 }
+			0x7FFF, 0x5294, 0x294A, 0x0000,
+			0x7FFF, 0x5294, 0x294A, 0x0000,
+			0x7FFF, 0x5294, 0x294A, 0x0000
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -443,11 +443,11 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 	/* 0x17 (Down) */
 	case 5:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7FF4, 0x7E52, 0x4A5F, 0x0000 },
-			{ 0x7FF4, 0x7E52, 0x4A5F, 0x0000 },
-			{ 0x7FF4, 0x7E52, 0x4A5F, 0x0000 }
+			0x7FF4, 0x7E52, 0x4A5F, 0x0000,
+			0x7FF4, 0x7E52, 0x4A5F, 0x0000,
+			0x7FF4, 0x7E52, 0x4A5F, 0x0000
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -456,11 +456,11 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 	/* 0x19 (B + Up) */
 	case 6:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 },
-			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 },
-			{ 0x7F98, 0x6670, 0x41A5, 0x2CC1 }
+			0x7FFF, 0x7EAC, 0x40C0, 0x0000,
+			0x7FFF, 0x7EAC, 0x40C0, 0x0000,
+			0x7F98, 0x6670, 0x41A5, 0x2CC1
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -469,11 +469,11 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 	/* 0x1C (A + Right) */
 	case 7:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 },
-			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 },
-			{ 0x7FFF, 0x3FE6, 0x0198, 0x0000 }
+			0x7FFF, 0x7E10, 0x48E7, 0x0000,
+			0x7FFF, 0x7E10, 0x48E7, 0x0000,
+			0x7FFF, 0x3FE6, 0x0198, 0x0000
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -482,11 +482,11 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 	/* 0x0D (A + Left) */
 	case 8:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 },
-			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 },
-			{ 0x7FFF, 0x463B, 0x2951, 0x0000 }
+			0x7FFF, 0x7E10, 0x48E7, 0x0000,
+			0x7FFF, 0x7EAC, 0x40C0, 0x0000,
+			0x7FFF, 0x463B, 0x2951, 0x0000
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -495,11 +495,11 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 	/* 0x10 (A + Up) */
 	case 9:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7FFF, 0x3FE6, 0x0200, 0x0000 },
-			{ 0x7FFF, 0x329F, 0x001F, 0x0000 },
-			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }
+			0x7FFF, 0x3FE6, 0x0200, 0x0000,
+			0x7FFF, 0x329F, 0x001F, 0x0000,
+			0x7FFF, 0x7E10, 0x48E7, 0x0000
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -508,11 +508,11 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 	/* 0x18 (Left) */
 	case 10:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 },
-			{ 0x7FFF, 0x3FE6, 0x0200, 0x0000 },
-			{ 0x7FFF, 0x329F, 0x001F, 0x0000 }
+			0x7FFF, 0x7E10, 0x48E7, 0x0000,
+			0x7FFF, 0x3FE6, 0x0200, 0x0000,
+			0x7FFF, 0x329F, 0x001F, 0x0000
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -521,11 +521,11 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
 	/* 0x1A (B + Down) */
 	case 11:
 	{
-		const uint16_t palette[3][4] =
+		const uint16_t palette[3 * 4] =
 		{
-			{ 0x7FFF, 0x329F, 0x001F, 0x0000 },
-			{ 0x7FFF, 0x3FE6, 0x0200, 0x0000 },
-			{ 0x7FFF, 0x7FE0, 0x3D20, 0x0000 }
+			0x7FFF, 0x329F, 0x001F, 0x0000,
+			0x7FFF, 0x3FE6, 0x0200, 0x0000,
+			0x7FFF, 0x7FE0, 0x3D20, 0x0000
 		};
 		memcpy(priv->selected_palette, palette, palette_bytes);
 		break;
@@ -546,9 +546,7 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
 
 	for(unsigned int x = 0; x < LCD_WIDTH; x++)
 	{
-		priv->fb[line][x] = priv->selected_palette
-				    [(pixels[x] & LCD_PALETTE_ALL) >> 4]
-				    [pixels[x] & 3];
+		priv->fb[line][x] = priv->selected_palette[pixels[x] & (LCD_COLOUR | LCD_PALETTE_ALL)];
 	}
 }
 #endif
