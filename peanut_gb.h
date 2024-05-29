@@ -42,6 +42,7 @@
 #endif
 
 #include <stdlib.h>	/* Required for qsort and abort */
+#include <stdbool.h>	/* Required for bool types */
 #include <stdint.h>	/* Required for int types */
 #include <string.h>	/* Required for memset */
 #include <time.h>	/* Required for tm struct */
@@ -581,10 +582,10 @@ struct gb_s
 
 	struct
 	{
-		uint8_t gb_halt		: 1;
-		uint8_t gb_ime		: 1;
-		uint8_t gb_frame	: 1; /* New frame drawn. */
-		uint8_t lcd_blank	: 1;
+		bool gb_halt	: 1;
+		bool gb_ime	: 1;
+		bool gb_frame	: 1; /* New frame drawn. */
+		bool lcd_blank	: 1;
 	};
 
 	/* Cartridge information:
@@ -649,8 +650,8 @@ struct gb_s
 		uint8_t WY;
 
 		/* Only support 30fps frame skip. */
-		uint8_t frame_skip_count : 1;
-		uint8_t interlace_count : 1;
+		bool frame_skip_count : 1;
+		bool interlace_count : 1;
 	} display;
 
 	/**
@@ -665,8 +666,8 @@ struct gb_s
 		/* Set to enable interlacing. Interlacing will start immediately
 		 * (at the next line drawing).
 		 */
-		uint8_t interlace : 1;
-		uint8_t frame_skip : 1;
+		bool interlace : 1;
+		bool frame_skip : 1;
 
 		union
 		{
@@ -1074,7 +1075,7 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 			/* Check if LCD is going to be switched on. */
 			if (!lcd_enabled && (val & LCDC_ENABLE))
 			{
-				gb->lcd_blank = 1;
+				gb->lcd_blank = true;
 			}
 			/* Check if LCD is being switched off. */
 			else if (lcd_enabled && !(val & LCDC_ENABLE))
@@ -1403,9 +1404,9 @@ void __gb_draw_line(struct gb_s *gb)
 	 * line. */
 	if(gb->direct.interlace)
 	{
-		if((gb->display.interlace_count == 0
+		if((!gb->display.interlace_count
 				&& (gb->hram_io[IO_LY] & 1) == 0)
-				|| (gb->display.interlace_count == 1
+				|| (gb->display.interlace_count
 				    && (gb->hram_io[IO_LY] & 1) == 1))
 		{
 			/* Compensate for missing window draw if required. */
@@ -1744,13 +1745,13 @@ void __gb_step_cpu(struct gb_s *gb)
 	while(gb->gb_halt || (gb->gb_ime &&
 			gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & ANY_INTR))
 	{
-		gb->gb_halt = 0;
+		gb->gb_halt = false;
 
 		if(!gb->gb_ime)
 			break;
 
 		/* Disable interrupts */
-		gb->gb_ime = 0;
+		gb->gb_ime = false;
 
 		/* Push Program Counter */
 		__gb_write(gb, --gb->cpu_reg.sp.reg, gb->cpu_reg.pc.bytes.p);
@@ -1877,7 +1878,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0x10: /* STOP */
-		//gb->gb_halt = 1;
+		//gb->gb_halt = true;
 		break;
 
 	case 0x11: /* LD DE, imm */
@@ -2394,7 +2395,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		int_fast16_t halt_cycles = INT_FAST16_MAX;
 
 		/* TODO: Emulate HALT bug? */
-		gb->gb_halt = 1;
+		gb->gb_halt = true;
 
 		if (gb->hram_io[IO_IE] == 0)
 		{
@@ -3001,7 +3002,7 @@ void __gb_step_cpu(struct gb_s *gb)
 	{
 		gb->cpu_reg.pc.bytes.c = __gb_read(gb, gb->cpu_reg.sp.reg++);
 		gb->cpu_reg.pc.bytes.p = __gb_read(gb, gb->cpu_reg.sp.reg++);
-		gb->gb_ime = 1;
+		gb->gb_ime = true;
 	}
 	break;
 
@@ -3138,7 +3139,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0xF3: /* DI */
-		gb->gb_ime = 0;
+		gb->gb_ime = false;
 		break;
 
 	case 0xF5: /* PUSH AF */
@@ -3185,7 +3186,7 @@ void __gb_step_cpu(struct gb_s *gb)
 	}
 
 	case 0xFB: /* EI */
-		gb->gb_ime = 1;
+		gb->gb_ime = true;
 		break;
 
 	case 0xFE: /* CP imm */
@@ -3367,9 +3368,9 @@ void __gb_step_cpu(struct gb_s *gb)
 			{
 				gb->hram_io[IO_STAT] =
 					(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_VBLANK;
-				gb->gb_frame = 1;
+				gb->gb_frame = true;
 				gb->hram_io[IO_IF] |= VBLANK_INTR;
-				gb->lcd_blank = 0;
+				gb->lcd_blank = false;
 
 				if(gb->hram_io[IO_STAT] & STAT_MODE_1_INTR)
 					gb->hram_io[IO_IF] |= LCDC_INTR;
@@ -3450,7 +3451,7 @@ void __gb_step_cpu(struct gb_s *gb)
 
 void gb_run_frame(struct gb_s *gb)
 {
-	gb->gb_frame = 0;
+	gb->gb_frame = false;
 
 	while(!gb->gb_frame)
 		__gb_step_cpu(gb);
@@ -3503,8 +3504,8 @@ uint8_t gb_colour_hash(struct gb_s *gb)
  */
 void gb_reset(struct gb_s *gb)
 {
-	gb->gb_halt = 0;
-	gb->gb_ime = 1;
+	gb->gb_halt = false;
+	gb->gb_ime = true;
 
 	/* Initialise MBC values. */
 	gb->selected_rom_bank = 1;
@@ -3657,7 +3658,7 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	 * always has 512 half-bytes of RAM. Hence, gb->num_ram_banks must be
 	 * ignored for MBC2. */
 
-	gb->lcd_blank = 0;
+	gb->lcd_blank = false;
 	gb->display.lcd_draw_line = NULL;
 
 	gb_reset(gb);
@@ -3697,10 +3698,10 @@ void gb_init_lcd(struct gb_s *gb,
 {
 	gb->display.lcd_draw_line = lcd_draw_line;
 
-	gb->direct.interlace = 0;
-	gb->display.interlace_count = 0;
-	gb->direct.frame_skip = 0;
-	gb->display.frame_skip_count = 0;
+	gb->direct.interlace = false;
+	gb->display.interlace_count = false;
+	gb->direct.frame_skip = false;
+	gb->display.frame_skip_count = false;
 
 	gb->display.window_clear = 0;
 	gb->display.WY = 0;

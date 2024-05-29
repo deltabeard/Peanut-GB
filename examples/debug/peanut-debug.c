@@ -379,8 +379,8 @@ int main(int argc, char **argv)
 		/* Execute CPU cycles until the screen has to be redrawn. */
 		//gb_run_frame(&gb);
 		
-		gb.gb_frame = 0;
-		while(gb.gb_frame == 0)
+		gb.gb_frame = false;
+		while(!gb.gb_frame)
 		{
 			const char *lcd_mode_str[4] = {
 				"HBLANK", "VBLANK", "OAM", "TRANSFER"
