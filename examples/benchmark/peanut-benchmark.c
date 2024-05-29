@@ -185,7 +185,7 @@ int main(int argc, char **argv)
 
 #if ENABLE_LCD
 		gb_init_lcd(&gb, &lcd_draw_line);
-		// gb.direct.interlace = 1;
+		// gb.direct.interlace = true;
 #endif
 
 		start_time = clock();

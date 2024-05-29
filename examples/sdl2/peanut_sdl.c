@@ -1118,11 +1118,11 @@ int main(int argc, char **argv)
 #if ENABLE_LCD
 
 				case SDLK_i:
-					gb.direct.interlace = ~gb.direct.interlace;
+					gb.direct.interlace = !gb.direct.interlace;
 					break;
 
 				case SDLK_o:
-					gb.direct.frame_skip = ~gb.direct.frame_skip;
+					gb.direct.frame_skip = !gb.direct.frame_skip;
 					break;
 
 				case SDLK_b:
