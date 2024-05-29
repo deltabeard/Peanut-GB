@@ -157,7 +157,7 @@
 #define VERTICAL_SYNC       (DMG_CLOCK_FREQ/SCREEN_REFRESH_CYCLES)
 
 /* Real Time Clock is locked to 1Hz. */
-#define RTC_CYCLES	((unsigned long)DMG_CLOCK_FREQ)
+#define RTC_CYCLES	((uint_fast32_t)DMG_CLOCK_FREQ)
 
 /* SERIAL SC register masks. */
 #define SERIAL_SC_TX_START  0x80
