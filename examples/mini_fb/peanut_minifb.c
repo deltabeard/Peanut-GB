@@ -96,7 +96,7 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
 	struct priv_t *priv = gb->direct.priv;
 
 	fprintf(stderr, "Error %d occurred: %s at %04X\n. Exiting.\n",
-			gb_err, gb_err_str[gb_err], addr);
+			gb_err, gb_err_str[gb_err], val);
 
 	/* Free memory and then exit. */
 	free(priv->cart_ram);

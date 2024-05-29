@@ -2,8 +2,9 @@
 *.o
 *.a
 *.exe
-peanut-sdl
+peanut-sdl*
 peanut-debug
+peanut-minifb
 tags
 build*/
 bin*/
