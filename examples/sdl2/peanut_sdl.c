@@ -1011,39 +1011,76 @@ int main(int argc, char **argv)
 				goto quit;
 
 			case SDL_CONTROLLERBUTTONDOWN:
+				switch(event.cbutton.button)
+				{
+				case SDL_CONTROLLER_BUTTON_A:
+					gb.direct.joypad &= ~JOYPAD_A;
+					break;
+
+				case SDL_CONTROLLER_BUTTON_B:
+					gb.direct.joypad &= ~JOYPAD_B;
+					break;
+
+				case SDL_CONTROLLER_BUTTON_BACK:
+					gb.direct.joypad &= ~JOYPAD_SELECT;
+					break;
+
+				case SDL_CONTROLLER_BUTTON_START:
+					gb.direct.joypad &= ~JOYPAD_START;
+					break;
+
+				case SDL_CONTROLLER_BUTTON_DPAD_UP:
+					gb.direct.joypad &= ~JOYPAD_UP;
+					break;
+
+				case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
+					gb.direct.joypad &= ~JOYPAD_RIGHT;
+					break;
+
+				case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
+					gb.direct.joypad &= ~JOYPAD_DOWN;
+					break;
+
+				case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
+					gb.direct.joypad &= ~JOYPAD_LEFT;
+					break;
+				}
+
+				break;
+
 			case SDL_CONTROLLERBUTTONUP:
 				switch(event.cbutton.button)
 				{
 				case SDL_CONTROLLER_BUTTON_A:
-					gb.direct.joypad_bits.a = !event.cbutton.state;
+					gb.direct.joypad |= JOYPAD_A;
 					break;
 
 				case SDL_CONTROLLER_BUTTON_B:
-					gb.direct.joypad_bits.b = !event.cbutton.state;
+					gb.direct.joypad |= JOYPAD_B;
 					break;
 
 				case SDL_CONTROLLER_BUTTON_BACK:
-					gb.direct.joypad_bits.select = !event.cbutton.state;
+					gb.direct.joypad |= JOYPAD_SELECT;
 					break;
 
 				case SDL_CONTROLLER_BUTTON_START:
-					gb.direct.joypad_bits.start = !event.cbutton.state;
+					gb.direct.joypad |= JOYPAD_START;
 					break;
 
 				case SDL_CONTROLLER_BUTTON_DPAD_UP:
-					gb.direct.joypad_bits.up = !event.cbutton.state;
+					gb.direct.joypad |= JOYPAD_UP;
 					break;
 
 				case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
-					gb.direct.joypad_bits.right = !event.cbutton.state;
+					gb.direct.joypad |= JOYPAD_RIGHT;
 					break;
 
 				case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
-					gb.direct.joypad_bits.down = !event.cbutton.state;
+					gb.direct.joypad |= JOYPAD_DOWN;
 					break;
 
 				case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
-					gb.direct.joypad_bits.left = !event.cbutton.state;
+					gb.direct.joypad |= JOYPAD_LEFT;
 					break;
 				}
 
@@ -1053,43 +1090,43 @@ int main(int argc, char **argv)
 				switch(event.key.keysym.sym)
 				{
 				case SDLK_RETURN:
-					gb.direct.joypad_bits.start = 0;
+					gb.direct.joypad &= ~JOYPAD_START;
 					break;
 
 				case SDLK_BACKSPACE:
-					gb.direct.joypad_bits.select = 0;
+					gb.direct.joypad &= ~JOYPAD_SELECT;
 					break;
 
 				case SDLK_z:
-					gb.direct.joypad_bits.a = 0;
+					gb.direct.joypad &= ~JOYPAD_A;
 					break;
 
 				case SDLK_x:
-					gb.direct.joypad_bits.b = 0;
+					gb.direct.joypad &= ~JOYPAD_B;
 					break;
 
 				case SDLK_a:
-					gb.direct.joypad_bits.a = ~gb.direct.joypad_bits.a;
+					gb.direct.joypad ^= JOYPAD_A;
 					break;
 
 				case SDLK_s:
-					gb.direct.joypad_bits.b = ~gb.direct.joypad_bits.b;
+					gb.direct.joypad ^= JOYPAD_B;
 					break;
 
 				case SDLK_UP:
-					gb.direct.joypad_bits.up = 0;
+					gb.direct.joypad &= ~JOYPAD_UP;
 					break;
 
 				case SDLK_RIGHT:
-					gb.direct.joypad_bits.right = 0;
+					gb.direct.joypad &= ~JOYPAD_RIGHT;
 					break;
 
 				case SDLK_DOWN:
-					gb.direct.joypad_bits.down = 0;
+					gb.direct.joypad &= ~JOYPAD_DOWN;
 					break;
 
 				case SDLK_LEFT:
-					gb.direct.joypad_bits.left = 0;
+					gb.direct.joypad &= ~JOYPAD_LEFT;
 					break;
 
 				case SDLK_SPACE:
@@ -1160,43 +1197,43 @@ int main(int argc, char **argv)
 				switch(event.key.keysym.sym)
 				{
 				case SDLK_RETURN:
-					gb.direct.joypad_bits.start = 1;
+					gb.direct.joypad |= JOYPAD_START;
 					break;
 
 				case SDLK_BACKSPACE:
-					gb.direct.joypad_bits.select = 1;
+					gb.direct.joypad |= JOYPAD_SELECT;
 					break;
 
 				case SDLK_z:
-					gb.direct.joypad_bits.a = 1;
+					gb.direct.joypad |= JOYPAD_A;
 					break;
 
 				case SDLK_x:
-					gb.direct.joypad_bits.b = 1;
+					gb.direct.joypad |= JOYPAD_B;
 					break;
 
 				case SDLK_a:
-					gb.direct.joypad_bits.a = 1;
+					gb.direct.joypad |= JOYPAD_A;
 					break;
 
 				case SDLK_s:
-					gb.direct.joypad_bits.b = 1;
+					gb.direct.joypad |= JOYPAD_B;
 					break;
 
 				case SDLK_UP:
-					gb.direct.joypad_bits.up = 1;
+					gb.direct.joypad |= JOYPAD_UP;
 					break;
 
 				case SDLK_RIGHT:
-					gb.direct.joypad_bits.right = 1;
+					gb.direct.joypad |= JOYPAD_RIGHT;
 					break;
 
 				case SDLK_DOWN:
-					gb.direct.joypad_bits.down = 1;
+					gb.direct.joypad |= JOYPAD_DOWN;
 					break;
 
 				case SDLK_LEFT:
-					gb.direct.joypad_bits.left = 1;
+					gb.direct.joypad |= JOYPAD_LEFT;
 					break;
 
 				case SDLK_SPACE:
