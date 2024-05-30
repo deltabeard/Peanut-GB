@@ -14,6 +14,7 @@
 
 #include "SDL.h"
 
+#define PEANUT_GB_USE_NIBBLE_FOR_PALETTE 1
 #define ENABLE_LCD 1
 #define ENABLE_SOUND 0
 

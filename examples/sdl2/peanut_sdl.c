@@ -17,6 +17,8 @@
 #	include "minigb_apu/minigb_apu.h"
 #endif
 
+#define PEANUT_GB_USE_NIBBLE_FOR_PALETTE 1
+
 #include "../../peanut_gb.h"
 
 enum {
