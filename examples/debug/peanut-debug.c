@@ -174,7 +174,7 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
  * Draws scanline into framebuffer.
  */
 void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
-		   const uint_least8_t line)
+		   const uint_fast8_t line)
 {
 	struct priv_t *priv = gb->direct.priv;
 
