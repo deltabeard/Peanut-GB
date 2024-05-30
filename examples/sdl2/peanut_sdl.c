@@ -20,6 +20,8 @@
 uint8_t audio_read(uint16_t addr);
 void audio_write(uint16_t addr, uint8_t val);
 
+#define PEANUT_GB_USE_NIBBLE_FOR_PALETTE 1
+
 #include "../../peanut_gb.h"
 
 enum {
