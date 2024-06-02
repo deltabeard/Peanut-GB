@@ -1390,7 +1390,7 @@ static int compare_sprites(const void *in1, const void *in2)
 
 void __gb_draw_line(struct gb_s *gb)
 {
-	uint8_t pixels[160] = {0};
+	uint8_t pixels[LCD_WIDTH];
 
 	/* If LCD not initialised by front-end, don't render anything. */
 	if(gb->display.lcd_draw_line == NULL)
@@ -1418,8 +1418,78 @@ void __gb_draw_line(struct gb_s *gb)
 		}
 	}
 
-	/* If background is enabled, draw it. */
-	if(gb->hram_io[IO_LCDC] & LCDC_BG_ENABLE)
+	/* If window is enabled and active on this line, draw it. */
+	if(gb->hram_io[IO_LCDC] & LCDC_WINDOW_ENABLE
+			&& gb->hram_io[IO_LY] >= gb->display.WY
+			&& gb->hram_io[IO_WX] <= 166)
+	{
+		uint16_t win_line, tile;
+		uint8_t disp_x, win_x, py, px, idx, t1, t2, end;
+
+		/* Calculate Window Map Address. */
+		win_line = (gb->hram_io[IO_LCDC] & LCDC_WINDOW_MAP) ?
+				    VRAM_BMAP_2 : VRAM_BMAP_1;
+		win_line += (gb->display.window_clear >> 3) * 0x20;
+
+		disp_x = LCD_WIDTH - 1;
+		win_x = disp_x - gb->hram_io[IO_WX] + 7;
+
+		// look up tile
+		py = gb->display.window_clear & 0x07;
+		px = 7 - (win_x & 0x07);
+		idx = gb->vram[win_line + (win_x >> 3)];
+
+		if(gb->hram_io[IO_LCDC] & LCDC_TILE_SELECT)
+			tile = VRAM_TILES_1 + idx * 0x10;
+		else
+			tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
+
+		tile += 2 * py;
+
+		// fetch first tile
+		t1 = gb->vram[tile] >> px;
+		t2 = gb->vram[tile + 1] >> px;
+
+		// loop & copy window
+		end = (gb->hram_io[IO_WX] < 7 ? 0 : gb->hram_io[IO_WX] - 7) - 1;
+
+		for(; disp_x != end; disp_x--)
+		{
+			uint8_t c;
+
+			if(px == 8)
+			{
+				// fetch next tile
+				px = 0;
+				win_x = disp_x - gb->hram_io[IO_WX] + 7;
+				idx = gb->vram[win_line + (win_x >> 3)];
+
+				if(gb->hram_io[IO_LCDC] & LCDC_TILE_SELECT)
+					tile = VRAM_TILES_1 + idx * 0x10;
+				else
+					tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
+
+				tile += 2 * py;
+				t1 = gb->vram[tile];
+				t2 = gb->vram[tile + 1];
+			}
+
+			// copy window
+			c = (t1 & 0x1) | ((t2 & 0x1) << 1);
+			pixels[disp_x] = gb->display.bg_palette[c];
+#if PEANUT_GB_12_COLOUR
+			pixels[disp_x] |= LCD_PALETTE_BG;
+#endif
+			t1 = t1 >> 1;
+			t2 = t2 >> 1;
+			px++;
+		}
+
+		gb->display.window_clear++; // advance window line
+	}
+
+	/* If background is enabled but not covered by the window, draw it. */
+	else if(gb->hram_io[IO_LCDC] & LCDC_BG_ENABLE)
 	{
 		uint8_t bg_y, disp_x, bg_x, idx, py, px, t1, t2;
 		uint16_t bg_map, tile;
@@ -1497,74 +1567,10 @@ void __gb_draw_line(struct gb_s *gb)
 		}
 	}
 
-	/* draw window */
-	if(gb->hram_io[IO_LCDC] & LCDC_WINDOW_ENABLE
-			&& gb->hram_io[IO_LY] >= gb->display.WY
-			&& gb->hram_io[IO_WX] <= 166)
+	/* If no pixels have been written yet, clear the buffer. */
+	else
 	{
-		uint16_t win_line, tile;
-		uint8_t disp_x, win_x, py, px, idx, t1, t2, end;
-
-		/* Calculate Window Map Address. */
-		win_line = (gb->hram_io[IO_LCDC] & LCDC_WINDOW_MAP) ?
-				    VRAM_BMAP_2 : VRAM_BMAP_1;
-		win_line += (gb->display.window_clear >> 3) * 0x20;
-
-		disp_x = LCD_WIDTH - 1;
-		win_x = disp_x - gb->hram_io[IO_WX] + 7;
-
-		// look up tile
-		py = gb->display.window_clear & 0x07;
-		px = 7 - (win_x & 0x07);
-		idx = gb->vram[win_line + (win_x >> 3)];
-
-		if(gb->hram_io[IO_LCDC] & LCDC_TILE_SELECT)
-			tile = VRAM_TILES_1 + idx * 0x10;
-		else
-			tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
-
-		tile += 2 * py;
-
-		// fetch first tile
-		t1 = gb->vram[tile] >> px;
-		t2 = gb->vram[tile + 1] >> px;
-
-		// loop & copy window
-		end = (gb->hram_io[IO_WX] < 7 ? 0 : gb->hram_io[IO_WX] - 7) - 1;
-
-		for(; disp_x != end; disp_x--)
-		{
-			uint8_t c;
-
-			if(px == 8)
-			{
-				// fetch next tile
-				px = 0;
-				win_x = disp_x - gb->hram_io[IO_WX] + 7;
-				idx = gb->vram[win_line + (win_x >> 3)];
-
-				if(gb->hram_io[IO_LCDC] & LCDC_TILE_SELECT)
-					tile = VRAM_TILES_1 + idx * 0x10;
-				else
-					tile = VRAM_TILES_2 + ((idx + 0x80) % 0x100) * 0x10;
-
-				tile += 2 * py;
-				t1 = gb->vram[tile];
-				t2 = gb->vram[tile + 1];
-			}
-
-			// copy window
-			c = (t1 & 0x1) | ((t2 & 0x1) << 1);
-			pixels[disp_x] = gb->display.bg_palette[c];
-#if PEANUT_GB_12_COLOUR
-			pixels[disp_x] |= LCD_PALETTE_BG;
-#endif
-			t1 = t1 >> 1;
-			t2 = t2 >> 1;
-			px++;
-		}
-
-		gb->display.window_clear++; // advance window line
+		memset(pixels, 0, LCD_WIDTH);
 	}
 
 	// draw sprites
