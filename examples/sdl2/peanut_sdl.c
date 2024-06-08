@@ -540,7 +540,7 @@ void manual_assign_palette(struct priv_t *priv, uint8_t selection)
  * Draws scanline into framebuffer.
  */
 void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
-		   const uint_least8_t line)
+		   const uint_fast8_t line)
 {
 	struct priv_t *priv = gb->direct.priv;
 
@@ -1155,11 +1155,11 @@ int main(int argc, char **argv)
 #if ENABLE_LCD
 
 				case SDLK_i:
-					gb.direct.interlace = ~gb.direct.interlace;
+					gb.direct.interlace = !gb.direct.interlace;
 					break;
 
 				case SDLK_o:
-					gb.direct.frame_skip = ~gb.direct.frame_skip;
+					gb.direct.frame_skip = !gb.direct.frame_skip;
 					break;
 
 				case SDLK_b:

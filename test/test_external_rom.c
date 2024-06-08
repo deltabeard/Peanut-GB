@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
 	gb_init_serial(&gb, gb_serial_tx, NULL);
 #if ENABLE_LCD
 	gb_init_lcd(&gb, &lcd_draw_line);
-	// gb.direct.interlace = 1;
+	// gb.direct.interlace = true;
 #endif
 
 	do
