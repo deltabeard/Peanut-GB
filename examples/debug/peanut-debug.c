@@ -340,14 +340,14 @@ int main(int argc, char **argv)
 				case SDL_KEYDOWN:
 					switch(event.key.keysym.sym)
 					{
-						case SDLK_RETURN: gb.direct.joypad_bits.start = 0; break;
-						case SDLK_BACKSPACE: gb.direct.joypad_bits.select = 0; break;
-						case SDLK_z: gb.direct.joypad_bits.a = 0; break;
-						case SDLK_x: gb.direct.joypad_bits.b = 0; break;
-						case SDLK_UP: gb.direct.joypad_bits.up = 0; break;
-						case SDLK_DOWN: gb.direct.joypad_bits.down = 0; break;
-						case SDLK_LEFT: gb.direct.joypad_bits.left = 0; break;
-						case SDLK_RIGHT: gb.direct.joypad_bits.right = 0; break;
+						case SDLK_RETURN: gb.direct.joypad &= ~JOYPAD_START; break;
+						case SDLK_BACKSPACE: gb.direct.joypad &= ~JOYPAD_SELECT; break;
+						case SDLK_z: gb.direct.joypad &= ~JOYPAD_A; break;
+						case SDLK_x: gb.direct.joypad &= ~JOYPAD_B; break;
+						case SDLK_UP: gb.direct.joypad &= ~JOYPAD_UP; break;
+						case SDLK_DOWN: gb.direct.joypad &= ~JOYPAD_DOWN; break;
+						case SDLK_LEFT: gb.direct.joypad &= ~JOYPAD_LEFT; break;
+						case SDLK_RIGHT: gb.direct.joypad &= ~JOYPAD_RIGHT; break;
 						case SDLK_SPACE: fast_mode = !fast_mode; break;
 						case SDLK_d: debug_mode = !debug_mode; break;
 						default: break;
@@ -356,14 +356,14 @@ int main(int argc, char **argv)
 				case SDL_KEYUP:
 					switch(event.key.keysym.sym)
 					{
-						case SDLK_RETURN: gb.direct.joypad_bits.start = 1; break;
-						case SDLK_BACKSPACE: gb.direct.joypad_bits.select = 1; break;
-						case SDLK_z: gb.direct.joypad_bits.a = 1; break;
-						case SDLK_x: gb.direct.joypad_bits.b = 1; break;
-						case SDLK_UP: gb.direct.joypad_bits.up = 1; break;
-						case SDLK_DOWN: gb.direct.joypad_bits.down = 1; break;
-						case SDLK_LEFT: gb.direct.joypad_bits.left = 1; break;
-						case SDLK_RIGHT: gb.direct.joypad_bits.right = 1; break;
+						case SDLK_RETURN: gb.direct.joypad |= JOYPAD_START; break;
+						case SDLK_BACKSPACE: gb.direct.joypad |= JOYPAD_SELECT; break;
+						case SDLK_z: gb.direct.joypad |= JOYPAD_A; break;
+						case SDLK_x: gb.direct.joypad |= JOYPAD_B; break;
+						case SDLK_UP: gb.direct.joypad |= JOYPAD_UP; break;
+						case SDLK_DOWN: gb.direct.joypad |= JOYPAD_DOWN; break;
+						case SDLK_LEFT: gb.direct.joypad |= JOYPAD_LEFT; break;
+						case SDLK_RIGHT: gb.direct.joypad |= JOYPAD_RIGHT; break;
 						default: break;
 					}
 					break;
