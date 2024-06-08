@@ -683,17 +683,18 @@ struct gb_s
 		{
 			struct
 			{
-				/* Using this bitfield is deprecated due to portability concerns.
-				 * It is recommended to use the JOYPAD_* defines instead.
+				/* Using this bitfield is deprecated due to
+				 * portability concerns. It is recommended to
+				 * use the JOYPAD_* defines instead.
 				 */
-				uint8_t a	: 1;
-				uint8_t b	: 1;
-				uint8_t select	: 1;
-				uint8_t start	: 1;
-				uint8_t right	: 1;
-				uint8_t left	: 1;
-				uint8_t up	: 1;
-				uint8_t down	: 1;
+				bool a		: 1;
+				bool b		: 1;
+				bool select	: 1;
+				bool start	: 1;
+				bool right	: 1;
+				bool left	: 1;
+				bool up		: 1;
+				bool down	: 1;
 			} joypad_bits;
 			uint8_t joypad;
 		};
