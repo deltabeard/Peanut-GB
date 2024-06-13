@@ -1179,7 +1179,7 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 
 		/* Turn off boot ROM */
 		case 0x50:
-			gb->hram_io[IO_BOOT] = val;
+			gb->hram_io[IO_BOOT] = 0x01;
 			return;
 
 		/* Interrupt Enable Register */
