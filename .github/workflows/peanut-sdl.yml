@@ -27,6 +27,7 @@ jobs:
             nice-name: "Ubuntu-Linux"
           
           - os: macos-latest
+            generator: "Ninja"
             nice-name: "macOS"
             nice-arch: "arm64"
             
