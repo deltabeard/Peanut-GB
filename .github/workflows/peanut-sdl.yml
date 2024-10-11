@@ -18,18 +18,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        build_type: [RelWithDebInfo]
-        generator: [Ninja]
-        nice-arch: [x86_64]
         include:
           - os: ubuntu-latest
+            build_type: RelWithDebInfo
+            generator: "Ninja"
+            nice-arch: "x86_64"
             nice-name: "Ubuntu-Linux"
           
           - os: macos-latest
+            build_type: RelWithDebInfo
             generator: "Ninja"
-            nice-name: "macOS"
             nice-arch: "arm64"
+            nice-name: "macOS"
             
           - os: windows-2022
             build_type: RelWithDebInfo
@@ -74,7 +74,7 @@ jobs:
       - name: Build
         run: |
           cmake -S ./examples/sdl2/ -B ${{github.workspace}}/build -G "${{matrix.generator}}" -DCMAKE_BUILD_TYPE=${{matrix.build_type}} -DLIBRARY_DISCOVER_METHOD=CPM ${{matrix.additional-cmake-args}}
-          cmake --build build --config ${{matrix.BUILD_TYPE}}
+          cmake --build build --config ${{matrix.build_type}}
           
       - name: Tar output on Unix systems
         if: "contains(matrix.os, 'windows') == false"
