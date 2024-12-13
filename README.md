@@ -106,8 +106,9 @@ In no particular order, and a non-exaustive list, the following projects use Pea
 
 * [Pico-GB](https://github.com/YouMakeTech/Pico-GB) -  Game Boy emulation on the Raspberry Pi RP2040 microcontroller.
 * [Peanut_gb-RGFW](https://github.com/ColleagueRiley/Peanut_gb-RGFW) - A Gameboy emulator example for [RGFW](https://github.com/ColleagueRiley/RGFW).
-* [CPBoy](https://github.com/diddyholz/CPBoy) - A Game Boy (DMG) emulator for the Classpad II (fx-CP400).
-* [PlayGB](https://github.com/risolvipro/PlayGB) - A Game Boy emulator for Playdate, based on Peanut-GB.
+* [CPBoy](https://github.com/diddyholz/CPBoy) - A Game Boy emulator for the Classpad II (fx-CP400).
+* [PlayGB](https://github.com/risolvipro/PlayGB) - A Game Boy emulator for Playdate.
+* [AcolyteHandPICd32](https://github.com/stevenchadburrow/AcolyteHandPICd32) - Game Boy emulation on the PIC32MZ2048EFH144 32-bit 150MHz microcontroller.
 
 ## Getting Started
 
