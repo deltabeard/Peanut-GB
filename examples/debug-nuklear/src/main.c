@@ -622,10 +622,10 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 
 			flags_len = SDL_snprintf(flags, sizeof(flags),
 				"%c%c%c%c",
-				gb->cpu_reg.f_bits.c ? 'C' : '-',
-				gb->cpu_reg.f_bits.h ? 'H' : '-',
-				gb->cpu_reg.f_bits.n ? 'N' : '-',
-				gb->cpu_reg.f_bits.z ? 'Z' : '-');
+				gb->cpu_reg.f.f_bits.c ? 'C' : '-',
+				gb->cpu_reg.f.f_bits.h ? 'H' : '-',
+				gb->cpu_reg.f.f_bits.n ? 'N' : '-',
+				gb->cpu_reg.f.f_bits.z ? 'Z' : '-');
 			nk_text(ctx, flags, flags_len, NK_TEXT_CENTERED);
 			nk_group_end(ctx);
 		}
