@@ -42,6 +42,7 @@
 #endif
 
 #include <stdlib.h>	/* Required for qsort and abort */
+#include <stdbool.h>	/* Required for bool types */
 #include <stdint.h>	/* Required for int types */
 #include <string.h>	/* Required for memset */
 #include <time.h>	/* Required for tm struct */
@@ -157,7 +158,7 @@
 #define VERTICAL_SYNC       (DMG_CLOCK_FREQ/SCREEN_REFRESH_CYCLES)
 
 /* Real Time Clock is locked to 1Hz. */
-#define RTC_CYCLES	((unsigned long)DMG_CLOCK_FREQ)
+#define RTC_CYCLES	((uint_fast32_t)DMG_CLOCK_FREQ)
 
 /* SERIAL SC register masks. */
 #define SERIAL_SC_TX_START  0x80
@@ -218,6 +219,16 @@
 #define OBJ_FLIP_Y          0x40
 #define OBJ_FLIP_X          0x20
 #define OBJ_PALETTE         0x10
+
+/* Joypad buttons */
+#define JOYPAD_A            0x01
+#define JOYPAD_B            0x02
+#define JOYPAD_SELECT       0x04
+#define JOYPAD_START        0x08
+#define JOYPAD_RIGHT        0x10
+#define JOYPAD_LEFT         0x20
+#define JOYPAD_UP           0x40
+#define JOYPAD_DOWN         0x80
 
 #define ROM_HEADER_CHECKSUM_LOC	0x014D
 
@@ -502,7 +513,9 @@ enum gb_init_error_e
 {
 	GB_INIT_NO_ERROR = 0,
 	GB_INIT_CARTRIDGE_UNSUPPORTED,
-	GB_INIT_INVALID_CHECKSUM
+	GB_INIT_INVALID_CHECKSUM,
+
+	GB_INIT_INVALID_MAX
 };
 
 /**
@@ -581,10 +594,10 @@ struct gb_s
 
 	struct
 	{
-		uint8_t gb_halt		: 1;
-		uint8_t gb_ime		: 1;
-		uint8_t gb_frame	: 1; /* New frame drawn. */
-		uint8_t lcd_blank	: 1;
+		bool gb_halt	: 1;
+		bool gb_ime	: 1;
+		bool gb_frame	: 1; /* New frame drawn. */
+		bool lcd_blank	: 1;
 	};
 
 	/* Cartridge information:
@@ -649,8 +662,8 @@ struct gb_s
 		uint8_t WY;
 
 		/* Only support 30fps frame skip. */
-		uint8_t frame_skip_count : 1;
-		uint8_t interlace_count : 1;
+		bool frame_skip_count : 1;
+		bool interlace_count : 1;
 	} display;
 
 	/**
@@ -665,21 +678,25 @@ struct gb_s
 		/* Set to enable interlacing. Interlacing will start immediately
 		 * (at the next line drawing).
 		 */
-		uint8_t interlace : 1;
-		uint8_t frame_skip : 1;
+		bool interlace : 1;
+		bool frame_skip : 1;
 
 		union
 		{
 			struct
 			{
-				uint8_t a	: 1;
-				uint8_t b	: 1;
-				uint8_t select	: 1;
-				uint8_t start	: 1;
-				uint8_t right	: 1;
-				uint8_t left	: 1;
-				uint8_t up	: 1;
-				uint8_t down	: 1;
+				/* Using this bitfield is deprecated due to
+				 * portability concerns. It is recommended to
+				 * use the JOYPAD_* defines instead.
+				 */
+				bool a		: 1;
+				bool b		: 1;
+				bool select	: 1;
+				bool start	: 1;
+				bool right	: 1;
+				bool left	: 1;
+				bool up		: 1;
+				bool down	: 1;
 			} joypad_bits;
 			uint8_t joypad;
 		};
@@ -699,7 +716,6 @@ struct gb_s
 #define IO_TMA	0x06
 #define IO_TAC	0x07
 #define IO_IF	0x0F
-#define IO_BOOT	0x50
 #define IO_LCDC	0x40
 #define IO_STAT	0x41
 #define IO_SCY	0x42
@@ -712,7 +728,7 @@ struct gb_s
 #define IO_OBP1	0x49
 #define IO_WY	0x4A
 #define IO_WX	0x4B
-#define IO_BANK	0x50
+#define IO_BOOT	0x50
 #define IO_IE	0xFF
 
 #define IO_TAC_RATE_MASK	0x3
@@ -734,9 +750,9 @@ uint8_t __gb_read(struct gb_s *gb, uint16_t addr)
 	switch(PEANUT_GB_GET_MSN16(addr))
 	{
 	case 0x0:
-		/* IO_BANK is only set to 1 if gb->gb_bootrom_read was not NULL
+		/* IO_BOOT is only set to 1 if gb->gb_bootrom_read was not NULL
 		 * on reset. */
-		if(gb->hram_io[IO_BANK] == 0 && addr < 0x0100)
+		if(gb->hram_io[IO_BOOT] == 0 && addr < 0x0100)
 		{
 			return gb->gb_bootrom_read(gb, addr);
 		}
@@ -1074,7 +1090,7 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 			/* Check if LCD is going to be switched on. */
 			if (!lcd_enabled && (val & LCDC_ENABLE))
 			{
-				gb->lcd_blank = 1;
+				gb->lcd_blank = true;
 			}
 			/* Check if LCD is being switched off. */
 			else if (lcd_enabled && !(val & LCDC_ENABLE))
@@ -1165,7 +1181,7 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 
 		/* Turn off boot ROM */
 		case 0x50:
-			gb->hram_io[IO_BANK] = val;
+			gb->hram_io[IO_BOOT] = 0x01;
 			return;
 
 		/* Interrupt Enable Register */
@@ -1403,9 +1419,9 @@ void __gb_draw_line(struct gb_s *gb)
 	 * line. */
 	if(gb->direct.interlace)
 	{
-		if((gb->display.interlace_count == 0
+		if((!gb->display.interlace_count
 				&& (gb->hram_io[IO_LY] & 1) == 0)
-				|| (gb->display.interlace_count == 1
+				|| (gb->display.interlace_count
 				    && (gb->hram_io[IO_LY] & 1) == 1))
 		{
 			/* Compensate for missing window draw if required. */
@@ -1744,13 +1760,13 @@ void __gb_step_cpu(struct gb_s *gb)
 	while(gb->gb_halt || (gb->gb_ime &&
 			gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & ANY_INTR))
 	{
-		gb->gb_halt = 0;
+		gb->gb_halt = false;
 
 		if(!gb->gb_ime)
 			break;
 
 		/* Disable interrupts */
-		gb->gb_ime = 0;
+		gb->gb_ime = false;
 
 		/* Push Program Counter */
 		__gb_write(gb, --gb->cpu_reg.sp.reg, gb->cpu_reg.pc.bytes.p);
@@ -1877,7 +1893,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0x10: /* STOP */
-		//gb->gb_halt = 1;
+		//gb->gb_halt = true;
 		break;
 
 	case 0x11: /* LD DE, imm */
@@ -2394,7 +2410,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		int_fast16_t halt_cycles = INT_FAST16_MAX;
 
 		/* TODO: Emulate HALT bug? */
-		gb->gb_halt = 1;
+		gb->gb_halt = true;
 
 		if (gb->hram_io[IO_IE] == 0)
 		{
@@ -3001,7 +3017,7 @@ void __gb_step_cpu(struct gb_s *gb)
 	{
 		gb->cpu_reg.pc.bytes.c = __gb_read(gb, gb->cpu_reg.sp.reg++);
 		gb->cpu_reg.pc.bytes.p = __gb_read(gb, gb->cpu_reg.sp.reg++);
-		gb->gb_ime = 1;
+		gb->gb_ime = true;
 	}
 	break;
 
@@ -3138,7 +3154,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0xF3: /* DI */
-		gb->gb_ime = 0;
+		gb->gb_ime = false;
 		break;
 
 	case 0xF5: /* PUSH AF */
@@ -3185,7 +3201,7 @@ void __gb_step_cpu(struct gb_s *gb)
 	}
 
 	case 0xFB: /* EI */
-		gb->gb_ime = 1;
+		gb->gb_ime = true;
 		break;
 
 	case 0xFE: /* CP imm */
@@ -3367,9 +3383,9 @@ void __gb_step_cpu(struct gb_s *gb)
 			{
 				gb->hram_io[IO_STAT] =
 					(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_VBLANK;
-				gb->gb_frame = 1;
+				gb->gb_frame = true;
 				gb->hram_io[IO_IF] |= VBLANK_INTR;
-				gb->lcd_blank = 0;
+				gb->lcd_blank = false;
 
 				if(gb->hram_io[IO_STAT] & STAT_MODE_1_INTR)
 					gb->hram_io[IO_IF] |= LCDC_INTR;
@@ -3450,7 +3466,7 @@ void __gb_step_cpu(struct gb_s *gb)
 
 void gb_run_frame(struct gb_s *gb)
 {
-	gb->gb_frame = 0;
+	gb->gb_frame = false;
 
 	while(!gb->gb_frame)
 		__gb_step_cpu(gb);
@@ -3503,8 +3519,8 @@ uint8_t gb_colour_hash(struct gb_s *gb)
  */
 void gb_reset(struct gb_s *gb)
 {
-	gb->gb_halt = 0;
-	gb->gb_ime = 1;
+	gb->gb_halt = false;
+	gb->gb_ime = true;
 
 	/* Initialise MBC values. */
 	gb->selected_rom_bank = 1;
@@ -3532,7 +3548,7 @@ void gb_reset(struct gb_s *gb)
 		gb->hram_io[IO_DIV ] = 0xAB;
 		gb->hram_io[IO_LCDC] = 0x91;
 		gb->hram_io[IO_STAT] = 0x85;
-		gb->hram_io[IO_BANK] = 0x01;
+		gb->hram_io[IO_BOOT] = 0x01;
 
 		memset(gb->vram, 0x00, VRAM_SIZE);
 	}
@@ -3544,7 +3560,7 @@ void gb_reset(struct gb_s *gb)
 		gb->hram_io[IO_DIV ] = 0x00;
 		gb->hram_io[IO_LCDC] = 0x00;
 		gb->hram_io[IO_STAT] = 0x84;
-		gb->hram_io[IO_BANK] = 0x00;
+		gb->hram_io[IO_BOOT] = 0x00;
 	}
 
 	gb->counter.lcd_count = 0;
@@ -3657,7 +3673,7 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	 * always has 512 half-bytes of RAM. Hence, gb->num_ram_banks must be
 	 * ignored for MBC2. */
 
-	gb->lcd_blank = 0;
+	gb->lcd_blank = false;
 	gb->display.lcd_draw_line = NULL;
 
 	gb_reset(gb);
@@ -3697,10 +3713,10 @@ void gb_init_lcd(struct gb_s *gb,
 {
 	gb->display.lcd_draw_line = lcd_draw_line;
 
-	gb->direct.interlace = 0;
-	gb->display.interlace_count = 0;
-	gb->direct.frame_skip = 0;
-	gb->display.frame_skip_count = 0;
+	gb->direct.interlace = false;
+	gb->display.interlace_count = false;
+	gb->direct.frame_skip = false;
+	gb->display.frame_skip_count = false;
 
 	gb->display.window_clear = 0;
 	gb->display.WY = 0;

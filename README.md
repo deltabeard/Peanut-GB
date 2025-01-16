@@ -48,14 +48,14 @@ accuracy is important.
 
 ## SDL2 Example
 
-An example implementation is given in peanut_sdl.c, which uses SDL2 to draw the
-screen and take input. Run `cmake` or `make` in the ./examples/sdl2/ folder to
-compile it.
+The flagship example implementation is given in peanut_sdl.c, which uses SDL2 to
+draw the screen and take input. Run `cmake` or `make` in the ./examples/sdl2/
+folder to compile it.
 
-Execute in command line with `peanut-sdl game.gb` which will automatically
-create the save file `game.sav` for the game if one isn't found. Or run with
-`peanut-sdl game.gb save.sav` to specify a save file. Or even `peanut-sdl` to
-create a *drop zone* window that you can drag and drop a ROM file to.
+Run `peanut-sdl`, which creates a *drop-zone* window that you can drag and drop
+a ROM file into.  Alternatively, run in a terminal using `peanut-sdl game.gb`,
+which will automatically create the save file `game.sav` for the game if one
+isn't found. Or, run with `peanut-sdl game.gb save.sav` to specify a save file.
 
 ### Screenshot
 
@@ -79,6 +79,8 @@ maximum FPS to 50.
 | Start             | Return     | START  |
 | Select            | Backspace  | BACK   |
 | D-Pad             | Arrow Keys | DPAD   |
+| Repeat A          | a          |        |
+| Repeat B          | s          |        |
 | Normal Speed      | 1          |        |
 | Turbo x2 (Hold)   | Space      |        |
 | Turbo X2 (Toggle) | 2          |        |
@@ -97,6 +99,16 @@ between 60 FPS and 30 FPS.
 
 Pressing 'b' will dump each frame as a 24-bit bitmap file in the current
 folder. See /screencaps/README.md for more information.
+
+## Projects Using Peanut-GB
+
+In no particular order, and a non-exaustive list, the following projects use Peanut-GB.
+
+* [Pico-GB](https://github.com/YouMakeTech/Pico-GB) -  Game Boy emulation on the Raspberry Pi RP2040 microcontroller.
+* [Peanut_gb-RGFW](https://github.com/ColleagueRiley/Peanut_gb-RGFW) - A Gameboy emulator example for [RGFW](https://github.com/ColleagueRiley/RGFW).
+* [CPBoy](https://github.com/diddyholz/CPBoy) - A Game Boy emulator for the Classpad II (fx-CP400).
+* [PlayGB](https://github.com/risolvipro/PlayGB) - A Game Boy emulator for Playdate.
+* [AcolyteHandPICd32](https://github.com/stevenchadburrow/AcolyteHandPICd32) - Game Boy emulation on the PIC32MZ2048EFH144 32-bit 150MHz microcontroller.
 
 ## Getting Started
 
@@ -162,7 +174,7 @@ returns 0 if the game does not use any save data.
 
 This function runs the CPU until a full frame is rendered to the LCD.
 
-#### gb_color_hash
+#### gb_colour_hash
 
 This function calculates a hash of the game title. This hash is calculated in
 the same way as the Game Boy Color to add colour to Game Boy games.

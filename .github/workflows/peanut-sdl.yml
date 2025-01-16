@@ -18,16 +18,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-11]
-        build_type: [RelWithDebInfo]
-        generator: [Ninja]
-        nice-arch: [x86_64]
         include:
-          - os: ubuntu-22.04
-            nice-name: "Linux-glibc2.35"
+          - os: ubuntu-latest
+            build_type: RelWithDebInfo
+            generator: "Ninja"
+            nice-arch: "x86_64"
+            nice-name: "Ubuntu-Linux"
           
-          - os: macos-11
-            nice-name: "macOS11"
+          - os: macos-latest
+            build_type: RelWithDebInfo
+            generator: "Ninja"
+            nice-arch: "arm64"
+            nice-name: "macOS"
             
           - os: windows-2022
             build_type: RelWithDebInfo
@@ -46,7 +48,7 @@ jobs:
             nice-name: "WindowsXP"
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           
@@ -61,7 +63,7 @@ jobs:
       - run: mkdir ${{ env.CPM_SOURCE_CACHE }}
 
       - name: Cache multiple paths
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ${{ env.CPM_SOURCE_CACHE }}
@@ -72,7 +74,7 @@ jobs:
       - name: Build
         run: |
           cmake -S ./examples/sdl2/ -B ${{github.workspace}}/build -G "${{matrix.generator}}" -DCMAKE_BUILD_TYPE=${{matrix.build_type}} -DLIBRARY_DISCOVER_METHOD=CPM ${{matrix.additional-cmake-args}}
-          cmake --build build --config ${{matrix.BUILD_TYPE}}
+          cmake --build build --config ${{matrix.build_type}}
           
       - name: Tar output on Unix systems
         if: "contains(matrix.os, 'windows') == false"
@@ -86,7 +88,7 @@ jobs:
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Upload output
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.nice-name }}-${{ matrix.nice-arch }}-${{ matrix.build_type }}-${{ steps.vars.outputs.sha_short }}
           path: |

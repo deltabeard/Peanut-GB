@@ -96,7 +96,7 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
 	struct priv_t *priv = gb->direct.priv;
 
 	fprintf(stderr, "Error %d occurred: %s at %04X\n. Exiting.\n",
-			gb_err, gb_err_str[gb_err], addr);
+			gb_err, gb_err_str[gb_err], val);
 
 	/* Free memory and then exit. */
 	free(priv->cart_ram);
@@ -109,7 +109,7 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
  * Draws scanline into framebuffer.
  */
 void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
-		   const uint_least8_t line)
+		   const uint_fast8_t line)
 {
 	struct priv_t *priv = gb->direct.priv;
 	const uint32_t palette[] = { 0xFFFFFF, 0xA5A5A5, 0x525252, 0x000000 };
@@ -159,7 +159,7 @@ int main(int argc, char **argv)
 
 #if ENABLE_LCD
 	gb_init_lcd(&gb, &lcd_draw_line);
-	// gb.direct.interlace = 1;
+	// gb.direct.interlace = true;
 #endif
 
 	if(!mfb_open("Peanut-minifb", LCD_WIDTH, LCD_HEIGHT))
