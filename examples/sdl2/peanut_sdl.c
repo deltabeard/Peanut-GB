@@ -145,7 +145,7 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t addr
 		"INVALID OPCODE",
 		"INVALID READ",
 		"INVALID WRITE",
-		"HALT FOREVER"
+		""
 	};
 	struct priv_t *priv = gb->direct.priv;
 	char error_msg[256];

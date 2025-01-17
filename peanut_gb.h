@@ -239,6 +239,13 @@
 
 #define PEANUT_GB_ARRAYSIZE(array)    (sizeof(array)/sizeof(array[0]))
 
+/** Allow setting deprecated functions and variables. */
+#if (defined(__GNUC__) && __GNUC__ >= 6) || (defined(__clang__) && __clang_major__ >= 4)
+# define PGB_DEPRECATED(msg) __attribute__((deprecated(msg)))
+#else
+# define PGB_DEPRECATED(msg)
+#endif
+
 #if !defined(__has_builtin)
 /* Stub __has_builtin if it isn't available. */
 # define __has_builtin(x) 0
@@ -498,12 +505,15 @@ struct count_s
 enum gb_error_e
 {
 	GB_UNKNOWN_ERROR = 0,
-	GB_INVALID_OPCODE,
-	GB_INVALID_READ,
-	GB_INVALID_WRITE,
-	GB_HALT_FOREVER,
+	GB_INVALID_OPCODE = 1,
+	GB_INVALID_READ = 2,
+	GB_INVALID_WRITE = 3,
 
-	GB_INVALID_MAX
+	/* GB_HALT_FOREVER is deprecated and will no longer be issued as an
+	 * error by Peanut-GB. */
+	GB_HALT_FOREVER PGB_DEPRECATED("Error no longer issued by Peanut-GB") = 4,
+
+	GB_INVALID_MAX = 5
 };
 
 /**
@@ -3728,6 +3738,7 @@ void gb_set_bootrom(struct gb_s *gb,
 /**
  * Deprecated. Will be removed in the next major version.
  */
+PGB_DEPRECATED("RTC is now ticked internally; this function has no effect")
 void gb_tick_rtc(struct gb_s *gb)
 {
 	(void) gb;
