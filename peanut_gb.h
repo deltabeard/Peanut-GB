@@ -2412,15 +2412,6 @@ void __gb_step_cpu(struct gb_s *gb)
 		/* TODO: Emulate HALT bug? */
 		gb->gb_halt = true;
 
-		if (gb->hram_io[IO_IE] == 0)
-		{
-			/* Return program counter where this halt forever state started. */
-			/* This may be intentional, but this is required to stop an infinite
-			 * loop. */
-			(gb->gb_error)(gb, GB_HALT_FOREVER, gb->cpu_reg.pc.reg - 1);
-			PGB_UNREACHABLE();
-		}
-
 		if(gb->hram_io[IO_SC] & SERIAL_SC_TX_START)
 		{
 			int serial_cycles = SERIAL_CYCLES -
@@ -3410,6 +3401,9 @@ void __gb_step_cpu(struct gb_s *gb)
 						!gb->display.interlace_count;
 				}
 #endif
+                                /* If halted forever, then return on VBLANK. */
+                                if(gb->gb_halt && !gb->hram_io[IO_IE])
+					break;
 			}
 			/* Normal Line */
 			else if(gb->hram_io[IO_LY] < LCD_HEIGHT)
