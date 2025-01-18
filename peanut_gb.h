@@ -3561,6 +3561,8 @@ void gb_reset(struct gb_s *gb)
 		gb->hram_io[IO_STAT] = 0x85;
 		gb->hram_io[IO_BOOT] = 0x01;
 
+		__gb_write(gb, 0xFF26, 0xF1);
+
 		memset(gb->vram, 0x00, VRAM_SIZE);
 	}
 	else
