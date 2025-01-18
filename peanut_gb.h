@@ -3423,10 +3423,16 @@ void __gb_step_cpu(struct gb_s *gb)
 					/* Clear Screen */
 					gb->display.WY = gb->hram_io[IO_WY];
 					gb->display.window_clear = 0;
-				}
 
-				gb->hram_io[IO_STAT] =
-					(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_HBLANK;
+					/* OAM Search occurs after VBLANK. */
+					gb->hram_io[IO_STAT] =
+						(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_SEARCH_OAM;
+				}
+				else
+				{
+					gb->hram_io[IO_STAT] =
+						(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_HBLANK;
+				}
 
 				if(gb->hram_io[IO_STAT] & STAT_MODE_0_INTR)
 					gb->hram_io[IO_IF] |= LCDC_INTR;
