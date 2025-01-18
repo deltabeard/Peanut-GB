@@ -7,10 +7,7 @@ CFLAGS	:= $(OPT) -std=c99 -Wall -Wextra -Wdouble-promotion \
 CFLAGS	+= $(shell sdl2-config --cflags)
 LDLIBS	+= $(shell sdl2-config --libs)
 
-all: peanut-debug
-
-peanut-debug: peanut-debug.c ../../peanut_gb.h
-	$(CC) $(CFLAGS) $< -o $@ $(LDLIBS)
+all: peanut-debug peanut-debug-simple
 
 clean:
-	$(RM) peanut-debug
+	$(RM) peanut-debug peanut-debug-simple
