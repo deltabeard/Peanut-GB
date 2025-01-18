@@ -410,6 +410,7 @@ struct cpu_registers_s
 	/* Define specific bits of Flag register. */
 	union {
 		struct {
+			uint8_t  : 4; /* Unused. */
 			uint8_t c: 1; /* Carry flag. */
 			uint8_t h: 1; /* Half carry flag. */
 			uint8_t n: 1; /* Add/sub flag. */
