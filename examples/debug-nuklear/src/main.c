@@ -124,9 +124,9 @@ static uint8_t gb_bios_read(struct gb_s *gb, const uint_fast16_t addr)
 static void gb_error(struct gb_s *ctx, const enum gb_error_e err,
 	const uint16_t val)
 {
-	const char *err_str[] = {
+	const char *err_str[GB_INVALID_MAX] = {
 		"Unknown", "Invalid opcode", "Invalid read", "Invalid write",
-		"Halted forever"
+		""
 	};
 	SDL_LogError(PGBDBG_LOG_APPLICATION,
 		"Error: %s", err_str[err]);
