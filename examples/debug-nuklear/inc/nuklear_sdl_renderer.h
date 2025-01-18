@@ -11,14 +11,17 @@
 #ifndef NK_SDL_RENDERER_H_
 #define NK_SDL_RENDERER_H_
 
-#include <SDL.h>
-#include "nuklear_proj.h"
+#ifndef NK_SDL_RENDERER_SDL_H
+#define NK_SDL_RENDERER_SDL_H <SDL.h>
+#endif
+#include NK_SDL_RENDERER_SDL_H
 NK_API struct nk_context*   nk_sdl_init(SDL_Window *win, SDL_Renderer *renderer);
 NK_API void                 nk_sdl_font_stash_begin(struct nk_font_atlas **atlas);
 NK_API void                 nk_sdl_font_stash_end(void);
 NK_API int                  nk_sdl_handle_event(SDL_Event *evt);
 NK_API void                 nk_sdl_render(enum nk_anti_aliasing);
 NK_API void                 nk_sdl_shutdown(void);
+NK_API void                 nk_sdl_handle_grab(void);
 
 #if SDL_COMPILEDVERSION < SDL_VERSIONNUM(2, 0, 22)
 /* Metal API does not support cliprects with negative coordinates or large
@@ -40,10 +43,12 @@ NK_API void                 nk_sdl_shutdown(void);
  * ===============================================================
  */
 #ifdef NK_SDL_RENDERER_IMPLEMENTATION
+#include <string.h>
+#include <stdlib.h>
 
 struct nk_sdl_device {
     struct nk_buffer cmds;
-    struct nk_draw_null_texture null;
+    struct nk_draw_null_texture tex_null;
     SDL_Texture *font_tex;
 };
 
@@ -59,9 +64,8 @@ static struct nk_sdl {
     struct nk_sdl_device ogl;
     struct nk_context ctx;
     struct nk_font_atlas atlas;
+    Uint64 time_of_last_frame;
 } sdl;
-
-
 
 NK_INTERN void
 nk_sdl_device_upload_atlas(const void *image, int width, int height)
@@ -108,11 +112,16 @@ nk_sdl_render(enum nk_anti_aliasing AA)
             {NK_VERTEX_COLOR, NK_FORMAT_R8G8B8A8, NK_OFFSETOF(struct nk_sdl_vertex, col)},
             {NK_VERTEX_LAYOUT_END}
         };
+
+        Uint64 now = SDL_GetTicks64();
+        sdl.ctx.delta_time_seconds = (float)(now - sdl.time_of_last_frame) / 1000;
+        sdl.time_of_last_frame = now;
+
         NK_MEMSET(&config, 0, sizeof(config));
         config.vertex_layout = vertex_layout;
         config.vertex_size = sizeof(struct nk_sdl_vertex);
         config.vertex_alignment = NK_ALIGNOF(struct nk_sdl_vertex);
-        config.null = dev->null;
+        config.tex_null = dev->tex_null;
         config.circle_segment_count = 22;
         config.curve_segment_count = 22;
         config.arc_segment_count = 22;
@@ -204,12 +213,12 @@ nk_sdl_clipboard_copy(nk_handle usr, const char *text, int len)
     char *str = 0;
     (void)usr;
     if (!len) return;
-    str = SDL_malloc((size_t)len+1);
+    str = (char*)malloc((size_t)len+1);
     if (!str) return;
-    NK_MEMCPY(str, text, (size_t)len);
+    memcpy(str, text, (size_t)len);
     str[len] = '\0';
     SDL_SetClipboardText(str);
-    SDL_free(str);
+    free(str);
 }
 
 NK_API struct nk_context*
@@ -222,7 +231,7 @@ nk_sdl_init(SDL_Window *win, SDL_Renderer *renderer)
     /* warn for cases where NK_SDL_CLAMP_CLIP_RECT should have been set but isn't */
     SDL_GetRendererInfo(renderer, &info);
     SDL_GetVersion(&runtimeVer);
-    if (SDL_strncmp("metal", info.name, 5) == 0 &&
+    if (strncmp("metal", info.name, 5) == 0 &&
         SDL_VERSIONNUM(runtimeVer.major, runtimeVer.minor, runtimeVer.patch) < SDL_VERSIONNUM(2, 0, 22))
     {
         SDL_LogWarn(
@@ -236,6 +245,7 @@ nk_sdl_init(SDL_Window *win, SDL_Renderer *renderer)
 #endif
     sdl.win = win;
     sdl.renderer = renderer;
+    sdl.time_of_last_frame = SDL_GetTicks64();
     nk_init_default(&sdl.ctx, 0);
     sdl.ctx.clip.copy = nk_sdl_clipboard_copy;
     sdl.ctx.clip.paste = nk_sdl_clipboard_paste;
@@ -258,26 +268,31 @@ nk_sdl_font_stash_end(void)
     const void *image; int w, h;
     image = nk_font_atlas_bake(&sdl.atlas, &w, &h, NK_FONT_ATLAS_RGBA32);
     nk_sdl_device_upload_atlas(image, w, h);
-    nk_font_atlas_end(&sdl.atlas, nk_handle_ptr(sdl.ogl.font_tex), &sdl.ogl.null);
+    nk_font_atlas_end(&sdl.atlas, nk_handle_ptr(sdl.ogl.font_tex), &sdl.ogl.tex_null);
     if (sdl.atlas.default_font)
         nk_style_set_font(&sdl.ctx, &sdl.atlas.default_font->handle);
+}
+
+NK_API void
+nk_sdl_handle_grab(void)
+{
+    struct nk_context *ctx = &sdl.ctx;
+    if (ctx->input.mouse.grab) {
+        SDL_SetRelativeMouseMode(SDL_TRUE);
+    } else if (ctx->input.mouse.ungrab) {
+        /* better support for older SDL by setting mode first; causes an extra mouse motion event */
+        SDL_SetRelativeMouseMode(SDL_FALSE);
+        SDL_WarpMouseInWindow(sdl.win, (int)ctx->input.mouse.prev.x, (int)ctx->input.mouse.prev.y);
+    } else if (ctx->input.mouse.grabbed) {
+        ctx->input.mouse.pos.x = ctx->input.mouse.prev.x;
+        ctx->input.mouse.pos.y = ctx->input.mouse.prev.y;
+    }
 }
 
 NK_API int
 nk_sdl_handle_event(SDL_Event *evt)
 {
     struct nk_context *ctx = &sdl.ctx;
-
-    /* optional grabbing behavior */
-    if (ctx->input.mouse.grab) {
-        SDL_SetRelativeMouseMode(SDL_TRUE);
-        ctx->input.mouse.grab = 0;
-    } else if (ctx->input.mouse.ungrab) {
-        int x = (int)ctx->input.mouse.prev.x, y = (int)ctx->input.mouse.prev.y;
-        SDL_SetRelativeMouseMode(SDL_FALSE);
-        SDL_WarpMouseInWindow(sdl.win, x, y);
-        ctx->input.mouse.ungrab = 0;
-    }
 
     switch(evt->type)
     {
@@ -351,7 +366,7 @@ nk_sdl_handle_event(SDL_Event *evt)
         case SDL_TEXTINPUT:
             {
                 nk_glyph glyph;
-                NK_MEMCPY(glyph, evt->text.text, NK_UTF_SIZE);
+                memcpy(glyph, evt->text.text, NK_UTF_SIZE);
                 nk_input_glyph(ctx, glyph);
             }
             return 1;
@@ -372,7 +387,7 @@ void nk_sdl_shutdown(void)
     SDL_DestroyTexture(dev->font_tex);
     /* glDeleteTextures(1, &dev->font_tex); */
     nk_buffer_free(&dev->cmds);
-    NK_MEMSET(&sdl, 0, sizeof(sdl));
+    memset(&sdl, 0, sizeof(sdl));
 }
 
 #endif /* NK_SDL_RENDERER_IMPLEMENTATION */
