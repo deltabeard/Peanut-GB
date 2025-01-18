@@ -22,6 +22,10 @@
 #define VRAM_WIDTH (NUMBER_OF_SPRITES_IN_ROW * SPRITE_WIDTH)
 #define VRAM_HEIGHT (NUMBER_OF_SPRITES_IN_COLUMN * SPRITE_BLOCKS * SPRITE_WIDTH)
 
+enum {
+	LOG_CATERGORY_PEANUTSDL = SDL_LOG_CATEGORY_CUSTOM
+};
+
 /* ===============================================================
  *
  *                          EXAMPLE
@@ -373,8 +377,9 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 		"LCD: CPU Step"
 	};
 	gb_priv_s *gb_priv = gb->direct.priv;
-	static int frame_step = 0, cpu_step = 0;
+	static int frame_step = 0, cpu_step = 0, log = nk_false;
 	static gb_state_e gb_state = GB_STATE_PAUSED;
+	static FILE *log_file = NULL;
 
 	/* Game Boy Control */
 	if(nk_begin(ctx, "Control", nk_rect(15, 210, 20 + LCD_WIDTH, 120),
@@ -388,6 +393,8 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 			frame_step++;
 			gb_state = GB_STATE_FRAME_STEP;
 		}
+
+		nk_checkbox_label(ctx, "Log", &log);
 
 		if (nk_button_label(ctx, "CPU Step"))
 		{
@@ -408,7 +415,62 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 	}
 	nk_end(ctx);
 
-	if(gb_state == GB_STATE_PLAYING ||
+	if(log == nk_true)
+	{
+		if(log_file == NULL)
+			log_file = fopen("log.txt", "w");
+
+		if(log_file == NULL)
+			log = nk_false;
+	}
+	else if(log == nk_false && log_file != NULL)
+	{
+		fclose(log_file);
+		log_file = NULL;
+	}
+
+	if((gb_state == GB_STATE_FRAME_STEP && frame_step != 0) && log == nk_true)
+	{
+		int ret;
+		ret = SDL_LockTexture(gb_priv->gb_lcd_tex, NULL,
+			&gb_priv->pixels, &gb_priv->pitch);
+		SDL_assert_always(ret == 0);
+
+		gb->gb_frame = false;
+		while(!gb->gb_frame)
+		{
+			const char *lcd_mode_str[4] = {
+				"HBLANK", "VBLANK", "OAM", "TRANSFER"
+			};
+			__gb_step_cpu(gb);
+
+			/* Debugging */
+			fprintf(log_file, "OP:%02X%s PC:%04X AF:%02X%02X BC:%04X DE:%04X SP:%04X HL:%04X ",
+					__gb_read(gb, gb->cpu_reg.pc.reg),
+					gb->gb_halt ? "(HALTED)" : "",
+					gb->cpu_reg.pc.reg,
+					gb->cpu_reg.a, gb->cpu_reg.f.reg,
+					gb->cpu_reg.bc.reg,
+					gb->cpu_reg.de.reg,
+					gb->cpu_reg.sp.reg,
+					gb->cpu_reg.hl.reg);
+			fprintf(log_file, "LCD Mode: %02X (%s), LCD Power: %02X (%s) ",
+					gb->hram_io[IO_STAT], lcd_mode_str[gb->hram_io[IO_STAT] & STAT_MODE],
+					gb->hram_io[IO_LCDC], (gb->hram_io[IO_LCDC] >> 7) ? "ON" : "OFF");
+			fprintf(log_file, "IF: %02X, IE: %02X ",
+				gb->hram_io[IO_IF], gb->hram_io[IO_IE]);
+			fprintf(log_file, "ROM%d", gb->selected_rom_bank);
+			fprintf(log_file, "\n");
+		}
+
+		if(!nk_window_is_collapsed(ctx, "VRAM Viewer"))
+			render_vram_tex(gb_priv->gb_vram_tex, gb);
+
+		SDL_UnlockTexture(gb_priv->gb_lcd_tex);
+
+		frame_step = 0;
+	}
+	else if(gb_state == GB_STATE_PLAYING ||
 		(gb_state == GB_STATE_FRAME_STEP && frame_step != 0))
 	{
 		int ret;
@@ -577,13 +639,13 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 		NK_WINDOW_MINIMIZABLE))
 	{
 		static const char reg_labels[6][3] = {
-			"A", "BC", "DE", "HL", "SP", "PC"
+			"AF", "BC", "DE", "HL", "SP", "PC"
 		};
 		static char reg_str[6][5];
 		int reg_str_len[6];
 
-		reg_str_len[0] = SDL_snprintf(reg_str[0], 5, "%02X",
-			gb->cpu_reg.a);
+		reg_str_len[0] = SDL_snprintf(reg_str[0], 5, "%02X%02X",
+			gb->cpu_reg.a, gb->cpu_reg.f.reg);
 		reg_str_len[1] = SDL_snprintf(reg_str[1], 5, "%04X",
 			gb->cpu_reg.bc.reg);
 		reg_str_len[2] = SDL_snprintf(reg_str[2], 5, "%04X",
@@ -811,6 +873,93 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 	nk_end(ctx);
 }
 
+
+char *get_save_file_name(const char *rom_file_name)
+{
+	char *save_file_name;
+	char *str_replace;
+	const char extension[] = ".sav";
+
+	/* Allocate enough space for the ROM file name, for the "sav"
+	 * extension and for the null terminator. */
+	save_file_name = SDL_malloc(SDL_strlen(rom_file_name) + SDL_strlen(extension) + 1);
+	if(save_file_name == NULL)
+	{
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_CRITICAL,
+				"%d: %s", __LINE__, SDL_GetError());
+		goto out;
+	}
+
+	/* Copy the ROM file name to allocated space. */
+	strcpy(save_file_name, rom_file_name);
+
+	/* If the file name does not have a dot, or the only dot is at
+	 * the start of the file name, set the pointer to begin
+	 * replacing the string to the end of the file name, otherwise
+	 * set it to the dot. */
+	if((str_replace = strrchr(save_file_name, '.')) == NULL ||
+			str_replace == save_file_name)
+		str_replace = save_file_name + strlen(save_file_name);
+
+	/* Copy extension to string including terminating null byte. */
+	for(unsigned int i = 0; i <= strlen(extension); i++)
+		*(str_replace++) = extension[i];
+
+out:
+	return save_file_name;
+}
+
+static void *read_cart_ram_file(const char *save_file_name, size_t len)
+{
+	SDL_RWops *f;
+	void *ret = NULL;
+
+	/* If save file not required. */
+	if(len == 0) goto out;
+
+	/* Allocate enough memory to hold save file. */
+	if((ret = SDL_malloc(len)) == NULL) goto out;
+
+	f = SDL_RWFromFile(save_file_name, "rb");
+
+	/* It doesn't matter if the save file doesn't exist. We initialise the
+	 * save memory allocated above. The save file will be created on exit. */
+	if(f == NULL)
+	{
+		SDL_memset(ret, 0, len);
+		goto out;
+	}
+
+	/* Read save file to allocated memory. */
+	SDL_RWread(f, ret, sizeof(uint8_t), len);
+	SDL_RWclose(f);
+
+out:
+	return ret;
+}
+
+static void write_cart_ram_file(const char *save_file_name, const void *ram, size_t len)
+{
+	SDL_RWops *f;
+
+	if(len == 0)
+		return;
+
+	if((f = SDL_RWFromFile(save_file_name, "wb")) == NULL)
+	{
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_CRITICAL,
+				"Unable to open save file: %s",
+				SDL_GetError());
+		return;
+	}
+
+	/* Record save file. */
+	SDL_RWwrite(f, ram, sizeof(uint8_t), len);
+	SDL_RWclose(f);
+}
+
 /**
  * Returns a pointer to the allocated space containing the file. Must be freed.
  */
@@ -885,6 +1034,9 @@ int main(int argc, char *argv[])
 	static struct gb_s gb;
 	gb_priv_s gb_priv;
 
+	char *save_file_name = NULL;
+	size_t ram_sz;
+
 	/* Print application log. */
 	SDL_LogSetPriority(PGBDBG_LOG_APPLICATION, SDL_LOG_PRIORITY_INFO);
 
@@ -907,8 +1059,6 @@ int main(int argc, char *argv[])
 
 	/* Initialise Peanut-GB. */
 	{
-		size_t ram_sz;
-
 		gb_init(&gb, gb_rom_read, gb_cart_ram_read, gb_cart_ram_write,
 			gb_error, &gb_priv);
 
@@ -925,11 +1075,17 @@ int main(int argc, char *argv[])
 		}
 
 		gb_init_lcd(&gb, lcd_draw_line);
+
 		ram_sz = gb_get_save_size(&gb);
-		if(ram_sz != 0)
-			gb_priv.ram = SDL_malloc(ram_sz);
+		if (ram_sz != 0)
+		{
+			save_file_name = get_save_file_name(argv[1]);
+			gb_priv.ram = read_cart_ram_file(save_file_name, ram_sz);
+		}
 		else
+		{
 			gb_priv.ram = NULL;
+		}
 	}
 
 	/* SDL setup */
@@ -1190,8 +1346,10 @@ int main(int argc, char *argv[])
 	}
 
 cleanup:
+	write_cart_ram_file(save_file_name, gb_priv.ram, ram_sz);
 	SDL_free(gb_priv.rom);
 	SDL_free(gb_priv.ram);
+	SDL_free(save_file_name);
 	nk_sdl_shutdown();
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(win);
