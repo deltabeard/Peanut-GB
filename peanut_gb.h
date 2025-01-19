@@ -184,18 +184,34 @@
 #define LCDC_BG_ENABLE      0x01
 
 /** LCD characteristics **/
-/* PPU cycles through modes every 456 cycles. */
-#define LCD_LINE_CYCLES     456
-/* Mode 0 starts on cycle 372. */
-#define LCD_MODE_0_CYCLES   372
-/* Mode 2 starts on cycle 204. */
-#define LCD_MODE_2_CYCLES   204
-/* Mode 3 starts on cycle 284. */
-#define LCD_MODE_3_CYCLES   284
 /* There are 154 scanlines. LY < 154. */
 #define LCD_VERT_LINES      154
 #define LCD_WIDTH           160
 #define LCD_HEIGHT          144
+/* PPU cycles through modes every 456 cycles. */
+#define LCD_LINE_CYCLES     456
+#define LCD_MODE0_HBLANK_MAX_DRUATION	204
+#define LCD_MODE0_HBLANK_MIN_DRUATION	87
+#define LCD_MODE2_OAM_SCAN_DURATION	80
+#define LCD_MODE3_LCD_DRAW_MIN_DURATION	172
+#define LCD_MODE3_LCD_DRAW_MAX_DURATION	289
+#define LCD_MODE1_VBLANK_DURATION	(LCD_LINE_CYCLES * (LCD_VERT_LINES - LCD_HEIGHT))
+/* The following assumes that Hblank starts on cycle 0. */
+/* Mode 2 (OAM Scan) starts on cycle 204 (although this is dependent on the
+ * duration of Mode 3 (LCD Draw). */
+#define LCD_MODE_2_CYCLES   LCD_MODE0_HBLANK_MAX_DRUATION
+/* Mode 3 starts on cycle 284. */
+#define LCD_MODE_3_CYCLES   (LCD_MODE_2_CYCLES + LCD_MODE2_OAM_SCAN_DURATION)
+/* Mode 0 starts on cycle 376. */
+#define LCD_MODE_0_CYCLES   (LCD_MODE_3_CYCLES + LCD_MODE3_LCD_DRAW_MIN_DURATION)
+
+#define LCD_MODE2_OAM_SCAN_START	0
+#define LCD_MODE2_OAM_SCAN_END		(LCD_MODE2_OAM_SCAN_DURATION)
+#define LCD_MODE3_LCD_DRAW_END		(LCD_MODE2_OAM_SCAN_END + LCD_MODE3_LCD_DRAW_MIN_DURATION)
+#define LCD_MODE0_HBLANK_END		(LCD_MODE3_LCD_DRAW_END + LCD_MODE0_HBLANK_MAX_DRUATION)
+#if LCD_MODE0_HBLANK_END != LCD_LINE_CYCLES
+#error "LCD length not equal"
+#endif
 
 /* VRAM Locations */
 #define VRAM_TILES_1        (0x8000 - VRAM_ADDR)
@@ -748,8 +764,8 @@ struct gb_s
 /* LCD Mode defines. */
 #define IO_STAT_MODE_HBLANK		0
 #define IO_STAT_MODE_VBLANK		1
-#define IO_STAT_MODE_SEARCH_OAM		2
-#define IO_STAT_MODE_SEARCH_TRANSFER	3
+#define IO_STAT_MODE_OAM_SCAN		2
+#define IO_STAT_MODE_LCD_DRAW		3
 #define IO_STAT_MODE_VBLANK_OR_TRANSFER_MASK 0x1
 
 /**
@@ -2450,24 +2466,20 @@ void __gb_step_cpu(struct gb_s *gb)
 			 * mode 1. */
 			if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_HBLANK)
 			{
-				lcd_cycles = LCD_MODE_2_CYCLES -
-					     gb->counter.lcd_count;
+				lcd_cycles = LCD_MODE0_HBLANK_MAX_DRUATION - gb->counter.lcd_count;
 			}
-			else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_SEARCH_OAM)
+			else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_OAM_SCAN)
 			{
-				lcd_cycles = LCD_MODE_3_CYCLES -
-					gb->counter.lcd_count;
+				lcd_cycles = LCD_MODE3_LCD_DRAW_MIN_DURATION - gb->counter.lcd_count;
 			}
-			else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_SEARCH_TRANSFER)
+			else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_LCD_DRAW)
 			{
-				lcd_cycles = LCD_MODE_0_CYCLES -
-					gb->counter.lcd_count;
+				lcd_cycles = LCD_MODE0_HBLANK_MAX_DRUATION - gb->counter.lcd_count;
 			}
 			else
 			{
 				/* VBlank */
-				lcd_cycles =
-					LCD_LINE_CYCLES - gb->counter.lcd_count;
+				lcd_cycles = LCD_LINE_CYCLES - gb->counter.lcd_count;
 			}
 
 			if(lcd_cycles < halt_cycles)
@@ -3361,7 +3373,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		/* LCD Timing */
 		gb->counter.lcd_count += inst_cycles;
 
-		/* New Scanline */
+		/* New Scanline. HBlank -> VBlank or OAM Scan */
 		if(gb->counter.lcd_count >= LCD_LINE_CYCLES)
 		{
 			gb->counter.lcd_count -= LCD_LINE_CYCLES;
@@ -3380,7 +3392,7 @@ void __gb_step_cpu(struct gb_s *gb)
 			else
 				gb->hram_io[IO_STAT] &= 0xFB;
 
-			/* VBLANK Start */
+			/* Check if LCD should be in Mode 1 (VBLANK) state */
 			if(gb->hram_io[IO_LY] == LCD_HEIGHT)
 			{
 				gb->hram_io[IO_STAT] =
@@ -3416,7 +3428,7 @@ void __gb_step_cpu(struct gb_s *gb)
                                 if(gb->gb_halt && !gb->hram_io[IO_IE])
 					break;
 			}
-			/* Normal Line */
+			/* Start of normal Line (not in VBLANK) */
 			else if(gb->hram_io[IO_LY] < LCD_HEIGHT)
 			{
 				if(gb->hram_io[IO_LY] == 0)
@@ -3424,52 +3436,47 @@ void __gb_step_cpu(struct gb_s *gb)
 					/* Clear Screen */
 					gb->display.WY = gb->hram_io[IO_WY];
 					gb->display.window_clear = 0;
-
-					/* OAM Search occurs after VBLANK. */
-					gb->hram_io[IO_STAT] =
-						(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_SEARCH_OAM;
-				}
-				else
-				{
-					gb->hram_io[IO_STAT] =
-						(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_HBLANK;
 				}
 
-				if(gb->hram_io[IO_STAT] & STAT_MODE_0_INTR)
+				/* OAM Search occurs at the start of the line. */
+				gb->hram_io[IO_STAT] = (gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_OAM_SCAN;
+				gb->counter.lcd_count = 0;
+
+				if(gb->hram_io[IO_STAT] & STAT_MODE_2_INTR)
 					gb->hram_io[IO_IF] |= LCDC_INTR;
 
-				/* If halted immediately jump to next LCD mode. */
-				if(gb->counter.lcd_count < LCD_MODE_2_CYCLES)
-					inst_cycles = LCD_MODE_2_CYCLES - gb->counter.lcd_count;
+				/* If halted immediately jump to next LCD mode.
+				 * From OAM Search to LCD Draw. */
+				//if(gb->counter.lcd_count < LCD_MODE2_OAM_SCAN_END)
+				//	inst_cycles = LCD_MODE2_OAM_SCAN_END - gb->counter.lcd_count;
+				inst_cycles = LCD_MODE2_OAM_SCAN_DURATION;
 			}
 		}
-		/* OAM access */
-		else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_HBLANK &&
-				gb->counter.lcd_count >= LCD_MODE_2_CYCLES)
+		/* Go from Mode 3 (LCD Draw) to Mode 0 (HBLANK). */
+		else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_LCD_DRAW &&
+				gb->counter.lcd_count >= LCD_MODE3_LCD_DRAW_END)
 		{
-			gb->hram_io[IO_STAT] =
-				(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_SEARCH_OAM;
+			gb->hram_io[IO_STAT] = (gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_HBLANK;
 
-			if(gb->hram_io[IO_STAT] & STAT_MODE_2_INTR)
+			if(gb->hram_io[IO_STAT] & STAT_MODE_0_INTR)
 				gb->hram_io[IO_IF] |= LCDC_INTR;
 
-			/* If halted immediately jump to next LCD mode. */
-			if (gb->counter.lcd_count < LCD_MODE_3_CYCLES)
-				inst_cycles = LCD_MODE_3_CYCLES - gb->counter.lcd_count;
+			/* If halted immediately, jump from OAM Scan to LCD Draw. */
+			if (gb->counter.lcd_count < LCD_MODE0_HBLANK_MAX_DRUATION)
+				inst_cycles = LCD_MODE0_HBLANK_MAX_DRUATION - gb->counter.lcd_count;
 		}
-		/* Update LCD */
-		else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_SEARCH_OAM &&
-				gb->counter.lcd_count >= LCD_MODE_3_CYCLES)
+		/* Go from Mode 2 (OAM Scan) to Mode 3 (LCD Draw). */
+		else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_OAM_SCAN &&
+				gb->counter.lcd_count >= LCD_MODE2_OAM_SCAN_END)
 		{
-			gb->hram_io[IO_STAT] =
-				(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_SEARCH_TRANSFER;
+			gb->hram_io[IO_STAT] = (gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_LCD_DRAW;
 #if ENABLE_LCD
 			if(!gb->lcd_blank)
 				__gb_draw_line(gb);
 #endif
 			/* If halted immediately jump to next LCD mode. */
-			if (gb->counter.lcd_count < LCD_MODE_0_CYCLES)
-				inst_cycles = LCD_MODE_0_CYCLES - gb->counter.lcd_count;
+			if (gb->counter.lcd_count < LCD_MODE3_LCD_DRAW_MIN_DURATION)
+				inst_cycles = LCD_MODE3_LCD_DRAW_MIN_DURATION - gb->counter.lcd_count;
 		}
 	} while(gb->gb_halt && (gb->hram_io[IO_IF] & gb->hram_io[IO_IE]) == 0);
 	/* If halted, loop until an interrupt occurs. */
