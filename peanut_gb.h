@@ -966,6 +966,7 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 		if(gb->mbc == 3 && val && gb->cart_mode_select == 0)
 			memcpy(&gb->rtc_latched.bytes, &gb->rtc_real.bytes, sizeof(gb->rtc_latched.bytes));
 
+		/* Set banking mode select. */
 		gb->cart_mode_select = val;
 		return;
 
@@ -995,13 +996,18 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 				addr &= 0x1FF;
 				/* Data is only 4 bits wide in MBC2 RAM. */
 				val &= 0x0F;
+				/* Upper nibble is set to high. */
+				val |= 0xF0;
 				gb->gb_cart_ram_write(gb, addr, val);
 			}
-			else if(gb->cart_mode_select &&
+			/* If cart has RAM, use this. If MBC1, only the first
+			 * RAM bank can be written to if the advanced banking
+			 * mode is selected. */
+			else if(((gb->mbc == 1 && gb->cart_mode_select) || gb->mbc != 1) &&
 					gb->cart_ram_bank < gb->num_ram_banks)
 			{
 				gb->gb_cart_ram_write(gb,
-						      addr - CART_RAM_ADDR + (gb->cart_ram_bank * CRAM_BANK_SIZE), val);
+					addr - CART_RAM_ADDR + (gb->cart_ram_bank * CRAM_BANK_SIZE), val);
 			}
 			else if(gb->num_ram_banks)
 				gb->gb_cart_ram_write(gb, addr - CART_RAM_ADDR, val);
@@ -3639,15 +3645,19 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 		0, 1, 1, 1, -1, 2, 2, -1, 0, 0, -1, 0, 0, 0, -1, 3,
 		3, 3, 3, 3, -1, -1, -1, -1, -1, 5, 5, 5, 5, 5, 5, -1
 	};
+	/* Whether cart has RAM. */
 	const uint8_t cart_ram[] =
 	{
 		0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0,
 		1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0
 	};
+	/* How large the ROM is in banks of 16 KiB. */
 	const uint16_t num_rom_banks_mask[] =
 	{
 		2, 4, 8, 16, 32, 64, 128, 256, 512
 	};
+	/* How large the cart RAM is in banks of 8 KiB. Code $01 is unused, but
+	 * some early homebrew ROMs supposedly may use this value. */
 	const uint8_t num_ram_banks[] = { 0, 1, 1, 4, 16, 8 };
 
 	gb->gb_rom_read = gb_rom_read;
