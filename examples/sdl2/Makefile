@@ -10,7 +10,7 @@ CPPFLAGS := -DCOMPANY=Deltabeard		\
 	-DLICENSE="$(LICENSE_SPDX)"		\
 	-DNAME="$(NAME)"			\
 	-DICON_FILE=./meta/icon.ico		\
-	-DENABLE_SOUND -DENABLE_SOUND_MINIGB
+	-DENABLE_SOUND -DENABLE_SOUND_MINIGB -DMINIGB_APU_AUDIO_FORMAT_S16SYS
 
 OPT := -O2 -Wall -Wextra
 CFLAGS := $(OPT) $(shell sdl2-config --cflags)

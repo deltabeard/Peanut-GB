@@ -17,6 +17,9 @@
 #	include "minigb_apu/minigb_apu.h"
 #endif
 
+uint8_t audio_read(uint16_t addr);
+void audio_write(uint16_t addr, uint8_t val);
+
 #include "../../peanut_gb.h"
 
 enum {
@@ -39,6 +42,8 @@ struct priv_t
 	uint16_t selected_palette[3][4];
 	uint16_t fb[LCD_HEIGHT][LCD_WIDTH];
 };
+
+static struct minigb_apu_ctx apu;
 
 /**
  * Returns a byte from the ROM file at the given address.
@@ -72,6 +77,21 @@ uint8_t gb_bootrom_read(struct gb_s *gb, const uint_fast16_t addr)
 {
 	const struct priv_t * const p = gb->direct.priv;
 	return p->bootrom[addr];
+}
+
+uint8_t audio_read(uint16_t addr)
+{
+	return minigb_apu_audio_read(&apu, addr);
+}
+
+void audio_write(uint16_t addr, uint8_t val)
+{
+	minigb_apu_audio_write(&apu, addr, val);
+}
+
+void audio_callback(void *ptr, uint8_t *data, int len)
+{
+	minigb_apu_audio_callback(&apu, (void *)data);
 }
 
 void read_cart_ram_file(const char *save_file_name, uint8_t **dest,
@@ -620,9 +640,9 @@ int main(int argc, char **argv)
 	SDL_LogSetPriority(LOG_CATERGORY_PEANUTSDL, SDL_LOG_PRIORITY_INFO);
 
 	/* Enable Hi-DPI to stop blurry game image. */
-	#ifdef SDL_HINT_WINDOWS_DPI_AWARENESS
+#ifdef SDL_HINT_WINDOWS_DPI_AWARENESS
 	SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
-	#endif
+#endif
 
 	/* Initialise frontend implementation, in this case, SDL2. */
 	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO) < 0)
@@ -877,7 +897,7 @@ int main(int argc, char **argv)
 			exit(EXIT_FAILURE);
 		}
 
-		audio_init();
+		minigb_apu_audio_init(&apu);
 		SDL_PauseAudioDevice(dev, 0);
 	}
 #endif
