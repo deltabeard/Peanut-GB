@@ -429,7 +429,8 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 		log_file = NULL;
 	}
 
-	if((gb_state == GB_STATE_FRAME_STEP && frame_step != 0) && log == nk_true)
+	if(((gb_state == GB_STATE_FRAME_STEP && frame_step != 0) ||
+			gb_state == GB_STATE_PLAYING) && log == nk_true)
 	{
 		int ret;
 		ret = SDL_LockTexture(gb_priv->gb_lcd_tex, NULL,
