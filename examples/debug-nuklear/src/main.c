@@ -1195,10 +1195,22 @@ int main(int argc, char *argv[])
 #endif
 
 	bg.r = 0.10f, bg.g = 0.18f, bg.b = 0.24f, bg.a = 1.0f;
+
+	/* Timing variables. */
+	double speed_compensation = 0.0;
+	uint_fast32_t new_ticks, old_ticks;
+	const double target_speed_ms = 1000.0 / VERTICAL_SYNC;
+
 	while(running)
 	{
 	    /* Input */
 		SDL_Event evt;
+		int delay;
+
+		/* Calculate the time taken to draw frame, then later add a
+		 * delay to cap at 60 fps. */
+		old_ticks = SDL_GetTicks();
+
 		nk_input_begin(ctx);
 		while(SDL_PollEvent(&evt))
 		{
@@ -1344,6 +1356,41 @@ int main(int argc, char *argv[])
 		nk_sdl_render(NK_ANTI_ALIASING_ON);
 
 		SDL_RenderPresent(renderer);
+
+
+		/* Use a delay that will draw the screen at a rate of 59.7275 Hz. */
+		new_ticks = SDL_GetTicks();
+
+		/* Since we can only delay for a maximum resolution of 1ms, we
+		 * can accumulate the error and compensate for the delay
+		 * accuracy when the delay compensation surpasses 1ms. */
+		speed_compensation += target_speed_ms - (new_ticks - old_ticks);
+
+		/* We cast the delay compensation value to an integer, since it
+		 * is the type used by SDL_Delay. This is where delay accuracy
+		 * is lost. */
+		delay = (int)(speed_compensation);
+
+		/* We then subtract the actual delay value by the requested
+		 * delay value. */
+		speed_compensation -= delay;
+
+		/* Only run delay logic if required. */
+		if(delay > 0)
+		{
+			uint_fast32_t delay_ticks = SDL_GetTicks();
+			uint_fast32_t after_delay_ticks;
+
+
+			/* This will delay for at least the number of
+			 * milliseconds requested, so we have to compensate for
+			 * error here too. */
+			SDL_Delay(delay);
+
+			after_delay_ticks = SDL_GetTicks();
+			speed_compensation += (double)delay -
+					      (int)(after_delay_ticks - delay_ticks);
+		}
 	}
 
 cleanup:
