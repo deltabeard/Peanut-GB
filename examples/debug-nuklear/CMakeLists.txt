@@ -1,7 +1,9 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.16...3.24 FATAL_ERROR)
 
 PROJECT(peanutgb-debugger)
-ADD_EXECUTABLE(peanutgb-debugger src/main.c src/nuklear.c src/overview.c ../../peanut_gb.h)
+ADD_EXECUTABLE(peanutgb-debugger src/main.c src/nuklear.c src/overview.c
+        ../sdl2/minigb_apu/minigb_apu.c
+        ../../peanut_gb.h)
 TARGET_INCLUDE_DIRECTORIES(peanutgb-debugger PRIVATE inc)
 
 set_property(TARGET peanutgb-debugger PROPERTY VS_DPI_AWARE "PerMonitor")
@@ -14,5 +16,5 @@ CPMADDPACKAGE(GITHUB_REPOSITORY libsdl-org/SDL
         OPTIONS
         "SDL_SHARED_ENABLED_BY_DEFAULT OFF"
         "SDL_STATIC_ENABLED_BY_DEFAULT ON")
-ADD_COMPILE_DEFINITIONS(SDL_MAIN_HANDLED SDL_LEAN_AND_MEAN)
+ADD_COMPILE_DEFINITIONS(SDL_MAIN_HANDLED SDL_LEAN_AND_MEAN MINIGB_APU_AUDIO_FORMAT_S16SYS)
 TARGET_LINK_LIBRARIES(peanutgb-debugger PRIVATE SDL2-static)

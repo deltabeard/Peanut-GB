@@ -4,6 +4,11 @@
 #include <SDL.h>
 
 #define ENABLE_LCD 1
+#define ENABLE_SOUND 1
+#include "../../sdl2/minigb_apu/minigb_apu.h"
+uint8_t audio_read(uint16_t addr);
+void audio_write(uint16_t addr, uint8_t val);
+
 #include "../../../peanut_gb.h"
 
 #include "nuklear_proj.h"
@@ -79,6 +84,8 @@ typedef struct {
 	uint8_t *rom;
 	uint8_t *ram;
 	uint8_t *bios;
+
+	SDL_AudioDeviceID audio_dev;
 } gb_priv_s;
 
 static const SDL_Color colour_lut[4] = {
@@ -87,6 +94,8 @@ static const SDL_Color colour_lut[4] = {
 		{.r = 0x84, .g = 0x31, .b = 0x00, .a = SDL_ALPHA_OPAQUE },
 		{.r = 0x00, .g = 0x00, .b = 0x00, .a = SDL_ALPHA_OPAQUE }
 };
+
+static struct minigb_apu_ctx apu;
 
 static uint8_t gb_rom_read(struct gb_s *ctx, const uint_fast32_t addr)
 {
@@ -136,6 +145,22 @@ static void gb_error(struct gb_s *ctx, const enum gb_error_e err,
 		"Error: %s", err_str[err]);
 	SDL_assert_release(0);
 }
+
+uint8_t audio_read(uint16_t addr)
+{
+	return minigb_apu_audio_read(&apu, addr);
+}
+
+void audio_write(uint16_t addr, uint8_t val)
+{
+	minigb_apu_audio_write(&apu, addr, val);
+}
+
+void audio_callback(void *ptr, uint8_t *data, int len)
+{
+	minigb_apu_audio_callback(&apu, (void *)data, len/2);
+}
+
 
 static void render_vram_tex(SDL_Texture *tex, const struct gb_s *const gb)
 {
@@ -392,6 +417,7 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 		{
 			frame_step++;
 			gb_state = GB_STATE_FRAME_STEP;
+			SDL_PauseAudioDevice(gb_priv->audio_dev, 1);
 		}
 
 		nk_checkbox_label(ctx, "Log", &log);
@@ -400,16 +426,21 @@ static void render_peanut_gb(struct nk_context *ctx, struct gb_s *gb)
 		{
 			cpu_step++;
 			gb_state = GB_STATE_CPU_STEP;
+			SDL_PauseAudioDevice(gb_priv->audio_dev, 1);
 		}
 
 		if(gb_state == GB_STATE_PLAYING)
 		{
 			if(nk_button_label(ctx, "Pause"))
+			{
 				gb_state = GB_STATE_PAUSED;
+				SDL_PauseAudioDevice(gb_priv->audio_dev, 1);
+			}
 		}
 		else if(nk_button_label(ctx, "Run"))
 		{
 			gb_state = GB_STATE_PLAYING;
+			SDL_PauseAudioDevice(gb_priv->audio_dev, 0);
 		}
 		print_window_pos(ctx);
 	}
@@ -1093,7 +1124,7 @@ int main(int argc, char *argv[])
 	set_dpi_awareness();
 	SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "0");
 	SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "0");
-	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMECONTROLLER) < 0)
+	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS | SDL_INIT_GAMECONTROLLER) < 0)
 	{
 		SDL_LogError(PGBDBG_LOG_APPLICATION,
 			"Error SDL_init: %s", SDL_GetError());
@@ -1185,6 +1216,34 @@ int main(int argc, char *argv[])
 		font->handle.height /= font_scale;
 		/*nk_style_load_all_cursors(ctx, atlas->cursors);*/
 		nk_style_set_font(ctx, &font->handle);
+	}
+
+	{
+		SDL_AudioSpec want, have;
+
+		want.freq = AUDIO_SAMPLE_RATE;
+		want.format   = AUDIO_S16,
+		want.channels = 2;
+		want.samples = 16;
+		want.callback = audio_callback;
+		want.userdata = NULL;
+
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_INFO,
+				"Audio driver: %s",
+				SDL_GetAudioDeviceName(0, 0));
+
+		if((gb_priv.audio_dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0)) == 0)
+		{
+			SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+					SDL_LOG_PRIORITY_CRITICAL,
+					"SDL could not open audio device: %s",
+					SDL_GetError());
+			exit(EXIT_FAILURE);
+		}
+
+		minigb_apu_audio_init(&apu);
+		SDL_PauseAudioDevice(gb_priv.audio_dev, 0);
 	}
 
 #ifdef INCLUDE_STYLE
