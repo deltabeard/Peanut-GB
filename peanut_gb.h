@@ -255,11 +255,16 @@
 
 #define PEANUT_GB_ARRAYSIZE(array)    (sizeof(array)/sizeof(array[0]))
 
-/** Allow setting deprecated functions and variables. */
-#if (defined(__GNUC__) && __GNUC__ >= 6) || (defined(__clang__) && __clang_major__ >= 4)
-# define PGB_DEPRECATED(msg) __attribute__((deprecated(msg)))
+#ifdef __GNUC__
+# define PGB_GNUC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 #else
-# define PGB_DEPRECATED(msg)
+# define PGB_GNUC_VERSION 0
+#endif
+
+#ifdef _MSC_VER
+# define PGB_MSC_VERSION _MSC_VER
+#else
+# define PGB_MSC_VERSION 0
 #endif
 
 #if !defined(__has_builtin)
@@ -267,12 +272,24 @@
 # define __has_builtin(x) 0
 #endif
 
+#if !defined(__has_extension)
+/* Stub __has_builtin if it isn't available. */
+# define __has_extension(x) 0
+#endif
+
+/** Allow setting deprecated functions and variables. */
+#if PGB_GNUC_VERSION >= 060000 || __has_extension(attribute_deprecated_with_message)
+# define PGB_DEPRECATED(msg) __attribute__((deprecated(msg)))
+#else
+# define PGB_DEPRECATED(msg)
+#endif
+
 /* The PGB_UNREACHABLE() macro tells the compiler that the code path will never
  * be reached, allowing for further optimisation. */
 #if !defined(PGB_UNREACHABLE)
-# if __has_builtin(__builtin_unreachable)
+# if __has_builtin(__builtin_unreachable) || PGB_GNUC_VERSION >= 040500
 #  define PGB_UNREACHABLE() __builtin_unreachable()
-# elif defined(_MSC_VER) && _MSC_VER >= 1200
+# elif PGB_MSC_VERSION >= 1200
 #  /* __assume is not available before VC6. */
 #  define PGB_UNREACHABLE() __assume(0)
 # else
@@ -281,14 +298,14 @@
 #endif /* !defined(PGB_UNREACHABLE) */
 
 #if !defined(PGB_UNLIKELY)
-# if __has_builtin(__builtin_expect)
+# if __has_builtin(__builtin_expect) || PGB_GNUC_VERSION >= 030000
 #  define PGB_UNLIKELY(expr) __builtin_expect(!!(expr), 0)
 # else
 #  define PGB_UNLIKELY(expr) (expr)
 # endif
 #endif /* !defined(PGB_UNLIKELY) */
 #if !defined(PGB_LIKELY)
-# if __has_builtin(__builtin_expect)
+# if __has_builtin(__builtin_expect) || PGB_GNUC_VERSION >= 030000
 #  define PGB_LIKELY(expr) __builtin_expect(!!(expr), 1)
 # else
 #  define PGB_LIKELY(expr) (expr)
@@ -297,7 +314,7 @@
 
 #if PEANUT_GB_USE_INTRINSICS
 /* If using MSVC, only enable intrinsics for x86 platforms*/
-# if defined(_MSC_VER) && __has_include("intrin.h") && \
+# if PGB_MSC_VERSION >= 1400 && \
 	(defined(_M_IX86_FP) || defined(_M_AMD64) || defined(_M_X64))
 /* Define intrinsic functions for MSVC. */
 #  include <intrin.h>
@@ -306,8 +323,10 @@
 # endif /* MSVC */
 
 /* Check for intrinsic functions in GCC and Clang. */
-# if __has_builtin(__builtin_sub_overflow)
+# if __has_builtin(__builtin_sub_overflow) || PGB_GNUC_VERSION >= 050000
 #  define PGB_INTRIN_SBC(x,y,cin,res) __builtin_sub_overflow(x,y+cin,&res)
+# endif
+# if __has_builtin(__builtin_add_overflow) || PGB_GNUC_VERSION >= 050000
 #  define PGB_INTRIN_ADC(x,y,cin,res) __builtin_add_overflow(x,y+cin,&res)
 # endif
 #endif /* PEANUT_GB_USE_INTRINSICS */
