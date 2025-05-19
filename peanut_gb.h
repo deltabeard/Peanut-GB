@@ -41,10 +41,10 @@
 # define __has_include(x) 0
 #endif
 
-#include <stdlib.h>	/* Required for qsort and abort */
+#include <stdlib.h>	/* Required for abort */
 #include <stdbool.h>	/* Required for bool types */
 #include <stdint.h>	/* Required for int types */
-#include <string.h>	/* Required for memset */
+#include <string.h>	/* Required for memset and memmove */
 #include <time.h>	/* Required for tm struct */
 
 /**
@@ -1432,13 +1432,10 @@ struct sprite_data {
 };
 
 #if PEANUT_GB_HIGH_LCD_ACCURACY
-static int compare_sprites(const void *in1, const void *in2)
+static int compare_sprites(const struct sprite_data *const sd1, const struct sprite_data *const sd2)
 {
-	const struct sprite_data *sd1, *sd2;
 	int x_res;
 
-	sd1 = (struct sprite_data *)in1;
-	sd2 = (struct sprite_data *)in2;
 	x_res = (int)sd1->x - (int)sd2->x;
 	if(x_res != 0)
 		return x_res;
@@ -1633,13 +1630,13 @@ void __gb_draw_line(struct gb_s *gb)
 #if PEANUT_GB_HIGH_LCD_ACCURACY
 		uint8_t number_of_sprites = 0;
 
-		struct sprite_data sprites_to_render[NUM_SPRITES];
+		struct sprite_data sprites_to_render[MAX_SPRITES_LINE];
 
 		/* Record number of sprites on the line being rendered, limited
 		 * to the maximum number sprites that the Game Boy is able to
 		 * render on each line (10 sprites). */
 		for(sprite_number = 0;
-				sprite_number < PEANUT_GB_ARRAYSIZE(sprites_to_render);
+				sprite_number < NUM_SPRITES;
 				sprite_number++)
 		{
 			/* Sprite Y position. */
@@ -1653,18 +1650,28 @@ void __gb_draw_line(struct gb_s *gb)
 					|| gb->hram_io[IO_LY] + 16 < OY)
 				continue;
 
+			struct sprite_data current;
 
-			sprites_to_render[number_of_sprites].sprite_number = sprite_number;
-			sprites_to_render[number_of_sprites].x = OX;
-			number_of_sprites++;
+			current.sprite_number = sprite_number;
+			current.x = OX;
+
+			uint8_t place;
+			for (place = number_of_sprites; place != 0; place--)
+			{
+				if(compare_sprites(&sprites_to_render[place - 1], &current) < 0)
+					break;
+			}
+			if(place >= MAX_SPRITES_LINE)
+				continue;
+			memmove(
+				&sprites_to_render[place + 1],
+				&sprites_to_render[place],
+				(MAX_SPRITES_LINE - place - 1) * sizeof(current)
+			);
+			if(number_of_sprites <= MAX_SPRITES_LINE)
+				number_of_sprites++;
+			sprites_to_render[place] = current;
 		}
-
-		/* If maximum number of sprites reached, prioritise X
-		 * coordinate and object location in OAM. */
-		qsort(&sprites_to_render[0], number_of_sprites,
-				sizeof(sprites_to_render[0]), compare_sprites);
-		if(number_of_sprites > MAX_SPRITES_LINE)
-			number_of_sprites = MAX_SPRITES_LINE;
 #endif
 
 		/* Render each sprite, from low priority to high priority. */
