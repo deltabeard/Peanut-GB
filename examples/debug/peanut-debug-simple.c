@@ -305,7 +305,8 @@ quit:
 
 	free(priv.rom);
 	free(priv.cart_ram);
-	free(save_file_name);
+	if(argc == 2)
+		free(save_file_name);
 
 	return EXIT_SUCCESS;
 }
