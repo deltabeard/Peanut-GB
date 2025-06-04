@@ -102,7 +102,7 @@ folder. See /screencaps/README.md for more information.
 
 ## Projects Using Peanut-GB
 
-In no particular order, and a non-exaustive list, the following projects use Peanut-GB.
+In no particular order, and a non-exhaustive list, the following projects use Peanut-GB.
 
 * [Pico-GB](https://github.com/YouMakeTech/Pico-GB) -  Game Boy emulation on the Raspberry Pi RP2040 microcontroller.
 * [Peanut_gb-RGFW](https://github.com/ColleagueRiley/Peanut_gb-RGFW) - A Gameboy emulator example for [RGFW](https://github.com/ColleagueRiley/RGFW).
