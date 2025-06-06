@@ -147,7 +147,7 @@ Boy games.
 These functions are required for audio emulation and output. Peanut-GB does not
 include audio emulation, so an external library must be used. These functions
 must be defined and audio output must be enabled by defining ENABLE_SOUND to 1
-before including peanut_gb.h. 
+before including peanut_gb.h.
 
 #### gb_serial_tx and gb_serial_rx
 
@@ -196,7 +196,17 @@ Deprecated: do not use. The RTC is ticked internally.
 Execute a bootrom image on reset. A reset must be performed after calling
 gb_set_bootrom for these changes to take effect. This is because gb_init calls
 gb_reset, but gb_set_bootrom must be called after gb_init.
+
 The bootrom must be either a DMG or a MGB bootrom.
+
+## Automated Testing
+
+The test suite can be built with `make -C test` and includes regression tests
+for the CPU, instruction timing and the `dmg-acid2` PPU test ROM. The
+`dmg-acid2` test embeds the ROM via `dmg-acid2.gb.h` and hashes the LCD output
+to check for regressions. If the hash differs from the expected value, the
+calculated hash is printed so that it can be copied into `DMG_ACID2_HASH` in
+`test/test.c` after verifying the image is correct.
 
 ## License
 
