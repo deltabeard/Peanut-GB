@@ -1,4 +1,4 @@
-OPT=-g2 -O2
+OPT=-g2 -O2 -DPEANUT_GB_HIGH_LCD_ACCURACY=0
 
 override CFLAGS += $(OPT) -Wall -Wextra
 
