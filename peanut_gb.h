@@ -196,6 +196,7 @@
 #define LCD_MODE3_LCD_DRAW_MIN_DURATION	172
 #define LCD_MODE3_LCD_DRAW_MAX_DURATION	289
 #define LCD_MODE1_VBLANK_DURATION	(LCD_LINE_CYCLES * (LCD_VERT_LINES - LCD_HEIGHT))
+#define LCD_FRAME_CYCLES		(LCD_LINE_CYCLES * LCD_VERT_LINES)
 /* The following assumes that Hblank starts on cycle 0. */
 /* Mode 2 (OAM Scan) starts on cycle 204 (although this is dependent on the
  * duration of Mode 3 (LCD Draw). */
@@ -492,6 +493,7 @@ struct count_s
 	uint_fast16_t tima_count;	/* Timer Counter */
 	uint_fast16_t serial_count;	/* Serial Counter */
 	uint_fast32_t rtc_count;	/* RTC Counter */
+	uint_fast32_t lcd_off_count;	/* Cycles LCD has been disabled */
 };
 
 #if ENABLE_LCD
@@ -623,7 +625,11 @@ struct gb_s
 	{
 		bool gb_halt	: 1;
 		bool gb_ime	: 1;
-		bool gb_frame	: 1; /* New frame drawn. */
+		/* gb_frame is set when 0.016742706298828125 seconds have
+		 * passed. It is likely that a new frame has been drawn since
+		 * then, but it is possible that the LCD was switched off and
+		 * nothing was drawn. */
+		bool gb_frame	: 1;
 		bool lcd_blank	: 1;
 	};
 
@@ -1138,7 +1144,11 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 					IO_STAT_MODE_HBLANK;
 				/* LY fixed to 0 when LCD turned off. */
 				gb->hram_io[IO_LY] = 0;
-				/* Reset LCD timer. */
+				/* Keep track of lcd_count to correctly track
+				 * passing time. */
+				gb->counter.lcd_off_count += gb->counter.lcd_count;
+				/* Reset LCD timer, since the LCD starts from
+				 * the beginning on power on. */
 				gb->counter.lcd_count = 0;
 			}
 			return;
@@ -3372,9 +3382,18 @@ void __gb_step_cpu(struct gb_s *gb)
 		}
 
 		/* If LCD is off, don't update LCD state or increase the LCD
-		 * ticks. */
+		 * ticks. Instead, keep track of the amount of time that is
+		 * being passed. */
 		if(!(gb->hram_io[IO_LCDC] & LCDC_ENABLE))
+		{
+			gb->counter.lcd_off_count += inst_cycles;
+			if(gb->counter.lcd_off_count >= LCD_FRAME_CYCLES)
+			{
+				gb->counter.lcd_off_count -= LCD_FRAME_CYCLES;
+				gb->gb_frame = true;
+			}
 			continue;
+		}
 
 		/* LCD Timing */
 		gb->counter.lcd_count += inst_cycles;
@@ -3594,6 +3613,7 @@ void gb_reset(struct gb_s *gb)
 	gb->counter.tima_count = 0;
 	gb->counter.serial_count = 0;
 	gb->counter.rtc_count = 0;
+	gb->counter.lcd_off_count = 0;
 
 	gb->direct.joypad = 0xFF;
 	gb->hram_io[IO_JOYP] = 0xCF;
@@ -3809,7 +3829,7 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 			     void *priv);
 
 /**
- * Executes the emulator and runs for one frame.
+ * Executes the emulator and runs for the duration of time equal to one frame.
  *
  * \param	An initialised emulator context. Must not be NULL.
  */
