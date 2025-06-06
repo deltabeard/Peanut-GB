@@ -1,17 +1,23 @@
-#include "minctest.h"
-
-#define ENABLE_SOUND 0
-#define ENABLE_LCD 1
-#include "../peanut_gb.h"
-
 #include <assert.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "dmg-acid2.gb.h" /* Generated via `xxd -i` */
+
+#include "minctest.h"
+
+uint8_t audio_read(uint16_t addr);
+void audio_write(uint16_t addr, uint8_t val);
+
+#define ENABLE_SOUND 1
+#define ENABLE_LCD 1
+#include "../peanut_gb.h"
+#include "../examples/sdl2/minigb_apu/minigb_apu.h"
 
 /* Hash of correct LCD output for DMG-Acid2 Test. */
 #define DMG_ACID2_HASH 0xF91DF416u
+
+static struct minigb_apu_ctx apu;
 
 struct priv
 {
@@ -23,6 +29,11 @@ struct priv
 struct acid_priv
 {
 	uint8_t fb[LCD_HEIGHT][LCD_WIDTH];
+};
+
+struct dmg_sound_priv
+{
+	uint8_t cart_ram[CRAM_BANK_SIZE];
 };
 
 /* FNV-1a 32-bit hashing function used to check the LCD output. */
@@ -49,6 +60,7 @@ static uint32_t fnv1a_hash(const void *data, size_t len)
 uint8_t gb_rom_read_cpu_instrs(struct gb_s *gb, const uint_fast32_t addr)
 {
 #include "cpu_instrs.h"
+	(void)gb;
 	assert(addr < cpu_instrs_gb_len);
 	return cpu_instrs_gb[addr];
 }
@@ -59,15 +71,25 @@ uint8_t gb_rom_read_cpu_instrs(struct gb_s *gb, const uint_fast32_t addr)
 uint8_t gb_rom_read_instr_timing(struct gb_s *gb, const uint_fast32_t addr)
 {
 #include "instr_timing.h"
+	(void)gb;
         assert(addr < instr_timing_gb_len);
         return instr_timing_gb[addr];
 }
 
 uint8_t gb_rom_read_acid(struct gb_s *gb, const uint_fast32_t addr)
 {
+#include "dmg-acid2.gb.h"
 	(void)gb;
 	assert(addr < dmg_acid2_gb_len);
 	return dmg_acid2_gb[addr];
+}
+
+uint8_t gb_rom_read_sound(struct gb_s *gb, const uint_fast32_t addr)
+{
+#include "dmg_sound.gb.h"
+        (void)gb;
+        assert(addr < dmg_sound_gb_len);
+        return dmg_sound_gb[addr];
 }
 
 /**
@@ -78,12 +100,25 @@ void gb_cart_ram_write(struct gb_s *gb, const uint_fast32_t addr, const uint8_t 
 	return;
 }
 
+void gb_cart_ram_write_apu(struct gb_s *gb, const uint_fast32_t addr, const uint8_t val)
+{
+	struct dmg_sound_priv *p = gb->direct.priv;
+	p->cart_ram[addr] = val;
+	return;
+}
+
 /**
  * Ignore cart RAM reads, since the test doesn't require it.
  */
 uint8_t gb_cart_ram_read(struct gb_s *gb, const uint_fast32_t addr)
 {
 	return 0xFF;
+}
+
+uint8_t gb_cart_ram_read_apu(struct gb_s *gb, const uint_fast32_t addr)
+{
+	struct dmg_sound_priv *p = gb->direct.priv;
+	return p->cart_ram[addr];
 }
 
 /**
@@ -206,10 +241,61 @@ void test_dmg_acid2(void)
 	}
 }
 
+uint8_t audio_read(uint16_t addr)
+{
+        return minigb_apu_audio_read(&apu, addr);
+}
+
+void audio_write(uint16_t addr, uint8_t val)
+{
+        minigb_apu_audio_write(&apu, addr, val);
+}
+
+void test_dmg_sound(void)
+{
+	struct gb_s gb;
+	struct dmg_sound_priv p = {0};
+	enum gb_init_error_e gb_err;
+	audio_sample_t audio_buf[AUDIO_SAMPLES_TOTAL];
+
+	gb_err = gb_init(&gb, &gb_rom_read_sound, &gb_cart_ram_read,
+			&gb_cart_ram_write, &gb_error, &p);
+	lok(gb_err == GB_INIT_NO_ERROR);
+	if(gb_err != GB_INIT_NO_ERROR)
+		return;
+
+	gb_init_serial(&gb, &gb_serial_tx, NULL);
+	minigb_apu_audio_init(&apu);
+
+	/* Run for at most 1 minute worth of frames. */
+	for(unsigned int i = 0; i < 3600; i++)
+	{
+		gb_run_frame(&gb);
+		minigb_apu_audio_callback(&apu, audio_buf);
+		if(p.cart_ram[0] != 0x80 &&
+				p.cart_ram[1] == 0xDE &&
+				p.cart_ram[2] == 0xB0 &&
+				p.cart_ram[3] == 0x61)
+			break;
+	}
+
+	if(p.cart_ram[1] == 0xDE && p.cart_ram[2] == 0xB0 && p.cart_ram[3] == 0x61)
+	{
+		printf("%s\n", &p.cart_ram[4]);
+		lok(p.cart_ram[0] == 0);
+	}
+	else
+	{
+		puts("dmg_sound output invalid or test didn't finish");
+		lok(0);
+	}
+}
+
 int main(void)
 {
 	lrun("cpu_inst blarrg tests    ", test_cpu_inst);
 	lrun("instr_timing blarrg tests", test_instr_timing);
-	lrun("dmg-acid2 lcd test     ", test_dmg_acid2);
+	lrun("dmg-acid2 PPU test       ", test_dmg_acid2);
+	lrun("dmg_sound APU test       ", test_dmg_sound);
 	return lfails != 0;
 }
