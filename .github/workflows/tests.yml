@@ -1,0 +1,39 @@
+name: tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches-ignore:
+      - '**pages**'
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build tests
+        run: make -C test
+      - name: Run tests
+        id: run_tests
+        run: |
+          set +e
+          ./test/test > test_output.txt 2>&1
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          echo 'output<<EOF' >> "$GITHUB_OUTPUT"
+          cat test_output.txt >> "$GITHUB_OUTPUT"
+          echo 'EOF' >> "$GITHUB_OUTPUT"
+      - name: Comment on failure
+        if: github.event_name == 'pull_request' && steps.run_tests.outputs.exit_code != '0'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const body = `Tests failed:\n\`\`\`\n${{ steps.run_tests.outputs.output }}\n\`\`\``;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
+            core.setFailed('Tests failed');
