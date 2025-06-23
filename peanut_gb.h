@@ -631,6 +631,8 @@ struct gb_s
 		 * nothing was drawn. */
 		bool gb_frame	: 1;
 		bool lcd_blank	: 1;
+		/* Set if MBC3O cart is used. */
+		bool cart_is_mbc3O : 1;
 	};
 
 	/* Cartridge information:
@@ -940,7 +942,9 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 		}
 		else if(gb->mbc == 3)
 		{
-			gb->selected_rom_bank = val & 0x7F;
+			gb->selected_rom_bank = val;
+			if(!gb->cart_is_mbc3O)
+				gb->selected_rom_bank = val & 0x7F;
 
 			if(!gb->selected_rom_bank)
 				gb->selected_rom_bank++;
@@ -960,7 +964,12 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 			gb->selected_rom_bank = gb->selected_rom_bank & gb->num_rom_banks_mask;
 		}
 		else if(gb->mbc == 3)
+		{
 			gb->cart_ram_bank = val;
+			if(!gb->cart_is_mbc3O)
+				gb->cart_ram_bank &= 0x3;
+		}
+
 		else if(gb->mbc == 5)
 			gb->cart_ram_bank = (val & 0x0F);
 
@@ -3718,6 +3727,11 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	gb->cart_ram = cart_ram[gb->gb_rom_read(gb, mbc_location)];
 	gb->num_rom_banks_mask = num_rom_banks_mask[gb->gb_rom_read(gb, bank_count_location)] - 1;
 	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(gb, ram_size_location)];
+
+	/* If MBC3 and number of ROM or RAM banks are larger than 128 or 8,
+	 * respectively, then select MBC3O mode. */
+	if(gb->mbc == 3)
+		gb->cart_is_mbc3O = gb->num_rom_banks_mask > 128 || gb->num_ram_banks > 4;
 
 	/* Note that MBC2 will appear to have no RAM banks, but it actually
 	 * always has 512 half-bytes of RAM. Hence, gb->num_ram_banks must be
