@@ -35,7 +35,9 @@ struct priv_t
 	uint8_t *rom;
 	/* Pointer to allocated memory holding save file. */
 	uint8_t *cart_ram;
-	/* Pointer to boot ROM binary. */
+	/* Size of the cart_ram in bytes. */
+	size_t save_size;
+	/* Pointer to boot ROM binary if available. */
 	uint8_t *bootrom;
 
 	/* Colour palette for each BG, OBJ0, and OBJ1. */
@@ -173,7 +175,7 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t addr
 	uint8_t instr_byte;
 
 	/* Record save file. */
-	write_cart_ram_file("recovery.sav", &priv->cart_ram, gb_get_save_size(gb));
+	write_cart_ram_file("recovery.sav", &priv->cart_ram, priv->save_size);
 
 	if(addr >= 0x4000 && addr < 0x8000)
 	{
@@ -695,7 +697,7 @@ int main(int argc, char **argv)
 					break;
 			}
 		} while(rom_file_name == NULL);
-			
+
 		break;
 
 	case 2:
@@ -828,7 +830,19 @@ int main(int argc, char **argv)
 	}
 
 	/* Load Save File. */
-	read_cart_ram_file(save_file_name, &priv.cart_ram, gb_get_save_size(&gb));
+	if(gb_get_save_size_s(&gb, &priv.save_size) < 0)
+	{
+		SDL_LogMessage(LOG_CATERGORY_PEANUTSDL,
+				SDL_LOG_PRIORITY_CRITICAL,
+				"Unable to get save size: %s",
+				SDL_GetError());
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	/* Only attempt to load a save file if the ROM actually supports saves.*/
+	if(priv.save_size > 0)
+		read_cart_ram_file(save_file_name, &priv.cart_ram, priv.save_size);
 
 	/* Set the RTC of the game cartridge. Only used by games that support it. */
 	{
@@ -1397,7 +1411,7 @@ int main(int argc, char **argv)
 #endif
 					write_cart_ram_file(save_file_name,
 						&priv.cart_ram,
-						gb_get_save_size(&gb));
+						priv.save_size);
 #if ENABLE_SOUND_BLARGG
 					SDL_UnlockAudioDevice(dev);
 #endif
@@ -1427,7 +1441,7 @@ quit:
 #endif
 
 	/* Record save file. */
-	write_cart_ram_file(save_file_name, &priv.cart_ram, gb_get_save_size(&gb));
+	write_cart_ram_file(save_file_name, &priv.cart_ram, priv.save_size);
 
 out:
 	SDL_free(priv.rom);
