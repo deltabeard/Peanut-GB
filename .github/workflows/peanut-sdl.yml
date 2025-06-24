@@ -39,13 +39,13 @@ jobs:
             nice-arch: "x86_64"
             nice-name: "Windows7"
 
-          - os: windows-2019
+          - os: windows-2022
             build_type: RelWithDebInfo
-            generator: "Visual Studio 16 2019"
+            generator: "Visual Studio 17 2022"
             arch: x86
-            additional-cmake-args: -T v141_xp -A Win32
+            additional-cmake-args: -T v142 -A Win32
             nice-arch: "i386"
-            nice-name: "WindowsXP"
+            nice-name: "Windows7"
 
     steps:
       - uses: actions/checkout@v4
