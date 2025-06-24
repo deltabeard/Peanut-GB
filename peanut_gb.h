@@ -3756,9 +3756,17 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 			return GB_INIT_CARTRIDGE_UNSUPPORTED;
 	}
 
-	gb->cart_ram = cart_ram[gb->gb_rom_read(gb, mbc_location)];
 	gb->num_rom_banks_mask = num_rom_banks_mask[gb->gb_rom_read(gb, bank_count_location)] - 1;
+	gb->cart_ram = cart_ram[gb->gb_rom_read(gb, mbc_location)];
 	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(gb, ram_size_location)];
+
+	/* If the ROM says that it support RAM, but has 0 RAM banks, then
+	 * disable RAM reads from the cartridge. */
+	if(gb->cart_ram == 0 || gb->num_ram_banks == 0)
+	{
+		gb->cart_ram = 0;
+		gb->num_ram_banks = 0;
+	}
 
 	/* If MBC3 and number of ROM or RAM banks are larger than 128 or 8,
 	 * respectively, then select MBC3O mode. */
