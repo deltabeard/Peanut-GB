@@ -3524,23 +3524,55 @@ void gb_run_frame(struct gb_s *gb)
 		__gb_step_cpu(gb);
 }
 
-/**
- * Gets the size of the save file required for the ROM.
- */
+int gb_get_save_size_s(struct gb_s *gb, size_t *ram_size)
+{
+	const uint_fast16_t ram_size_location = 0x0149;
+	const uint_fast32_t ram_sizes[] =
+	{
+		/* 0,  2KiB,   8KiB,  32KiB,  128KiB,   64KiB */
+		0x00, 0x800, 0x2000, 0x8000, 0x20000, 0x10000
+	};
+	uint8_t ram_size_code = gb->gb_rom_read(gb, ram_size_location);
+
+	/* MBC2 always has 512 half-bytes of cart RAM.
+	 * This assumes that only the lower nibble of each byte is used; the
+	 * nibbles are not packed. */
+	if(gb->mbc == 2)
+	{
+		*ram_size = 0x200;
+		return 0;
+	}
+
+	/* Return -1 on invalid or unsupported RAM size. */
+	if(ram_size_code >= PEANUT_GB_ARRAYSIZE(ram_sizes))
+		return -1;
+
+	*ram_size = ram_sizes[ram_size_code];
+	return 0;
+}
+
+PGB_DEPRECATED("Does not return error code. Use gb_get_save_size_s instead.")
 uint_fast32_t gb_get_save_size(struct gb_s *gb)
 {
 	const uint_fast16_t ram_size_location = 0x0149;
 	const uint_fast32_t ram_sizes[] =
 	{
-		0x00, 0x800, 0x2000, 0x8000, 0x20000
+		/* 0,  2KiB,   8KiB,  32KiB,  128KiB,   64KiB */
+		0x00, 0x800, 0x2000, 0x8000, 0x20000, 0x10000
 	};
-	uint8_t ram_size = gb->gb_rom_read(gb, ram_size_location);
+	uint8_t ram_size_code = gb->gb_rom_read(gb, ram_size_location);
 
-	/* MBC2 always has 512 half-bytes of cart RAM. */
+	/* MBC2 always has 512 half-bytes of cart RAM.
+	 * This assumes that only the lower nibble of each byte is used; the
+	 * nibbles are not packed. */
 	if(gb->mbc == 2)
 		return 0x200;
 
-	return ram_sizes[ram_size];
+	/* Return 0 on invalid or unsupported RAM size. */
+	if(ram_size_code >= PEANUT_GB_ARRAYSIZE(ram_sizes))
+		return 0;
+
+	return ram_sizes[ram_size_code];
 }
 
 void gb_init_serial(struct gb_s *gb,
@@ -3909,8 +3941,24 @@ void gb_init_serial(struct gb_s *gb,
  * frontend to allocate enough memory for the Cart RAM.
  *
  * \param gb	An initialised emulator context. Must not be NULL.
+ * \param ram_size Pointer to size_t variable that will be set to the size of
+ *		the Cart RAM in bytes. Must not be NULL.
+ *		If the Cart RAM is not battery backed, this will be set to 0.
+ *		If the Cart RAM size is invalid or unknown, this will not be
+ *		set.
+ * \returns	0 on success, or -1 if the RAM size is invalid or unknown.
+ */
+int gb_get_save_size_s(struct gb_s *gb, size_t *ram_size);
+
+/**
+ * Deprecated. Use gb_get_save_size_s() instead.
+ * Obtains the save size of the game (size of the Cart RAM). Required by the
+ * frontend to allocate enough memory for the Cart RAM.
+ *
+ * \param gb	An initialised emulator context. Must not be NULL.
  * \returns	Size of the Cart RAM in bytes. 0 if Cartridge has not battery
  *		backed RAM.
+ *		0 is also returned on invalid or unknown RAM size.
  */
 uint_fast32_t gb_get_save_size(struct gb_s *gb);
 
