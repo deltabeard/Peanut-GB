@@ -966,7 +966,10 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 		else if(gb->mbc == 3)
 		{
 			gb->cart_ram_bank = val;
-			if(!gb->cart_is_mbc3O)
+			/* If not using MBC3, only the first 4 cart RAM banks are useable.
+			 * If cart RAM bank 0x8-0xC are selected, then the corresponding
+			 * RTC register is selected instead of cart RAM. */
+			if(!gb->cart_is_mbc3O && gb->cart_ram_bank < 0x8)
 				gb->cart_ram_bank &= 0x3;
 		}
 
