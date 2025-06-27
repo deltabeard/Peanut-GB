@@ -3385,9 +3385,8 @@ void __gb_step_cpu(struct gb_s *gb)
 			gb->counter.lcd_count -= LCD_LINE_CYCLES;
 
 			/* Next line */
-			if (gb->hram_io[IO_LY] + 1 < LCD_VERT_LINES)
-				gb->hram_io[IO_LY] = gb->hram_io[IO_LY] + 1;
-			else
+			gb->hram_io[IO_LY] = gb->hram_io[IO_LY] + 1;
+			if (gb->hram_io[IO_LY] == LCD_VERT_LINES)
 				gb->hram_io[IO_LY] = 0;
 
 			/* LYC Update */
