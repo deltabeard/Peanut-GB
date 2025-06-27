@@ -44,7 +44,7 @@
 #include <stdlib.h>	/* Required for abort */
 #include <stdbool.h>	/* Required for bool types */
 #include <stdint.h>	/* Required for int types */
-#include <string.h>	/* Required for memset and memmove */
+#include <string.h>	/* Required for memset */
 #include <time.h>	/* Required for tm struct */
 
 /**
@@ -1675,11 +1675,9 @@ void __gb_draw_line(struct gb_s *gb)
 			}
 			if(place >= MAX_SPRITES_LINE)
 				continue;
-			memmove(
-				&sprites_to_render[place + 1],
-				&sprites_to_render[place],
-				(MAX_SPRITES_LINE - place - 1) * sizeof(current)
-			);
+			for (uint8_t i = number_of_sprites; i > place; --i) {
+				sprites_to_render[i] = sprites_to_render[i - 1];
+			}
 			if(number_of_sprites <= MAX_SPRITES_LINE)
 				number_of_sprites++;
 			sprites_to_render[place] = current;
