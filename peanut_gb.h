@@ -1680,7 +1680,7 @@ void __gb_draw_line(struct gb_s *gb)
 				&sprites_to_render[place],
 				(MAX_SPRITES_LINE - place - 1) * sizeof(current)
 			);
-			if(number_of_sprites <= MAX_SPRITES_LINE)
+			if(number_of_sprites < MAX_SPRITES_LINE)
 				number_of_sprites++;
 			sprites_to_render[place] = current;
 		}
