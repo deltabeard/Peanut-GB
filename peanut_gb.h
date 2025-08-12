@@ -1678,7 +1678,7 @@ void __gb_draw_line(struct gb_s *gb)
 			for (uint8_t i = number_of_sprites; i > place; --i) {
 				sprites_to_render[i] = sprites_to_render[i - 1];
 			}
-			if(number_of_sprites <= MAX_SPRITES_LINE)
+			if(number_of_sprites < MAX_SPRITES_LINE)
 				number_of_sprites++;
 			sprites_to_render[place] = current;
 		}
@@ -3421,7 +3421,9 @@ void __gb_step_cpu(struct gb_s *gb)
 			gb->counter.lcd_count -= LCD_LINE_CYCLES;
 
 			/* Next line */
-			gb->hram_io[IO_LY] = (gb->hram_io[IO_LY] + 1) % LCD_VERT_LINES;
+			gb->hram_io[IO_LY] = gb->hram_io[IO_LY] + 1;
+			if (gb->hram_io[IO_LY] == LCD_VERT_LINES)
+				gb->hram_io[IO_LY] = 0;
 
 			/* LYC Update */
 			if(gb->hram_io[IO_LY] == gb->hram_io[IO_LYC])
