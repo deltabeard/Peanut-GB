@@ -23,8 +23,6 @@
 #include <stdlib.h>
 #include <time.h>
 
-const uint_fast32_t frames_per_run = 64 * 1024;
-
 struct priv_t
 {
 	/* Pointer to allocated memory holding GB file. */
@@ -138,18 +136,22 @@ static void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
 
 int main(int argc, char **argv)
 {
-	/* Must be freed */
+	uint_fast32_t frames_per_run = 64 * 1024;
 	char *rom_file_name = NULL;
 
-	switch(argc)
-	{
-		case 2:
-			rom_file_name = argv[1];
-			break;
+	for(int i = 1; i < argc; i++) {
+		if(strcmp(argv[i], "--frames") == 0)
+			if (++i == argc)
+				frames_per_run = 0;
+			else
+				frames_per_run = atoi(argv[i]);
+		else
+			rom_file_name = argv[i];
+	}
 
-		default:
-			fprintf(stderr, "%s ROM\n", argv[0]);
-			exit(EXIT_FAILURE);
+	if(!rom_file_name || !frames_per_run) {
+		fprintf(stderr, "Syntax: %s [--frames <f>] <ROM>\n", argv[0]);
+		exit(EXIT_FAILURE);
 	}
 
 	for(unsigned int i = 0; i < 5; i++)
