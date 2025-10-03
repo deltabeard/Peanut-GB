@@ -125,11 +125,7 @@ static void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
 
 	for (unsigned int x = 0; x < LCD_WIDTH; x++)
 	{
-#if PEANUT_GB_16BIT_COLOUR
-		priv->fb[line][x] = palette[pixels[x] & 3];
-#else
-		priv->fb[line][x] = palette[pixels[x]];
-#endif
+		priv->fb[line][x] = palette[pixels[x] & LCD_COLOUR];
 	}
 }
 #endif
