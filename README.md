@@ -7,7 +7,6 @@ platform that has a C99 compiler.
 
 This emulator is *very fast*. So much so that it can run at
 [full speed on the Raspberry Pi Pico](https://github.com/deltabeard/RP2040-GB)!
-Check out [BENCHMARK.md](BENCHMARK.md) for benchmarks of Peanut-GB.
 
 Only the original Game Boy (DMG) is supported at this time, but preliminary work
 has been completed to support Game Boy Color
