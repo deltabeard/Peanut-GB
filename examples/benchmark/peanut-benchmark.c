@@ -159,6 +159,7 @@ int main(int argc, char **argv)
 		/* Start benchmark. */
 		struct gb_s gb;
 		struct priv_t priv;
+		size_t save_size;
 
 		clock_t start_time;
 		uint_fast32_t frames = 0;
@@ -183,7 +184,13 @@ int main(int argc, char **argv)
 		}
 
 		printf("Run %u: ", i);
-		priv.cart_ram = malloc(gb_get_save_size(&gb));
+		if(gb_get_save_size_s(&gb, &save_size) != 0)
+		{
+			fprintf(stderr, "Failed to get save size.\n");
+			exit(EXIT_FAILURE);
+		}
+
+		priv.cart_ram = malloc(save_size);
 
 #if ENABLE_LCD
 		gb_init_lcd(&gb, &lcd_draw_line);
