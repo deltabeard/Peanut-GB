@@ -14,16 +14,17 @@
 
 #include "SDL.h"
 
+#define PEANUT_GB_USE_NIBBLE_FOR_PALETTE 1
 #define ENABLE_LCD 1
 #define ENABLE_SOUND 0
 
 #include "../../peanut_gb.h"
 
-const uint16_t lcd_palette[3][4] =
+const uint16_t lcd_palette[4 * 4] =
 {
-	{ 0x7FFF, 0x5294, 0x294A, 0x0000 },
-	{ 0x7FFF, 0x5294, 0x294A, 0x0000 },
-	{ 0x7FFF, 0x5294, 0x294A, 0x0000 }
+	0x7FFF, 0x5294, 0x294A, 0x0000,
+	0x7FFF, 0x5294, 0x294A, 0x0000,
+	0x7FFF, 0x5294, 0x294A, 0x0000
 };
 
 struct priv_t
@@ -180,9 +181,7 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[160],
 
 	for(unsigned int x = 0; x < LCD_WIDTH; x++)
 	{
-		priv->fb[line][x] = lcd_palette
-				    [(pixels[x] & LCD_PALETTE_ALL) >> 4]
-				    [pixels[x] & 3];
+		priv->fb[line][x] = lcd_palette[pixels[x] & (LCD_COLOUR | LCD_PALETTE_ALL)];
 	}
 }
 #endif
