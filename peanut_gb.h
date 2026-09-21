@@ -1086,9 +1086,10 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 		/* Joypad */
 		case 0x00:
 			/* Only bits 5 and 4 are R/W.
-			 * The lower bits are overwritten later, and the two most
-			 * significant bits are unused. */
-			gb->hram_io[IO_JOYP] = val;
+			 * The lower bits are overwritten later.
+			 * The two most significant bits are unused,
+			 * but they must always be read as 1. */
+			gb->hram_io[IO_JOYP] = val | 0xC0;
 
 			/* Direction keys selected */
 			if((gb->hram_io[IO_JOYP] & 0x10) == 0)
