@@ -1645,7 +1645,7 @@ void __gb_draw_line(struct gb_s *gb)
 #if PEANUT_GB_HIGH_LCD_ACCURACY
 		uint8_t number_of_sprites = 0;
 
-		struct sprite_data sprites_to_render[MAX_SPRITES_LINE];
+		struct sprite_data sprites_to_render[MAX_SPRITES_LINE + 1];
 
 		/* Record number of sprites on the line being rendered, limited
 		 * to the maximum number sprites that the Game Boy is able to
